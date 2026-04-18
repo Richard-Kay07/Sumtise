@@ -24,7 +24,7 @@ import {
   BarChart3
 } from "lucide-react"
 import { Logo } from "@/components/logo"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell } from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell } from "recharts"
 
 // Sample data for charts
 const revenueData = [
@@ -259,7 +259,7 @@ export default function Dashboard() {
               <ResponsiveContainer width="100%" height={250}>
                 <RechartsPieChart>
                   <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                  <RechartsPieChart.Pie
+                  <Pie
                     data={expenseCategories}
                     cx="50%"
                     cy="50%"
@@ -271,7 +271,7 @@ export default function Dashboard() {
                     {expenseCategories.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
-                  </RechartsPieChart.Pie>
+                  </Pie>
                 </RechartsPieChart>
               </ResponsiveContainer>
             </CardContent>
