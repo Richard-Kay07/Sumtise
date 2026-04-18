@@ -1,0 +1,854 @@
+{
+  "info": {
+    "name": "Sumtise API Smoke Tests",
+    "description": "API smoke tests for Sumtise accounting platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "sumtise-api-tests"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "apiBase",
+      "value": "{{baseUrl}}/api/trpc",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "organizationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testUserId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Sign In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('authToken', jsonData.token || jsonData.accessToken || '');",
+                  "    pm.collectionVariables.set('testUserId', jsonData.user?.id || '');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/signin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "signin"]
+            }
+          }
+        },
+        {
+          "name": "Get Session",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/auth.getSession",
+              "host": ["{{apiBase}}"],
+              "path": ["auth.getSession"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Organizations",
+      "item": [
+        {
+          "name": "Get User Organizations",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "    ",
+                  "    if (jsonData.length > 0) {",
+                  "        pm.collectionVariables.set('organizationId', jsonData[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/organization.getUserOrganizations",
+              "host": ["{{apiBase}}"],
+              "path": ["organization.getUserOrganizations"]
+            }
+          }
+        },
+        {
+          "name": "Create Organization",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Organization\",\n  \"slug\": \"test-org\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/organization.create",
+              "host": ["{{apiBase}}"],
+              "path": ["organization.create"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chart of Accounts",
+      "item": [
+        {
+          "name": "Get All Accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/chartOfAccounts.getAll?organizationId={{organizationId}}",
+              "host": ["{{apiBase}}"],
+              "path": ["chartOfAccounts.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Get All Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/transactions.getAll?organizationId={{organizationId}}&page=1&limit=10",
+              "host": ["{{apiBase}}"],
+              "path": ["transactions.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationId}}\",\n  \"accountId\": \"account-id\",\n  \"date\": \"2024-01-15\",\n  \"description\": \"Test Transaction\",\n  \"debit\": 100.00,\n  \"credit\": 0.00,\n  \"currency\": \"GBP\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/transactions.create",
+              "host": ["{{apiBase}}"],
+              "path": ["transactions.create"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "Get All Customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/customers.getAll?organizationId={{organizationId}}&page=1&limit=10",
+              "host": ["{{apiBase}}"],
+              "path": ["customers.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationId}}\",\n  \"name\": \"Test Customer\",\n  \"email\": \"customer@example.com\",\n  \"phone\": \"+1234567890\",\n  \"address\": {\n    \"street\": \"123 Test St\",\n    \"city\": \"London\",\n    \"postcode\": \"SW1A 1AA\",\n    \"country\": \"UK\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/customers.create",
+              "host": ["{{apiBase}}"],
+              "path": ["customers.create"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vendors",
+      "item": [
+        {
+          "name": "Get All Vendors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/vendors.getAll?organizationId={{organizationId}}&page=1&limit=10",
+              "host": ["{{apiBase}}"],
+              "path": ["vendors.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Vendors with Filters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/vendors.getAll?organizationId={{organizationId}}&page=1&limit=10&name=Office&isActive=true&tags=office,supplies",
+              "host": ["{{apiBase}}"],
+              "path": ["vendors.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "name",
+                  "value": "Office"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true"
+                },
+                {
+                  "key": "tags",
+                  "value": "office,supplies"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Vendor by ID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Get first vendor ID from previous request",
+                  "const vendorsResponse = pm.collectionVariables.get('vendorsResponse');",
+                  "if (vendorsResponse) {",
+                  "    const vendors = JSON.parse(vendorsResponse);",
+                  "    if (vendors.vendors && vendors.vendors.length > 0) {",
+                  "        pm.collectionVariables.set('testVendorId', vendors.vendors[0].id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/vendors.getById?organizationId={{organizationId}}&id={{testVendorId}}",
+              "host": ["{{apiBase}}"],
+              "path": ["vendors.getById"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                },
+                {
+                  "key": "id",
+                  "value": "{{testVendorId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Vendor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Vendor created successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('name');",
+                  "    pm.collectionVariables.set('testVendorId', jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationId}}\",\n  \"name\": \"Test Vendor Ltd\",\n  \"alias\": \"TestVendor\",\n  \"email\": \"vendor@example.com\",\n  \"phone\": \"+44 20 1234 5678\",\n  \"address\": {\n    \"street\": \"123 Vendor St\",\n    \"city\": \"London\",\n    \"postcode\": \"SW1A 1AA\",\n    \"country\": \"United Kingdom\"\n  },\n  \"taxId\": \"GB123456789\",\n  \"paymentTerms\": 30,\n  \"currency\": \"GBP\",\n  \"taxScheme\": \"VAT_STANDARD\",\n  \"tags\": [\"test\", \"vendor\"]\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/vendors.create",
+              "host": ["{{apiBase}}"],
+              "path": ["vendors.create"]
+            }
+          }
+        },
+        {
+          "name": "Update Vendor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{testVendorId}}\",\n  \"organizationId\": \"{{organizationId}}\",\n  \"data\": {\n    \"phone\": \"+44 20 9876 5432\",\n    \"paymentTerms\": 45\n  }\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/vendors.update",
+              "host": ["{{apiBase}}"],
+              "path": ["vendors.update"]
+            }
+          }
+        },
+        {
+          "name": "Delete Vendor (Soft Delete)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{testVendorId}}\",\n  \"organizationId\": \"{{organizationId}}\",\n  \"force\": false\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/vendors.delete",
+              "host": ["{{apiBase}}"],
+              "path": ["vendors.delete"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bills",
+      "item": [
+        {
+          "name": "Get All Bills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/bills.getAll?organizationId={{organizationId}}&page=1&limit=10",
+              "host": ["{{apiBase}}"],
+              "path": ["bills.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Bills with Filters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/bills.getAll?organizationId={{organizationId}}&page=1&limit=10&status=APPROVED&vendorId={{testVendorId}}&currency=GBP",
+              "host": ["{{apiBase}}"],
+              "path": ["bills.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "APPROVED"
+                },
+                {
+                  "key": "vendorId",
+                  "value": "{{testVendorId}}"
+                },
+                {
+                  "key": "currency",
+                  "value": "GBP"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Bill by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/bills.getById?organizationId={{organizationId}}&id={{testBillId}}",
+              "host": ["{{apiBase}}"],
+              "path": ["bills.getById"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                },
+                {
+                  "key": "id",
+                  "value": "{{testBillId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Bill",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Bill created successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result?.data).to.have.property('id');",
+                  "    pm.expect(jsonData.result?.data).to.have.property('billNumber');",
+                  "    pm.collectionVariables.set('testBillId', jsonData.result?.data.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationId}}\",\n  \"vendorId\": \"{{testVendorId}}\",\n  \"billNumber\": \"BILL-TEST-{{$timestamp}}\",\n  \"date\": \"2024-01-15\",\n  \"dueDate\": \"2024-02-15\",\n  \"currency\": \"GBP\",\n  \"notes\": \"Test bill\",\n  \"tags\": [\"test\"],\n  \"items\": [\n    {\n      \"description\": \"Office Supplies\",\n      \"quantity\": 10,\n      \"unitPrice\": 25.00,\n      \"taxRate\": 20.00,\n      \"accountId\": \"{{expenseAccountId}}\",\n      \"lineMemo\": \"Test line item\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/bills.create",
+              "host": ["{{apiBase}}"],
+              "path": ["bills.create"]
+            }
+          }
+        },
+        {
+          "name": "Approve Bill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{testBillId}}\",\n  \"organizationId\": \"{{organizationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/bills.approve",
+              "host": ["{{apiBase}}"],
+              "path": ["bills.approve"]
+            }
+          }
+        },
+        {
+          "name": "Get Outstanding Bills for Payment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/bills.getOutstandingForPayment?organizationId={{organizationId}}",
+              "host": ["{{apiBase}}"],
+              "path": ["bills.getOutstandingForPayment"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark Bill as Paid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{testBillId}}\",\n  \"organizationId\": \"{{organizationId}}\",\n  \"paymentId\": \"{{testPaymentId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/bills.markAsPaid",
+              "host": ["{{apiBase}}"],
+              "path": ["bills.markAsPaid"]
+            }
+          }
+        },
+        {
+          "name": "Delete Bill (Soft Delete)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{testBillId}}\",\n  \"organizationId\": \"{{organizationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/bills.delete",
+              "host": ["{{apiBase}}"],
+              "path": ["bills.delete"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "Get All Invoices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/invoices.getAll?organizationId={{organizationId}}&page=1&limit=10",
+              "host": ["{{apiBase}}"],
+              "path": ["invoices.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationId}}\",\n  \"customerId\": \"customer-id\",\n  \"date\": \"2024-01-15\",\n  \"dueDate\": \"2024-02-15\",\n  \"items\": [\n    {\n      \"description\": \"Test Item\",\n      \"quantity\": 1,\n      \"unitPrice\": 100.00,\n      \"taxRate\": 20.00\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{apiBase}}/invoices.create",
+              "host": ["{{apiBase}}"],
+              "path": ["invoices.create"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bank Accounts",
+      "item": [
+        {
+          "name": "Get All Bank Accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/bankAccounts.getAll?organizationId={{organizationId}}",
+              "host": ["{{apiBase}}"],
+              "path": ["bankAccounts.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/dashboard.getStats?organizationId={{organizationId}}",
+              "host": ["{{apiBase}}"],
+              "path": ["dashboard.getStats"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Security Tests",
+      "item": [
+        {
+          "name": "Unauthenticated Request",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('authToken', '');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/invoices.getAll?organizationId={{organizationId}}",
+              "host": ["{{apiBase}}"],
+              "path": ["invoices.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organizationId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Unauthorized Organization",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBase}}/invoices.getAll?organizationId=unauthorized-org-id",
+              "host": ["{{apiBase}}"],
+              "path": ["invoices.getAll"],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "unauthorized-org-id"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+

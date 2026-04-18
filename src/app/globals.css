@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 220 25% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 10%;
+    /* Sumtise brand blue: #50B0E0 */
+    --primary: 199 75% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 95%;
+    --secondary-foreground: 220 25% 10%;
+    --muted: 220 15% 95%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 199 75% 95%;
+    --accent-foreground: 199 75% 40%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 15% 90%;
+    --input: 220 15% 90%;
+    --ring: 199 75% 60%;
+    /* Increased radius for modern rounded look */
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* Sumtise dark background: #1A1D24 */
+    --background: 220 25% 10%;
+    --foreground: 210 40% 98%;
+    --card: 220 25% 12%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 25% 12%;
+    --popover-foreground: 210 40% 98%;
+    /* Sumtise brand blue: #50B0E0 */
+    --primary: 199 75% 60%;
+    --primary-foreground: 220 25% 10%;
+    --secondary: 220 25% 15%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 220 25% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 199 75% 20%;
+    --accent-foreground: 199 75% 80%;
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 25% 20%;
+    --input: 220 25% 20%;
+    --ring: 199 75% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
