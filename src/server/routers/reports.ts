@@ -9,7 +9,7 @@
  */
 
 import { z } from "zod"
-import { createTRPCRouter, orgScopedProcedure, requirePermissionProcedure } from "../trpc"
+import { createTRPCRouter, orgScopedProcedure, requirePermissionProcedure } from "@/lib/trpc"
 import { Permission } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { Decimal } from "decimal.js"
