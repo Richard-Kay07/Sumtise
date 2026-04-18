@@ -1,4 +1,5 @@
 # Sumtise - Modern Accounting Software for SMEs
+<!-- Trigger rebuild with NEXT_PUBLIC_APP_URL -->
 
 Sumtise is a comprehensive, full-stack accounting software application designed specifically for Small and Medium Enterprises (SMEs) in UK and African markets. Built with modern technologies and AI-powered features, it provides a complete solution for financial management, invoicing, expense tracking, and compliance.
 
