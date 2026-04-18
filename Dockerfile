@@ -35,6 +35,7 @@ RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
+COPY start.sh ./start.sh
 
 # Copy full node_modules so prisma CLI has all its wasm/binary files
 COPY --from=builder /app/node_modules ./node_modules
@@ -42,6 +43,7 @@ COPY --from=builder /app/node_modules ./node_modules
 # Set the correct permission for prerender cache
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
+RUN chmod +x start.sh
 
 # Automatically leverage output traces to reduce image size
 # standalone output overwrites only what it needs inside node_modules
@@ -55,4 +57,4 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["sh", "start.sh"]
