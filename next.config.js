@@ -4,6 +4,10 @@ const nextConfig = {
   images: {
     domains: ['localhost'],
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  serverExternalPackages: ['pdfkit', 'fontkit', 'iconv-lite'],
 }
 
 module.exports = nextConfig

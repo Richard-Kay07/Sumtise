@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { trpc } from "@/lib/trpc-client"
+import { Logo } from "@/components/logo"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { 
   CreditCard, 

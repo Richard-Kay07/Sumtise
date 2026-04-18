@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { FileText, ReceiptPlus, Edit, FileX, Banknote } from "lucide-react"
+import { FileText, Receipt, Edit, FileX, Banknote } from "lucide-react"
 
 interface ExpensesLayoutProps {
   children: React.ReactNode
@@ -12,7 +12,7 @@ interface ExpensesLayoutProps {
 
 const subNavigation = [
   { name: "View Expenses", href: "/expenses", icon: FileText, exact: true },
-  { name: "Create Expense", href: "/expenses/new", icon: ReceiptPlus },
+  { name: "Create Expense", href: "/expenses/new", icon: Receipt },
   { name: "Amend Expense", href: "/expenses/amend", icon: Edit },
   { name: "Debit Notes", href: "/expenses/debit-note", icon: FileX },
   { name: "Payment Run", href: "/expenses/payment-run", icon: Banknote },

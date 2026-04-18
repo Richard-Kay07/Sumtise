@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { trpc } from "@/lib/trpc-client"
+import { Logo } from "@/components/logo"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { 
   Plus, 
