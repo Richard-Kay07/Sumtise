@@ -86,7 +86,7 @@ model Organization {
   email       String?
   phone       String?
   address     Json?
-  settings    Json?
+  metadata    Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
