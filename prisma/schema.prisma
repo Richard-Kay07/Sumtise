@@ -123,6 +123,11 @@ model Organization {
   timesheets  Timesheet[]
   pensionContributions PensionContribution[]
   taxSubmissions TaxSubmission[]
+  bankTransactions     BankTransaction[]
+  bankStatementImports BankStatementImport[]
+  reconciliations      Reconciliation[]
+  reconciliationLines  ReconciliationLine[]
+  payrollEntries       PayrollEntry[]
 
   @@map("organizations")
 }
@@ -167,6 +172,7 @@ model ChartOfAccount {
   children     ChartOfAccount[] @relation("AccountHierarchy")
   transactions Transaction[]
   billItems    BillItem[]
+  vendors      Vendor[] @relation("VendorExpenseAccount")
 
   @@unique([organizationId, code])
   @@map("chart_of_accounts")
