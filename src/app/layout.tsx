@@ -3,8 +3,9 @@ export const dynamic = 'force-dynamic'
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ClerkProvider, SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
+import { ClerkProvider } from "@clerk/nextjs"
 import { Providers } from "@/components/providers"
+import { Nav } from "@/components/nav"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -20,26 +21,49 @@ export const metadata: Metadata = {
   },
 }
 
+const clerkAppearance = {
+  variables: {
+    colorPrimary: "#50B0E0",
+    colorBackground: "#ffffff",
+    colorText: "#1A1D24",
+    colorInputBackground: "#f9fafb",
+    colorInputText: "#1A1D24",
+    borderRadius: "0.75rem",
+    fontFamily: "Inter, system-ui, sans-serif",
+  },
+  elements: {
+    card: "shadow-xl border border-gray-100 rounded-2xl",
+    headerTitle: "text-2xl font-bold text-[#1A1D24]",
+    headerSubtitle: "text-gray-500",
+    formButtonPrimary:
+      "bg-[#50B0E0] hover:bg-[#3a9fd0] text-white font-semibold rounded-xl transition-colors",
+    formFieldInput:
+      "border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#50B0E0] focus:border-[#50B0E0]",
+    footerActionLink: "text-[#50B0E0] hover:text-[#3a9fd0] font-medium",
+    identityPreviewEditButton: "text-[#50B0E0]",
+    logoImage: "rounded-xl",
+    dividerLine: "bg-gray-200",
+    dividerText: "text-gray-400 text-xs",
+    socialButtonsBlockButton:
+      "border border-gray-200 rounded-xl hover:bg-[#50B0E0]/5 hover:border-[#50B0E0] transition-colors",
+    socialButtonsBlockButtonText: "font-medium text-gray-700",
+  },
+}
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider appearance={clerkAppearance}>
       <html lang="en" suppressHydrationWarning>
         <body className={inter.className}>
-          <header className="flex justify-end p-4 gap-2">
-            <SignedOut>
-              <SignInButton />
-              <SignUpButton />
-            </SignedOut>
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-          </header>
           <Providers>
-            {children}
+            <Nav />
+            <div className="pt-14">
+              {children}
+            </div>
           </Providers>
         </body>
       </html>

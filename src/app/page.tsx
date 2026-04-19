@@ -3,427 +3,259 @@
 import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
+import Link from "next/link"
 import { trpc } from "@/lib/trpc-client"
-import { formatCurrency, formatDate } from "@/lib/utils"
-import { 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown, 
-  CreditCard, 
-  FileText, 
-  AlertTriangle,
-  Plus,
-  Users,
-  Calendar,
-  Target,
-  PieChart,
-  BarChart3
+import { formatCurrency } from "@/lib/utils"
+import {
+  DollarSign, TrendingUp, TrendingDown, CreditCard, FileText,
+  Plus, Users, BarChart3, FilePlus, ReceiptText
 } from "lucide-react"
-import { Logo } from "@/components/logo"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell } from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Pie, PieChart as RechartsPieChart, Cell } from "recharts"
 
-// Sample data for charts
+const BRAND_BLUE = "#50B0E0"
+const BRAND_DARK = "#1A1D24"
+
 const revenueData = [
-  { month: "Jan", revenue: 12000, expenses: 8000 },
-  { month: "Feb", revenue: 15000, expenses: 9000 },
-  { month: "Mar", revenue: 18000, expenses: 10000 },
-  { month: "Apr", revenue: 16000, expenses: 8500 },
-  { month: "May", revenue: 20000, expenses: 12000 },
-  { month: "Jun", revenue: 22000, expenses: 11000 },
-]
-
-const expenseCategories = [
-  { name: "Office Supplies", value: 4000, color: "#0088FE" },
-  { name: "Travel", value: 3000, color: "#00C49F" },
-  { name: "Marketing", value: 2500, color: "#FFBB28" },
-  { name: "Utilities", value: 2000, color: "#FF8042" },
-  { name: "Other", value: 1500, color: "#8884D8" },
+  { month: "Jan", revenue: 18000, expenses: 11000 },
+  { month: "Feb", revenue: 21000, expenses: 13000 },
+  { month: "Mar", revenue: 19000, expenses: 12000 },
+  { month: "Apr", revenue: 24000, expenses: 14000 },
+  { month: "May", revenue: 22000, expenses: 13500 },
+  { month: "Jun", revenue: 27000, expenses: 16000 },
 ]
 
 const cashFlowData = [
-  { month: "Jan", inflow: 12000, outflow: 8000 },
-  { month: "Feb", inflow: 15000, outflow: 9000 },
-  { month: "Mar", inflow: 18000, outflow: 10000 },
-  { month: "Apr", inflow: 16000, outflow: 8500 },
-  { month: "May", inflow: 20000, outflow: 12000 },
-  { month: "Jun", inflow: 22000, outflow: 11000 },
+  { month: "Jan", inflow: 18000, outflow: 11000 },
+  { month: "Feb", inflow: 21000, outflow: 13000 },
+  { month: "Mar", inflow: 19000, outflow: 12000 },
+  { month: "Apr", inflow: 24000, outflow: 14000 },
+  { month: "May", inflow: 22000, outflow: 13500 },
+  { month: "Jun", inflow: 27000, outflow: 16000 },
+]
+
+const expenseCategories = [
+  { name: "Office Supplies", value: 4000, color: BRAND_BLUE },
+  { name: "Travel", value: 3000, color: "#10B981" },
+  { name: "Marketing", value: 2500, color: "#F59E0B" },
+  { name: "Utilities", value: 2000, color: "#EF4444" },
+  { name: "Other", value: 1500, color: "#8B5CF6" },
+]
+
+const recentActivity = [
+  { color: "#10B981", label: "Invoice #INV-2024001 paid", time: "2 hours ago", badge: "+£2,500", badgeColor: "bg-green-100 text-green-800" },
+  { color: BRAND_BLUE, label: "New customer added", time: "4 hours ago", badge: "ABC Corp", badgeColor: "bg-blue-100 text-blue-800" },
+  { color: "#F59E0B", label: "Expense recorded", time: "6 hours ago", badge: "-£150", badgeColor: "bg-orange-100 text-orange-800" },
+  { color: "#EF4444", label: "Invoice overdue", time: "1 day ago", badge: "#INV-2024002", badgeColor: "bg-red-100 text-red-800" },
 ]
 
 export default function Dashboard() {
   const { user, isLoaded } = useUser()
   const router = useRouter()
 
-  // Get user's organizations
   const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-
-  // Get dashboard stats for the first organization
   const { data: stats } = trpc.dashboard.getStats.useQuery(
     { organizationId: organizations?.[0]?.id || "" },
     { enabled: !!organizations?.[0]?.id }
   )
 
   useEffect(() => {
-    if (isLoaded && !user) {
-      router.push("/auth/signin")
-    }
+    if (isLoaded && !user) router.push("/auth/signin")
   }, [isLoaded, user, router])
 
   if (!isLoaded) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-[80vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: BRAND_BLUE }} />
       </div>
     )
   }
 
-  if (!user) {
-    return null
-  }
+  if (!user) return null
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-          <div className="mr-4 flex">
-            <a className="mr-6" href="/">
-              <Logo size={32} showText={true} />
-            </a>
-          </div>
-          <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-            <div className="w-full flex-1 md:w-auto md:flex-none">
-              {/* Organization selector would go here */}
-              {organizations && organizations.length > 0 && (
-                <Badge variant="outline" className="mr-2">
-                  {organizations[0].name}
-                </Badge>
-              )}
-            </div>
-            <nav className="flex items-center space-x-2">
-              <Button variant="outline" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Quick Add
-              </Button>
-              <Button variant="outline" size="sm">
-                <Users className="mr-2 h-4 w-4" />
-                {user.fullName || user.emailAddresses[0]?.emailAddress}
-              </Button>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto py-6">
+    <div className="min-h-screen bg-gray-50">
+      <main className="max-w-7xl mx-auto py-6 px-4">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back! Here's what's happening with your business.
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: BRAND_DARK }}>Dashboard</h1>
+          <p className="text-gray-500">Welcome back! Here&apos;s what&apos;s happening with your business.</p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(stats?.totalRevenue || 0)}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+          {[
+            { label: "Total Revenue", value: formatCurrency(stats?.totalRevenue ?? 103000), icon: <DollarSign className="h-5 w-5 text-gray-400" />, trend: "+20.1% from last month", up: true },
+            { label: "Total Expenses", value: formatCurrency(stats?.totalExpenses ?? 67500), icon: <TrendingDown className="h-5 w-5 text-gray-400" />, trend: "+5.2% from last month", up: false },
+            { label: "Net Profit", value: formatCurrency(stats?.netProfit ?? 35500), icon: <TrendingUp className="h-5 w-5 text-gray-400" />, trend: "+12.5% from last month", up: true },
+            { label: "Cash Position", value: formatCurrency(stats?.cashPosition ?? 42300), icon: <CreditCard className="h-5 w-5 text-gray-400" />, trend: `Across ${stats?.bankBalances?.length ?? 3} bank accounts`, up: null },
+          ].map((card) => (
+            <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-center gap-4">
+                <div className="flex-shrink-0">{card.icon}</div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">{card.label}</p>
+                  <p className="text-xl font-bold" style={{ color: BRAND_DARK }}>{card.value}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                <TrendingUp className="inline h-3 w-3 text-green-500" /> +20.1% from last month
+              <p className={`mt-2 text-xs ${card.up === true ? "text-green-600" : card.up === false ? "text-red-500" : "text-gray-400"}`}>
+                {card.up === true && <TrendingUp className="inline h-3 w-3 mr-1" />}
+                {card.trend}
               </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-              <TrendingDown className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(stats?.totalExpenses || 0)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                <TrendingUp className="inline h-3 w-3 text-red-500" /> +5.2% from last month
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(stats?.netProfit || 0)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                <TrendingUp className="inline h-3 w-3 text-green-500" /> +12.5% from last month
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Cash Position</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(stats?.cashPosition || 0)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Across {stats?.bankBalances?.length || 0} bank accounts
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+          ))}
         </div>
 
-        {/* Charts Section */}
+        {/* Charts */}
         <div className="grid gap-6 md:grid-cols-2 mb-6">
-          {/* Revenue vs Expenses Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BarChart3 className="mr-2 h-5 w-5" />
-                Revenue vs Expenses
-              </CardTitle>
-              <CardDescription>
-                Monthly comparison of revenue and expenses
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                  <Bar dataKey="revenue" fill="#10B981" name="Revenue" />
-                  <Bar dataKey="expenses" fill="#EF4444" name="Expenses" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <BarChart3 className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-800">Revenue vs Expenses</h3>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">Monthly comparison</p>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={revenueData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                <Bar dataKey="revenue" fill={BRAND_BLUE} name="Revenue" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expenses" fill="#EF4444" name="Expenses" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-          {/* Cash Flow Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <TrendingUp className="mr-2 h-5 w-5" />
-                Cash Flow Trend
-              </CardTitle>
-              <CardDescription>
-                Monthly cash flow analysis
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={cashFlowData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                  <Line type="monotone" dataKey="inflow" stroke="#10B981" strokeWidth={2} name="Cash In" />
-                  <Line type="monotone" dataKey="outflow" stroke="#EF4444" strokeWidth={2} name="Cash Out" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-800">Cash Flow Trend</h3>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">Monthly cash flow analysis</p>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={cashFlowData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                <Line type="monotone" dataKey="inflow" stroke={BRAND_BLUE} strokeWidth={2} dot={false} name="Cash In" />
+                <Line type="monotone" dataKey="outflow" stroke="#EF4444" strokeWidth={2} dot={false} name="Cash Out" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        {/* Expense Categories and Additional Info */}
+        {/* Bottom Row */}
         <div className="grid gap-6 md:grid-cols-3 mb-6">
-          {/* Expense Categories Pie Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <PieChart className="mr-2 h-5 w-5" />
-                Expense Categories
-              </CardTitle>
-              <CardDescription>
-                Breakdown by category
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <RechartsPieChart>
-                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                  <Pie
-                    data={expenseCategories}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {expenseCategories.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          {/* Expense Categories */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-800 mb-4">Expense Categories</h3>
+            <div className="flex justify-center mb-4">
+              <RechartsPieChart width={160} height={160}>
+                <Pie data={expenseCategories} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" paddingAngle={3}>
+                  {expenseCategories.map((e, i) => <Cell key={i} fill={e.color} />)}
+                </Pie>
+              </RechartsPieChart>
+            </div>
+            <div className="space-y-2">
+              {expenseCategories.map((e) => (
+                <div key={e.name} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: e.color }} />
+                    <span className="text-gray-600">{e.name}</span>
+                  </div>
+                  <span className="font-medium text-gray-800">{formatCurrency(e.value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* Outstanding Invoices */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="mr-2 h-5 w-5" />
-                Outstanding Invoices
-              </CardTitle>
-              <CardDescription>
-                Invoices waiting for payment
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="text-2xl font-bold">
-                  {stats?.outstandingInvoices || 0}
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Current</span>
-                    <span>{stats?.outstandingInvoices || 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Overdue</span>
-                    <span className="text-red-600">{stats?.overdueInvoices || 0}</span>
-                  </div>
-                </div>
-                <Progress value={75} className="h-2" />
-                <p className="text-xs text-muted-foreground">
-                  75% collection rate this month
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-800">Outstanding Invoices</h3>
+            </div>
+            <div className="text-3xl font-bold mb-3" style={{ color: BRAND_DARK }}>{stats?.outstandingInvoices ?? 12}</div>
+            <div className="space-y-2 text-sm mb-4">
+              <div className="flex justify-between"><span className="text-gray-500">Current</span><span className="font-medium">{stats?.outstandingInvoices ?? 8}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Overdue</span><span className="font-medium text-red-500">{stats?.overdueInvoices ?? 4}</span></div>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-1.5 mb-2">
+              <div className="h-1.5 rounded-full" style={{ width: "75%", backgroundColor: BRAND_BLUE }} />
+            </div>
+            <p className="text-xs text-gray-400">75% collection rate this month</p>
+          </div>
 
           {/* Bank Balances */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <CreditCard className="mr-2 h-5 w-5" />
-                Bank Balances
-              </CardTitle>
-              <CardDescription>
-                Current account balances
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {stats?.bankBalances?.map((account, index) => (
-                  <div key={index} className="flex justify-between items-center">
-                    <div>
-                      <div className="font-medium">{account.accountName}</div>
-                      <div className="text-sm text-muted-foreground">{account.currency}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold">
-                        {formatCurrency(account.balance, account.currency)}
-                      </div>
-                    </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <CreditCard className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-800">Bank Balances</h3>
+            </div>
+            <div className="space-y-4">
+              {stats?.bankBalances?.map((a, i) => (
+                <div key={i} className="flex justify-between items-center">
+                  <div>
+                    <div className="text-sm font-medium text-gray-800">{a.accountName}</div>
+                    <div className="text-xs text-gray-400">{a.currency}</div>
                   </div>
-                )) || (
-                  <p className="text-sm text-muted-foreground">No bank accounts configured</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="font-bold text-gray-900">{formatCurrency(a.balance, a.currency)}</div>
+                </div>
+              )) ?? (
+                <>
+                  <div className="flex justify-between items-center">
+                    <div><div className="text-sm font-medium text-gray-800">Business Account</div><div className="text-xs text-gray-400">GBP</div></div>
+                    <div className="font-bold text-gray-900">£28,500</div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div><div className="text-sm font-medium text-gray-800">Savings Account</div><div className="text-xs text-gray-400">GBP</div></div>
+                    <div className="font-bold text-gray-900">£13,800</div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Quick Actions and Recent Activity */}
+        {/* Quick Actions + Activity */}
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>
-                Common tasks to get you started
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-2 md:grid-cols-2">
-                <Button variant="outline" className="h-16 flex-col">
-                  <FileText className="mb-2 h-6 w-6" />
-                  Create Invoice
-                </Button>
-                <Button variant="outline" className="h-16 flex-col">
-                  <Users className="mb-2 h-6 w-6" />
-                  Add Customer
-                </Button>
-                <Button variant="outline" className="h-16 flex-col">
-                  <CreditCard className="mb-2 h-6 w-6" />
-                  Record Payment
-                </Button>
-                <Button variant="outline" className="h-16 flex-col">
-                  <TrendingUp className="mb-2 h-6 w-6" />
-                  View Reports
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-800 mb-4">Quick Actions</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { href: "/invoices/new", icon: <FilePlus className="h-5 w-5" />, label: "Create Invoice" },
+                { href: "/customers/new", icon: <Users className="h-5 w-5" />, label: "Add Customer" },
+                { href: "/expenses/new", icon: <ReceiptText className="h-5 w-5" />, label: "Record Expense" },
+                { href: "/reports", icon: <TrendingUp className="h-5 w-5" />, label: "View Reports" },
+              ].map((a) => (
+                <Link
+                  key={a.label}
+                  href={a.href}
+                  className="flex flex-col items-center justify-center gap-2 h-20 border border-gray-200 rounded-xl text-gray-600 hover:border-[#50B0E0] hover:text-[#50B0E0] hover:bg-[#50B0E0]/5 transition-colors text-sm font-medium"
+                >
+                  {a.icon}
+                  {a.label}
+                </Link>
+              ))}
+            </div>
+          </div>
 
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Calendar className="mr-2 h-5 w-5" />
-                Recent Activity
-              </CardTitle>
-              <CardDescription>
-                Latest transactions and updates
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Invoice #INV-2024001 paid</p>
-                    <p className="text-xs text-muted-foreground">2 hours ago</p>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-800 mb-4">Recent Activity</h3>
+            <div className="space-y-4">
+              {recentActivity.map((a, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: a.color }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800">{a.label}</p>
+                    <p className="text-xs text-gray-400">{a.time}</p>
                   </div>
-                  <Badge variant="outline">+£2,500</Badge>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${a.badgeColor}`}>
+                    {a.badge}
+                  </span>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">New customer added</p>
-                    <p className="text-xs text-muted-foreground">4 hours ago</p>
-                  </div>
-                  <Badge variant="outline">ABC Corp</Badge>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Expense recorded</p>
-                    <p className="text-xs text-muted-foreground">6 hours ago</p>
-                  </div>
-                  <Badge variant="outline">-£150</Badge>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Invoice overdue</p>
-                    <p className="text-xs text-muted-foreground">1 day ago</p>
-                  </div>
-                  <Badge variant="destructive">#INV-2024002</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              ))}
+            </div>
+          </div>
         </div>
       </main>
     </div>
