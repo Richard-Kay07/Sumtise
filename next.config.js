@@ -11,7 +11,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
-    serverComponentsExternalPackages: ['pdfkit', 'fontkit', 'iconv-lite'],
+    serverComponentsExternalPackages: ['pdfkit', 'fontkit', 'iconv-lite', '@prisma/client', 'prisma'],
   },
 }
 

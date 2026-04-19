@@ -12,7 +12,7 @@ import { createTRPCRouter, orgScopedProcedure, requirePermissionProcedure } from
 import { Permission } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { TRPCError } from "@trpc/server"
-import { Decimal } from "@prisma/client/runtime/library"
+import Decimal from "decimal.js"
 
 export const payrollRouter = createTRPCRouter({
   /**
