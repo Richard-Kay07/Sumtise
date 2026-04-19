@@ -26,9 +26,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <ClerkProvider>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className={inter.className}>
           <header className="flex justify-end p-4 gap-2">
             <Show when="signed-out">
               <SignInButton />
@@ -41,8 +41,8 @@ export default function RootLayout({
           <Providers>
             {children}
           </Providers>
-        </ClerkProvider>
-      </body>
-    </html>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }
