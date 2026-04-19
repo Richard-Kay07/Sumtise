@@ -186,6 +186,16 @@ export const invoiceSchema = z.object({
   updatedAt: z.date(),
 })
 
+// File attachment schema (defined here so it can be used in invoice and bill schemas below)
+export const fileAttachmentSchema = z.object({
+  fileId: z.string(),
+  fileName: z.string(),
+  fileSize: z.number(),
+  contentType: z.string(),
+  uploadedAt: z.date(),
+  uploaderId: z.string(),
+})
+
 export const createInvoiceSchema = z.object({
   customerId: z.string(),
   date: z.date(),
@@ -197,7 +207,7 @@ export const createInvoiceSchema = z.object({
     unitPrice: z.number().min(0),
     taxRate: z.number().min(0).max(100).default(0),
   })),
-  attachments: z.array(fileAttachmentSchema).optional(), // File attachments
+  attachments: z.array(fileAttachmentSchema).optional(),
 })
 
 export const invoiceItemSchema = z.object({
@@ -303,15 +313,6 @@ export const createBillItemSchema = z.object({
   trackingCodes: z.any().optional(), // Project codes, cost centers, etc.
 })
 
-// File attachment schema
-export const fileAttachmentSchema = z.object({
-  fileId: z.string(),
-  fileName: z.string(),
-  fileSize: z.number(),
-  contentType: z.string(),
-  uploadedAt: z.date(),
-  uploaderId: z.string(),
-})
 
 export const createBillSchema = z.object({
   vendorId: z.string().min(1, "Vendor ID is required"),

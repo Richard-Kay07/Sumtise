@@ -8,7 +8,7 @@ import { trpc } from "@/lib/trpc-client"
 import { formatCurrency } from "@/lib/utils"
 import {
   DollarSign, TrendingUp, TrendingDown, CreditCard, FileText,
-  Plus, Users, BarChart3, FilePlus, ReceiptText
+  Plus, Users, BarChart3, FilePlus, Receipt
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Pie, PieChart as RechartsPieChart, Cell } from "recharts"
 
@@ -224,7 +224,7 @@ export default function Dashboard() {
               {[
                 { href: "/invoices/new", icon: <FilePlus className="h-5 w-5" />, label: "Create Invoice" },
                 { href: "/customers/new", icon: <Users className="h-5 w-5" />, label: "Add Customer" },
-                { href: "/expenses/new", icon: <ReceiptText className="h-5 w-5" />, label: "Record Expense" },
+                { href: "/expenses/new", icon: <Receipt className="h-5 w-5" />, label: "Record Expense" },
                 { href: "/reports", icon: <TrendingUp className="h-5 w-5" />, label: "View Reports" },
               ].map((a) => (
                 <Link
