@@ -1,63 +1,25 @@
-/**
- * REST API organization guards
- * Helper functions for Next.js API routes
- */
-
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
+import { auth } from "@clerk/nextjs/server"
 import { verifyOrganizationMembership } from "./organization"
 
-/**
- * Gets authenticated user session from request
- */
-export async function getAuthSession(request: NextRequest) {
-  // Convert NextRequest to IncomingMessage for getServerSession
-  const headers = new Headers(request.headers)
-  const cookie = headers.get("cookie") || ""
-  
-  // Create a mock req/res object for getServerSession
-  const req = {
-    headers: Object.fromEntries(headers),
-    cookies: Object.fromEntries(
-      cookie.split("; ").map(c => {
-        const [key, ...values] = c.split("=")
-        return [key, values.join("=")]
-      })
-    ),
-  } as any
-
-  const res = {} as any
-  
-  return await getServerSession(req, res, authOptions)
-}
-
-/**
- * Middleware to verify organization access in REST API routes
- * Returns organizationId if valid, throws error otherwise
- */
 export async function requireOrganizationAccess(
   request: NextRequest,
   organizationId?: string
 ): Promise<{ userId: string; organizationId: string }> {
-  // Get session
-  const session = await getAuthSession(request)
-  
-  if (!session?.user?.id) {
+  const { userId } = auth()
+
+  if (!userId) {
     throw new Error("UNAUTHORIZED")
   }
 
-  // Get organizationId from parameter, body, or query params
   let orgId = organizationId
-  
+
   if (!orgId) {
-    // Try to get from query params first (doesn't consume request body)
     const { searchParams } = new URL(request.url)
     orgId = searchParams.get("organizationId") || undefined
   }
 
   if (!orgId) {
-    // Try to get from body (this will consume the body, so clone request if needed elsewhere)
     try {
       const clonedRequest = request.clone()
       const body = await clonedRequest.json().catch(() => ({}))
@@ -71,18 +33,11 @@ export async function requireOrganizationAccess(
     throw new Error("BAD_REQUEST: organizationId is required")
   }
 
-  // Verify membership
-  await verifyOrganizationMembership(session.user.id, orgId)
+  await verifyOrganizationMembership(userId, orgId)
 
-  return {
-    userId: session.user.id,
-    organizationId: orgId,
-  }
+  return { userId, organizationId: orgId }
 }
 
-/**
- * Creates error response for REST API
- */
 export function createErrorResponse(
   message: string,
   status: number = 400
@@ -93,9 +48,6 @@ export function createErrorResponse(
   )
 }
 
-/**
- * Wraps API handler with organization guard
- */
 export function withOrgGuard<T extends any[]>(
   handler: (request: NextRequest, ...args: T) => Promise<NextResponse>
 ) {
@@ -117,4 +69,3 @@ export function withOrgGuard<T extends any[]>(
     }
   }
 }
-

@@ -7,7 +7,6 @@
 
 import { TRPCError } from "@trpc/server"
 import { prisma } from "@/lib/prisma"
-import type { Session } from "next-auth"
 
 /**
  * User roles in the system

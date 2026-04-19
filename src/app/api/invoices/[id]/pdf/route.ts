@@ -9,8 +9,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { handleError, logRequest, addSecurityHeaders } from "@/lib/error-handler"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { auth } from "@clerk/nextjs/server"
 
 export async function GET(
   request: NextRequest,
@@ -31,8 +30,8 @@ export async function GET(
     }
 
     // Verify authentication
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const { userId } = auth()
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }

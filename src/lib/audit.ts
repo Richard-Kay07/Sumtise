@@ -6,7 +6,6 @@
  */
 
 import { prisma } from "@/lib/prisma"
-import type { Session } from "next-auth"
 
 /**
  * Entity types that can be audited
@@ -223,7 +222,7 @@ export async function recordAudit(options: AuditRecordOptions) {
  */
 export async function recordAuditFromContext(
   ctx: {
-    session: Session
+    userId: string
     organizationId?: string
   },
   options: Omit<AuditRecordOptions, "organizationId" | "userId"> & {
@@ -231,7 +230,7 @@ export async function recordAuditFromContext(
     userId?: string
   }
 ) {
-  if (!ctx.session?.user?.id) {
+  if (!ctx.userId) {
     throw new Error("User session required for audit logging")
   }
 
@@ -243,7 +242,7 @@ export async function recordAuditFromContext(
   return recordAudit({
     ...options,
     organizationId,
-    userId: options.userId || ctx.session.user.id,
+    userId: options.userId || ctx.userId,
   })
 }
 

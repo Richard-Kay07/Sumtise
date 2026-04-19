@@ -1,23 +1,21 @@
 import { initTRPC, TRPCError } from "@trpc/server"
 import { type NextRequest } from "next/server"
-import { type Session } from "next-auth"
+import { auth } from "@clerk/nextjs/server"
 import superjson from "superjson"
 import { ZodError } from "zod"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Permission, requirePermission, getUserRole } from "@/lib/permissions"
 import { getCorrelationId, createLogger } from "@/lib/logger"
 
 type CreateContextOptions = {
-  session: Session | null
+  userId: string | null
   correlationId?: string
   logger?: ReturnType<typeof createLogger>
 }
 
 const createInnerTRPCContext = (opts: CreateContextOptions) => {
   return {
-    session: opts.session,
+    userId: opts.userId,
     prisma,
     correlationId: opts.correlationId,
     logger: opts.logger,
@@ -25,7 +23,7 @@ const createInnerTRPCContext = (opts: CreateContextOptions) => {
 }
 
 export const createTRPCContext = async (opts: { req: NextRequest }) => {
-  const session = await getServerSession(authOptions)
+  const { userId } = auth()
 
   const correlationId = getCorrelationId(
     Object.fromEntries(opts.req.headers.entries()) as Record<string, string>
@@ -33,7 +31,7 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
   const logger = createLogger(correlationId)
 
   return createInnerTRPCContext({
-    session,
+    userId,
     correlationId,
     logger,
   })
@@ -42,7 +40,6 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
   errorFormatter({ shape, error, ctx }) {
-    // Log errors
     if (ctx?.logger) {
       ctx.logger.error("tRPC Error", error as Error, {
         code: shape.data.code,
@@ -67,124 +64,87 @@ export const createTRPCRouter = t.router
 export const publicProcedure = t.procedure
 
 const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
-  if (!ctx.session || !ctx.session.user) {
+  if (!ctx.userId) {
     throw new TRPCError({ code: "UNAUTHORIZED" })
   }
   return next({
-    ctx: {
-      session: { ...ctx.session, user: ctx.session.user },
-    },
+    ctx: { userId: ctx.userId },
   })
 })
 
 export const protectedProcedure = t.procedure.use(enforceUserIsAuthed)
 
-/**
- * Organization-scoped procedure: Verifies user has access to the organization
- * Input must contain organizationId field
- * 
- * Note: Input validation happens after this middleware, so we use a wrapper
- * that validates organizationId after input schema validation
- */
-export const orgScopedProcedure = protectedProcedure.use(async ({ ctx, next, input, rawInput }) => {
+export const orgScopedProcedure = protectedProcedure.use(async ({ ctx, next, input }) => {
   const correlationId = ctx.correlationId || createLogger().generateCorrelationId()
   const logger = ctx.logger || createLogger(correlationId)
 
-  if (!ctx.session || !ctx.session.user) {
+  if (!ctx.userId) {
     logger.warn("Unauthorized access attempt", { correlationId })
     throw new TRPCError({ code: "UNAUTHORIZED" })
   }
 
-  // Extract organizationId from input (after schema validation)
   let organizationId: string | undefined
-  
+
   if (typeof input === "object" && input !== null) {
     organizationId = (input as any).organizationId
   }
 
   if (!organizationId) {
-    logger.warn("Missing organizationId in request", {
-      correlationId,
-      userId: ctx.session.user.id,
-    })
+    logger.warn("Missing organizationId in request", { correlationId, userId: ctx.userId })
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "organizationId is required",
     })
   }
 
-  // Verify user is a member of the organization
   const { verifyOrganizationMembership } = await import("@/lib/guards/organization")
   try {
-    await verifyOrganizationMembership(ctx.session.user.id, organizationId)
+    await verifyOrganizationMembership(ctx.userId, organizationId)
   } catch (error) {
     logger.warn("Organization membership verification failed", {
       correlationId,
-      userId: ctx.session.user.id,
+      userId: ctx.userId,
       organizationId,
     })
     throw error
   }
 
-  // Get user's role in the organization
-  const role = await getUserRole(ctx.session.user.id, organizationId)
+  const role = await getUserRole(ctx.userId, organizationId)
   if (!role) {
-    logger.warn("User role not found", {
-      correlationId,
-      userId: ctx.session.user.id,
-      organizationId,
-    })
+    logger.warn("User role not found", { correlationId, userId: ctx.userId, organizationId })
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "You do not have access to this organization",
     })
   }
 
-  // Create logger with user and organization context
   const contextLogger = logger
-    .withUser({ id: ctx.session.user.id, email: ctx.session.user.email || undefined })
+    .withUser({ id: ctx.userId })
     .withOrganization({ id: organizationId })
 
   logger.debug("Organization access granted", {
     correlationId,
-    userId: ctx.session.user.id,
+    userId: ctx.userId,
     organizationId,
     role,
   })
 
   return next({
     ctx: {
-      session: { ...ctx.session, user: ctx.session.user },
+      userId: ctx.userId,
       organizationId,
-      role, // Include role in context for permission checks
+      role,
       correlationId,
       logger: contextLogger,
     },
   })
 })
 
-/**
- * Permission-required procedure: Requires specific permission(s)
- * Must be used after orgScopedProcedure
- * 
- * @example
- * ```typescript
- * export const myRouter = createTRPCRouter({
- *   create: orgScopedProcedure
- *     .use(requirePermissionProcedure(Permission.INVOICES_CREATE))
- *     .input(createInvoiceSchema)
- *     .mutation(async ({ ctx, input }) => {
- *       // ctx.role is available
- *       // Permission already checked
- *     }),
- * })
- * ```
- */
 export function requirePermissionProcedure(permission: Permission) {
   return async ({ ctx, next }: any) => {
     const logger = ctx.logger || createLogger(ctx.correlationId)
 
-    if (!ctx.organizationId || !ctx.session?.user?.id) {
+    if (!ctx.organizationId || !ctx.userId) {
       logger.warn("Permission check failed: missing context", {
         correlationId: ctx.correlationId,
         permission,
@@ -196,15 +156,10 @@ export function requirePermissionProcedure(permission: Permission) {
     }
 
     try {
-      await requirePermission(
-        ctx.session.user.id,
-        ctx.organizationId,
-        permission
-      )
-
+      await requirePermission(ctx.userId, ctx.organizationId, permission)
       logger.debug("Permission granted", {
         correlationId: ctx.correlationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         organizationId: ctx.organizationId,
         permission,
         role: ctx.role,
@@ -212,7 +167,7 @@ export function requirePermissionProcedure(permission: Permission) {
     } catch (error) {
       logger.warn("Permission denied", {
         correlationId: ctx.correlationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         organizationId: ctx.organizationId,
         permission,
         role: ctx.role,
@@ -224,12 +179,9 @@ export function requirePermissionProcedure(permission: Permission) {
   }
 }
 
-/**
- * Require any of the specified permissions
- */
 export function requireAnyPermissionProcedure(permissions: Permission[]) {
   return async ({ ctx, next }: any) => {
-    if (!ctx.organizationId || !ctx.session?.user?.id) {
+    if (!ctx.organizationId || !ctx.userId) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "Organization context required",
@@ -237,28 +189,18 @@ export function requireAnyPermissionProcedure(permissions: Permission[]) {
     }
 
     const { requireAnyPermission } = await import("@/lib/permissions")
-    await requireAnyPermission(
-      ctx.session.user.id,
-      ctx.organizationId,
-      permissions
-    )
+    await requireAnyPermission(ctx.userId, ctx.organizationId, permissions)
 
     return next({ ctx })
   }
 }
 
-
 const enforceUserIsAdmin = t.middleware(({ ctx, next }) => {
-  if (!ctx.session || !ctx.session.user) {
+  if (!ctx.userId) {
     throw new TRPCError({ code: "UNAUTHORIZED" })
   }
-  
-  // Add organization role check here
-  // For now, we'll assume all authenticated users are admins
   return next({
-    ctx: {
-      session: { ...ctx.session, user: ctx.session.user },
-    },
+    ctx: { userId: ctx.userId },
   })
 })
 

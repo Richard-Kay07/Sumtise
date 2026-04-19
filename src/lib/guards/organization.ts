@@ -5,7 +5,6 @@
 
 import { TRPCError } from "@trpc/server"
 import { prisma } from "@/lib/prisma"
-import type { Session } from "next-auth"
 
 /**
  * Verifies that a user is a member of an organization
@@ -178,10 +177,10 @@ export function getOrganizationIdFromInput(input: any): string | null {
  * Middleware helper to extract organization ID and verify membership
  */
 export async function requireOrganizationAccess(
-  session: Session,
+  userId: string,
   input: any
 ): Promise<string> {
-  if (!session?.user?.id) {
+  if (!userId) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
       message: "You must be logged in",
@@ -196,7 +195,7 @@ export async function requireOrganizationAccess(
     })
   }
 
-  await verifyOrganizationMembership(session.user.id, organizationId)
+  await verifyOrganizationMembership(userId, organizationId)
   return organizationId
 }
 

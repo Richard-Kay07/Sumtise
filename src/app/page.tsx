@@ -1,6 +1,6 @@
 "use client"
 
-import { useSession } from "next-auth/react"
+import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -54,7 +54,7 @@ const cashFlowData = [
 ]
 
 export default function Dashboard() {
-  const { data: session, status } = useSession()
+  const { user, isLoaded } = useUser()
   const router = useRouter()
 
   // Get user's organizations
@@ -67,12 +67,12 @@ export default function Dashboard() {
   )
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (isLoaded && !user) {
       router.push("/auth/signin")
     }
-  }, [status, router])
+  }, [isLoaded, user, router])
 
-  if (status === "loading") {
+  if (!isLoaded) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -80,7 +80,7 @@ export default function Dashboard() {
     )
   }
 
-  if (!session) {
+  if (!user) {
     return null
   }
 
@@ -110,7 +110,7 @@ export default function Dashboard() {
               </Button>
               <Button variant="outline" size="sm">
                 <Users className="mr-2 h-4 w-4" />
-                {session.user?.name}
+                {user.fullName || user.emailAddresses[0]?.emailAddress}
               </Button>
             </nav>
           </div>
