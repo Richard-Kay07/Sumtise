@@ -1,31 +1,10 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
-import { NextResponse } from "next/server"
+import { clerkMiddleware } from '@clerk/nextjs/server'
 
-const isPublicRoute = createRouteMatcher([
-  "/auth/signin(.*)",
-  "/auth/signup(.*)",
-  "/api/webhooks(.*)",
-])
-
-export default clerkMiddleware((auth, request) => {
-  const correlationId =
-    request.headers.get("x-correlation-id") || crypto.randomUUID()
-  const requestHeaders = new Headers(request.headers)
-  requestHeaders.set("x-correlation-id", correlationId)
-
-  if (!isPublicRoute(request)) {
-    auth().protect()
-  }
-
-  const response = NextResponse.next({ request: { headers: requestHeaders } })
-  response.headers.set("x-correlation-id", correlationId)
-  return response
-})
+export default clerkMiddleware()
 
 export const config = {
   matcher: [
-    "/((?!.*\\..*|_next).*)",
-    "/",
-    "/(api|trpc)(.*)",
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(api|trpc)(.*)',
   ],
 }
