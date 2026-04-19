@@ -1,5 +1,5 @@
 import { initTRPC, TRPCError } from "@trpc/server"
-import { type CreateNextContextOptions } from "@trpc/server/adapters/next"
+import { type NextRequest } from "next/server"
 import { type Session } from "next-auth"
 import superjson from "superjson"
 import { ZodError } from "zod"
@@ -24,14 +24,12 @@ const createInnerTRPCContext = (opts: CreateContextOptions) => {
   }
 }
 
-export const createTRPCContext = async (opts: CreateNextContextOptions) => {
-  const { req, res } = opts
-  const session = await getServerSession(req, res, authOptions)
+export const createTRPCContext = async (opts: { req: NextRequest }) => {
+  const session = await getServerSession(authOptions)
 
-  // Get or generate correlation ID
-  const correlationId = getCorrelationId(req.headers as Record<string, string | string[] | undefined>)
-  
-  // Create logger with correlation ID
+  const correlationId = getCorrelationId(
+    Object.fromEntries(opts.req.headers.entries()) as Record<string, string>
+  )
   const logger = createLogger(correlationId)
 
   return createInnerTRPCContext({
