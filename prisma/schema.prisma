@@ -130,6 +130,17 @@ model Organization {
   reconciliations      Reconciliation[]
   reconciliationLines  ReconciliationLine[]
   payrollEntries       PayrollEntry[]
+  projects             Project[]
+  projectEntries       ProjectEntry[]
+  grants               Grant[]
+  grantMilestones      GrantMilestone[]
+  fixedAssets          FixedAsset[]
+  depreciationSchedules DepreciationSchedule[]
+  inventoryItems       InventoryItem[]
+  stockMovements       StockMovement[]
+  budgets              Budget[]
+  budgetLines          BudgetLine[]
+  recurringInvoices    RecurringInvoice[]
 
   @@map("organizations")
 }
@@ -174,7 +185,14 @@ model ChartOfAccount {
   children     ChartOfAccount[] @relation("AccountHierarchy")
   transactions Transaction[]
   billItems    BillItem[]
-  vendors      Vendor[] @relation("VendorExpenseAccount")
+  vendors      Vendor[]                @relation("VendorExpenseAccount")
+  assetAccounts         FixedAsset[]   @relation("AssetAccount")
+  depreciationAccounts  FixedAsset[]   @relation("DepreciationAccount")
+  depreciationExpenseAccounts FixedAsset[] @relation("DepreciationExpenseAccount")
+  inventoryAccounts     InventoryItem[] @relation("InventoryAccount")
+  cogsAccounts          InventoryItem[] @relation("CogsAccount")
+  grantAccounts         Grant[]        @relation("GrantAccount")
+  budgetLines           BudgetLine[]
 
   @@unique([organizationId, code])
   @@map("chart_of_accounts")
@@ -206,7 +224,10 @@ model Transaction {
 
   organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   account           ChartOfAccount      @relation(fields: [accountId], references: [id])
-  reconciliationLines ReconciliationLine[]
+  reconciliationLines   ReconciliationLine[]
+  projectEntries        ProjectEntry[]
+  stockMovements        StockMovement[]
+  depreciationSchedules DepreciationSchedule[]
 
   @@index([organizationId, accountId, date])
   @@map("transactions")
@@ -232,8 +253,10 @@ model Customer {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invoices     Invoice[]
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoices          Invoice[]
+  projects          Project[]
+  recurringInvoices RecurringInvoice[]
 
   @@index([organizationId, deletedAt])
   @@index([organizationId, isActive])
@@ -270,6 +293,8 @@ model Vendor {
   bills                 Bill[]
   debitNotes            DebitNote[]
   payments              Payment[]
+  fixedAssets           FixedAsset[]
+  inventoryItems        InventoryItem[]
 
   @@unique([organizationId, name])
   @@index([organizationId, deletedAt])
@@ -279,28 +304,30 @@ model Vendor {
 
 // Invoicing System
 model Invoice {
-  id             String        @id @default(cuid())
-  organizationId String
-  customerId     String
-  invoiceNumber  String
-  date           DateTime
-  dueDate        DateTime
-  status         InvoiceStatus @default(DRAFT)
-  subtotal       Decimal
-  taxAmount      Decimal       @default(0)
-  total          Decimal
-  currency       String        @default("GBP")
-  notes          String?
-  metadata       Json?
-  attachments    Json?         // Array of file attachments: [{ fileId, fileName, fileSize, contentType, uploadedAt, uploaderId }]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                  String        @id @default(cuid())
+  organizationId      String
+  customerId          String
+  invoiceNumber       String
+  date                DateTime
+  dueDate             DateTime
+  status              InvoiceStatus @default(DRAFT)
+  subtotal            Decimal
+  taxAmount           Decimal       @default(0)
+  total               Decimal
+  currency            String        @default("GBP")
+  notes               String?
+  metadata            Json?
+  attachments         Json?
+  recurringInvoiceId  String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer     Customer     @relation(fields: [customerId], references: [id])
-  items        InvoiceItem[]
-  creditNotes  CreditNote[]
-  reminders    InvoiceReminder[]
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer         Customer          @relation(fields: [customerId], references: [id])
+  items            InvoiceItem[]
+  creditNotes      CreditNote[]
+  reminders        InvoiceReminder[]
+  recurringInvoice RecurringInvoice? @relation("RecurringInvoiceSource", fields: [recurringInvoiceId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, invoiceNumber])
   @@map("invoices")
@@ -1363,6 +1390,493 @@ enum TaxSubmissionType {
   VAT_RETURN    // VAT return
   CORPORATION_TAX
   OTHER
+}
+
+// ─── Projects & Cost Tracking ───────────────────────────────────────────────
+
+model Project {
+  id             String        @id @default(cuid())
+  organizationId String
+  customerId     String?
+  projectNumber  String
+  name           String
+  description    String?       @db.Text
+  status         ProjectStatus @default(ACTIVE)
+  startDate      DateTime
+  endDate        DateTime?
+  budget         Decimal?
+  currency       String        @default("GBP")
+  managerId      String?
+  tags           String[]
+  metadata       Json?
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  entries      ProjectEntry[]
+  budgets      Budget[]
+
+  @@unique([organizationId, projectNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, deletedAt])
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+model ProjectEntry {
+  id             String           @id @default(cuid())
+  organizationId String
+  projectId      String
+  date           DateTime
+  description    String
+  entryType      ProjectEntryType
+  quantity       Decimal          @default(1)
+  unitCost       Decimal          @default(0)
+  amount         Decimal
+  currency       String           @default("GBP")
+  billableAmount Decimal?
+  isBillable     Boolean          @default(false)
+  transactionId  String?
+  invoiceId      String?
+  billId         String?
+  notes          String?          @db.Text
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  transaction  Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, projectId])
+  @@index([organizationId, projectId, date])
+  @@map("project_entries")
+}
+
+enum ProjectEntryType {
+  LABOUR
+  MATERIAL
+  EXPENSE
+  REVENUE
+  OVERHEAD
+}
+
+// ─── Grants ──────────────────────────────────────────────────────────────────
+
+model Grant {
+  id              String      @id @default(cuid())
+  organizationId  String
+  grantNumber     String
+  name            String
+  description     String?     @db.Text
+  funder          String
+  funderReference String?
+  grantType       GrantType   @default(RESTRICTED)
+  totalAmount     Decimal
+  receivedAmount  Decimal     @default(0)
+  spentAmount     Decimal     @default(0)
+  currency        String      @default("GBP")
+  startDate       DateTime
+  endDate         DateTime?
+  status          GrantStatus @default(ACTIVE)
+  conditions      String?     @db.Text
+  accountId       String?
+  tags            String[]
+  metadata        Json?
+  deletedAt       DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  account      ChartOfAccount? @relation("GrantAccount", fields: [accountId], references: [id], onDelete: SetNull)
+  milestones   GrantMilestone[]
+
+  @@unique([organizationId, grantNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, deletedAt])
+  @@map("grants")
+}
+
+enum GrantType {
+  RESTRICTED
+  UNRESTRICTED
+  CAPITAL
+  REVENUE
+}
+
+enum GrantStatus {
+  PENDING
+  ACTIVE
+  REPORTING
+  CLOSED
+  CANCELLED
+}
+
+model GrantMilestone {
+  id             String               @id @default(cuid())
+  organizationId String
+  grantId        String
+  name           String
+  description    String?              @db.Text
+  dueDate        DateTime
+  amount         Decimal?
+  status         GrantMilestoneStatus @default(PENDING)
+  completedAt    DateTime?
+  evidence       Json?
+  notes          String?              @db.Text
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  grant        Grant        @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, grantId])
+  @@index([grantId, status])
+  @@map("grant_milestones")
+}
+
+enum GrantMilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  WAIVED
+}
+
+// ─── Fixed Assets & Depreciation ────────────────────────────────────────────
+
+model FixedAsset {
+  id                    String             @id @default(cuid())
+  organizationId        String
+  assetNumber           String
+  name                  String
+  description           String?            @db.Text
+  category              AssetCategory
+  location              String?
+  serialNumber          String?
+  purchaseDate          DateTime
+  purchasePrice         Decimal
+  residualValue         Decimal            @default(0)
+  usefulLifeYears       Decimal
+  depreciationMethod    DepreciationMethod @default(STRAIGHT_LINE)
+  currency              String             @default("GBP")
+  assetAccountId        String?
+  depreciationAccountId String?
+  expenseAccountId      String?
+  supplierId            String?
+  status                AssetStatus        @default(ACTIVE)
+  disposalDate          DateTime?
+  disposalProceeds      Decimal?
+  disposalReason        String?            @db.Text
+  warrantyExpiry        DateTime?
+  notes                 String?            @db.Text
+  metadata              Json?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  organization            Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assetAccount            ChartOfAccount? @relation("AssetAccount",              fields: [assetAccountId],        references: [id], onDelete: SetNull)
+  depreciationAccount     ChartOfAccount? @relation("DepreciationAccount",        fields: [depreciationAccountId], references: [id], onDelete: SetNull)
+  depreciationExpenseAccount ChartOfAccount? @relation("DepreciationExpenseAccount", fields: [expenseAccountId],   references: [id], onDelete: SetNull)
+  supplier                Vendor?         @relation(fields: [supplierId],          references: [id], onDelete: SetNull)
+  depreciationSchedules   DepreciationSchedule[]
+
+  @@unique([organizationId, assetNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, category])
+  @@map("fixed_assets")
+}
+
+enum AssetCategory {
+  LAND_AND_BUILDINGS
+  PLANT_AND_MACHINERY
+  VEHICLES
+  FURNITURE_AND_FIXTURES
+  COMPUTER_EQUIPMENT
+  INTANGIBLE
+  OTHER
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+  REDUCING_BALANCE
+  UNITS_OF_PRODUCTION
+  SUM_OF_YEARS_DIGITS
+}
+
+enum AssetStatus {
+  ACTIVE
+  DISPOSED
+  FULLY_DEPRECIATED
+  UNDER_MAINTENANCE
+  WRITTEN_OFF
+}
+
+model DepreciationSchedule {
+  id                      String             @id @default(cuid())
+  organizationId          String
+  assetId                 String
+  periodStart             DateTime
+  periodEnd               DateTime
+  depreciationAmount      Decimal
+  accumulatedDepreciation Decimal
+  netBookValue            Decimal
+  transactionId           String?
+  status                  DepreciationStatus @default(SCHEDULED)
+  postedAt                DateTime?
+  notes                   String?            @db.Text
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        FixedAsset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  transaction  Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, assetId])
+  @@index([organizationId, periodStart])
+  @@index([organizationId, status])
+  @@map("depreciation_schedules")
+}
+
+enum DepreciationStatus {
+  SCHEDULED
+  POSTED
+  REVERSED
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
+
+model InventoryItem {
+  id                 String        @id @default(cuid())
+  organizationId     String
+  sku                String
+  name               String
+  description        String?       @db.Text
+  category           String?
+  unitOfMeasure      String        @default("EACH")
+  costingMethod      CostingMethod @default(FIFO)
+  unitCost           Decimal       @default(0)
+  sellingPrice       Decimal?
+  reorderLevel       Decimal       @default(0)
+  reorderQuantity    Decimal       @default(0)
+  quantityOnHand     Decimal       @default(0)
+  quantityOnOrder    Decimal       @default(0)
+  inventoryAccountId String?
+  cogsAccountId      String?
+  supplierId         String?
+  isActive           Boolean       @default(true)
+  isSaleable         Boolean       @default(true)
+  isPurchaseable     Boolean       @default(true)
+  taxRate            Decimal       @default(0)
+  barcode            String?
+  notes              String?       @db.Text
+  metadata           Json?
+  deletedAt          DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inventoryAccount ChartOfAccount? @relation("InventoryAccount", fields: [inventoryAccountId], references: [id], onDelete: SetNull)
+  cogsAccount      ChartOfAccount? @relation("CogsAccount",       fields: [cogsAccountId],      references: [id], onDelete: SetNull)
+  supplier         Vendor?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  movements        StockMovement[]
+
+  @@unique([organizationId, sku])
+  @@index([organizationId, isActive])
+  @@index([organizationId, deletedAt])
+  @@map("inventory_items")
+}
+
+enum CostingMethod {
+  FIFO
+  LIFO
+  WEIGHTED_AVG
+  STANDARD
+}
+
+model StockMovement {
+  id             String            @id @default(cuid())
+  organizationId String
+  itemId         String
+  date           DateTime
+  movementType   StockMovementType
+  quantity       Decimal
+  unitCost       Decimal
+  totalCost      Decimal
+  reference      String?
+  sourceType     String?
+  sourceId       String?
+  transactionId  String?
+  createdBy      String?
+  notes          String?           @db.Text
+  metadata       Json?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  item         InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  transaction  Transaction?  @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, itemId])
+  @@index([organizationId, itemId, date])
+  @@index([organizationId, movementType])
+  @@map("stock_movements")
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  TRANSFER
+  WRITE_OFF
+  RETURN_IN
+  RETURN_OUT
+}
+
+// ─── Budgets ─────────────────────────────────────────────────────────────────
+
+model Budget {
+  id             String       @id @default(cuid())
+  organizationId String
+  projectId      String?
+  name           String
+  description    String?      @db.Text
+  budgetType     BudgetType   @default(ANNUAL)
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         BudgetStatus @default(DRAFT)
+  currency       String       @default("GBP")
+  approvedAt     DateTime?
+  approvedBy     String?
+  notes          String?      @db.Text
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  lines        BudgetLine[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, periodStart, periodEnd])
+  @@map("budgets")
+}
+
+enum BudgetType {
+  ANNUAL
+  QUARTERLY
+  MONTHLY
+  PROJECT
+  GRANT
+}
+
+enum BudgetStatus {
+  DRAFT
+  APPROVED
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+model BudgetLine {
+  id             String   @id @default(cuid())
+  organizationId String
+  budgetId       String
+  accountId      String
+  description    String?
+  periodStart    DateTime
+  periodEnd      DateTime
+  budgetedAmount Decimal
+  actualAmount   Decimal  @default(0)
+  variance       Decimal  @default(0)
+  notes          String?  @db.Text
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  budget       Budget         @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  account      ChartOfAccount @relation(fields: [accountId], references: [id])
+
+  @@index([organizationId, budgetId])
+  @@index([organizationId, accountId])
+  @@map("budget_lines")
+}
+
+// ─── Recurring Invoices ───────────────────────────────────────────────────────
+
+model RecurringInvoice {
+  id             String             @id @default(cuid())
+  organizationId String
+  customerId     String
+  templateName   String
+  frequency      RecurringFrequency
+  dayOfMonth     Int?
+  dayOfWeek      Int?
+  startDate      DateTime
+  endDate        DateTime?
+  nextRunDate    DateTime
+  lastRunDate    DateTime?
+  status         RecurringStatus    @default(ACTIVE)
+  subtotal       Decimal
+  taxAmount      Decimal            @default(0)
+  total          Decimal
+  currency       String             @default("GBP")
+  notes          String?            @db.Text
+  paymentTerms   Int?               @default(30)
+  autoSend       Boolean            @default(false)
+  runCount       Int                @default(0)
+  maxRuns        Int?
+  metadata       Json?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer          Customer              @relation(fields: [customerId], references: [id])
+  items             RecurringInvoiceItem[]
+  generatedInvoices Invoice[]             @relation("RecurringInvoiceSource")
+
+  @@index([organizationId, status])
+  @@index([organizationId, nextRunDate])
+  @@map("recurring_invoices")
+}
+
+enum RecurringFrequency {
+  WEEKLY
+  FORTNIGHTLY
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+model RecurringInvoiceItem {
+  id                 String           @id @default(cuid())
+  recurringInvoiceId String
+  description        String
+  quantity           Decimal
+  unitPrice          Decimal
+  total              Decimal
+  taxRate            Decimal          @default(0)
+
+  recurringInvoice RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+
+  @@map("recurring_invoice_items")
 }
 
 enum TaxSubmissionStatus {
