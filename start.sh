@@ -9,5 +9,8 @@ echo "DATABASE_URL set: $([ -n "$DATABASE_URL" ] && echo yes || echo NO)"
 echo "NEXTAUTH_SECRET set: $([ -n "$NEXTAUTH_SECRET" ] && echo yes || echo NO)"
 echo "NEXTAUTH_URL: $NEXTAUTH_URL"
 
+echo "=== Running database migrations ==="
+npx prisma migrate deploy
+
 echo "=== Starting Next.js server ==="
 exec node server.js
