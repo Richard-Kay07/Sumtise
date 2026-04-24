@@ -141,6 +141,17 @@ model Organization {
   budgets              Budget[]
   budgetLines          BudgetLine[]
   recurringInvoices    RecurringInvoice[]
+  orgModuleSettings       OrgModuleSettings?
+  tagCategories           TagCategory[]
+  customTags              CustomTag[]
+  transactionTags         TransactionTag[]
+  relatedParties          RelatedParty[]
+  wgaCpidCodes            WGACPIDCode[]
+  leases                  Lease[]
+  rouAssets               RouAsset[]
+  payrollCoaMappings      PayrollCOAMapping[]
+  employeeAllocationRules EmployeeAllocationRule[]
+  payrollJournalEntries   PayrollJournalEntry[]
 
   @@map("organizations")
 }
@@ -191,8 +202,16 @@ model ChartOfAccount {
   depreciationExpenseAccounts FixedAsset[] @relation("DepreciationExpenseAccount")
   inventoryAccounts     InventoryItem[] @relation("InventoryAccount")
   cogsAccounts          InventoryItem[] @relation("CogsAccount")
-  grantAccounts         Grant[]        @relation("GrantAccount")
-  budgetLines           BudgetLine[]
+  grantAccounts             Grant[]              @relation("GrantAccount")
+  budgetLines               BudgetLine[]
+  leaseRouAssetAccounts     Lease[]              @relation("LeaseRouAssetAccount")
+  leaseLiabilityAccounts    Lease[]              @relation("LeaseLiabilityAccount")
+  leaseDepreciationAccounts Lease[]              @relation("LeaseDepreciationAccount")
+  leaseInterestAccounts     Lease[]              @relation("LeaseInterestAccount")
+  leaseRentExpenseAccounts  Lease[]              @relation("LeaseRentExpenseAccount")
+  payrollDebitMappings      PayrollCOAMapping[]  @relation("PayrollDebitAccount")
+  payrollCreditMappings     PayrollCOAMapping[]  @relation("PayrollCreditAccount")
+  payrollJournalLines       PayrollJournalLine[]
 
   @@unique([organizationId, code])
   @@map("chart_of_accounts")
@@ -1160,10 +1179,11 @@ model Employee {
 
   organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user                User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
-  payrollEntries      PayrollEntry[]
+  payrollEntries       PayrollEntry[]
   leaveRequests        LeaveRequest[]
-  timesheets          Timesheet[]
+  timesheets           Timesheet[]
   pensionContributions PensionContribution[]
+  allocationRules      EmployeeAllocationRule[]
 
   @@unique([organizationId, employeeNumber])
   @@index([organizationId, status])
@@ -1206,8 +1226,9 @@ model PayrollRun {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   entries        PayrollEntry[]
+  journalEntry   PayrollJournalEntry?
 
   @@unique([organizationId, runNumber])
   @@index([organizationId, status])
@@ -1415,8 +1436,12 @@ model Project {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  entries      ProjectEntry[]
-  budgets      Budget[]
+  entries             ProjectEntry[]
+  budgets             Budget[]
+  transactionTags     TransactionTag[]
+  allocationSplits    EmployeeAllocationSplit[]
+  payrollJournalLines PayrollJournalLine[]
+  leases              Lease[]
 
   @@unique([organizationId, projectNumber])
   @@index([organizationId, status])
@@ -1497,8 +1522,11 @@ model Grant {
   updatedAt       DateTime    @updatedAt
 
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  account      ChartOfAccount? @relation("GrantAccount", fields: [accountId], references: [id], onDelete: SetNull)
-  milestones   GrantMilestone[]
+  account             ChartOfAccount?          @relation("GrantAccount", fields: [accountId], references: [id], onDelete: SetNull)
+  milestones          GrantMilestone[]
+  transactionTags     TransactionTag[]
+  allocationSplits    EmployeeAllocationSplit[]
+  payrollJournalLines PayrollJournalLine[]
 
   @@unique([organizationId, grantNumber])
   @@index([organizationId, status])
@@ -1885,4 +1913,412 @@ enum TaxSubmissionStatus {
   ACCEPTED
   REJECTED
   AMENDED
+}
+
+// ─── Organisation Module Settings ────────────────────────────────────────────
+
+model OrgModuleSettings {
+  id    String @id @default(cuid())
+  orgId String @unique
+
+  enableProjectTagging      Boolean @default(false)
+  enableGrantTagging        Boolean @default(false)
+  enableRelatedPartyTagging Boolean @default(false)
+  enableWGACPIDCodes        Boolean @default(false)
+  enableFundAccounting      Boolean @default(false)
+  enableStatutoryClassCodes Boolean @default(false)
+
+  enableIFRS16Leases      Boolean @default(false)
+  leaseAccountingStandard String  @default("FRS_102")
+
+  enablePayrollCOAPosting         Boolean @default(false)
+  enablePayrollProjectAllocation  Boolean @default(false)
+  enablePayrollGrantAllocation    Boolean @default(false)
+  enablePayrollCostCentreAnalysis Boolean @default(false)
+
+  reportingStandard     String  @default("FRS_102")
+  enableWGAReporting    Boolean @default(false)
+  enableMultiCurrencyFX Boolean @default(false)
+  enableIntercompany    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("org_module_settings")
+}
+
+// ─── Tag Categories & Custom Tags ────────────────────────────────────────────
+
+model TagCategory {
+  id                 String   @id @default(cuid())
+  orgId              String
+  code               String
+  name               String
+  description        String?
+  isSystemCategory   Boolean  @default(false)
+  isEnabled          Boolean  @default(false)
+  isMultiSelect      Boolean  @default(false)
+  isMandatoryOnEntry Boolean  @default(false)
+  appliesTo          String[]
+  moduleKey          String?
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  customTags CustomTag[]
+
+  @@unique([orgId, code])
+  @@map("tag_categories")
+}
+
+model CustomTag {
+  id          String   @id @default(cuid())
+  orgId       String
+  categoryId  String
+  code        String
+  name        String
+  description String?
+  colour      String?
+  metadata    Json?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org             Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  category        TagCategory      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  transactionTags TransactionTag[]
+
+  @@unique([orgId, categoryId, code])
+  @@index([orgId, categoryId])
+  @@map("custom_tags")
+}
+
+// ─── Transaction Tags ─────────────────────────────────────────────────────────
+
+model TransactionTag {
+  id                String   @id @default(cuid())
+  transactionLineId String
+  orgId             String
+  tagType           String
+
+  projectId      String?
+  grantId        String?
+  relatedPartyId String?
+  wgaCpidId      String?
+  customTagId    String?
+
+  allocationPercent Decimal?
+  allocationAmount  Decimal?
+  isSplitLine       Boolean  @default(false)
+
+  notes     String?
+  createdAt DateTime @default(now())
+
+  org          Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  grant        Grant?        @relation(fields: [grantId], references: [id], onDelete: SetNull)
+  relatedParty RelatedParty? @relation(fields: [relatedPartyId], references: [id], onDelete: SetNull)
+  wgaCpid      WGACPIDCode?  @relation(fields: [wgaCpidId], references: [id], onDelete: SetNull)
+  customTag    CustomTag?    @relation(fields: [customTagId], references: [id], onDelete: SetNull)
+
+  @@index([transactionLineId])
+  @@index([orgId, tagType])
+  @@index([projectId])
+  @@index([grantId])
+  @@index([relatedPartyId])
+  @@map("transaction_tags")
+}
+
+// ─── Related Parties ─────────────────────────────────────────────────────────
+
+model RelatedParty {
+  id                   String   @id @default(cuid())
+  orgId                String
+  name                 String
+  relationship         String
+  description          String?
+  companiesHouseNumber String?
+  ownershipPercent     Decimal?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  org             Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  transactionTags TransactionTag[]
+
+  @@index([orgId])
+  @@map("related_parties")
+}
+
+// ─── WGA CPID Codes ───────────────────────────────────────────────────────────
+
+model WGACPIDCode {
+  id                String   @id @default(cuid())
+  orgId             String
+  cpid              String
+  entityName        String
+  entityType        String
+  departmentalGroup String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  org             Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  transactionTags TransactionTag[]
+
+  @@unique([orgId, cpid])
+  @@index([orgId, entityType])
+  @@map("wga_cpid_codes")
+}
+
+// ─── Lease Accounting ─────────────────────────────────────────────────────────
+
+model Lease {
+  id             String @id @default(cuid())
+  orgId          String
+  leaseReference String
+  description    String
+  assetClass     String
+
+  treatment                    String
+  isShortTermExemption         Boolean  @default(false)
+  isLowValueExemption          Boolean  @default(false)
+  lowValueAssetCost            Decimal?
+
+  commencementDate               DateTime
+  originalEndDate                DateTime
+  revisedEndDate                 DateTime?
+  reviewDate                     DateTime?
+  breakClauseDate                DateTime?
+  breakClauseIsReasonablyCertain Boolean  @default(false)
+
+  annualRentAmount         Decimal
+  paymentFrequency         String
+  paymentDayOfMonth        Int     @default(1)
+  rentFreeMonths           Int     @default(0)
+  incrementalBorrowingRate Decimal
+  currency                 String  @default("GBP")
+
+  rouAssetAccountId       String?
+  leaseLiabilityAccountId String?
+  depreciationAccountId   String?
+  interestAccountId       String?
+  rentExpenseAccountId    String?
+  projectId               String?
+  costCentreId            String?
+
+  status             String    @default("ACTIVE")
+  terminationDate    DateTime?
+  terminationPenalty Decimal?
+
+  landlordName    String?
+  propertyAddress String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  org                   Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  rouAssetAccount       ChartOfAccount? @relation("LeaseRouAssetAccount",    fields: [rouAssetAccountId],       references: [id], onDelete: SetNull)
+  leaseLiabilityAccount ChartOfAccount? @relation("LeaseLiabilityAccount",   fields: [leaseLiabilityAccountId], references: [id], onDelete: SetNull)
+  depreciationAccount   ChartOfAccount? @relation("LeaseDepreciationAccount", fields: [depreciationAccountId],   references: [id], onDelete: SetNull)
+  interestAccount       ChartOfAccount? @relation("LeaseInterestAccount",     fields: [interestAccountId],       references: [id], onDelete: SetNull)
+  rentExpenseAccount    ChartOfAccount? @relation("LeaseRentExpenseAccount",  fields: [rentExpenseAccountId],    references: [id], onDelete: SetNull)
+  project               Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  rouAsset              RouAsset?
+  scheduleEntries       LeaseScheduleEntry[]
+
+  @@unique([orgId, leaseReference])
+  @@index([orgId, status])
+  @@map("leases")
+}
+
+model RouAsset {
+  id      String @id @default(cuid())
+  leaseId String @unique
+  orgId   String
+
+  recognitionDate           DateTime
+  presentValueLeasePayments Decimal
+  initialDirectCosts        Decimal  @default(0)
+  leaseIncentivesReceived   Decimal  @default(0)
+  restorationProvision      Decimal  @default(0)
+  initialCarryingAmount     Decimal
+
+  depreciationMethod     String @default("STRAIGHT_LINE")
+  depreciationTermMonths Int
+  residualValue          Decimal @default(0)
+
+  currentCarryingAmount   Decimal
+  accumulatedDepreciation Decimal  @default(0)
+  lastPostedDate          DateTime?
+
+  org                 Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  lease               Lease                 @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  depreciationEntries RouDepreciationEntry[]
+
+  @@map("rou_assets")
+}
+
+model LeaseScheduleEntry {
+  id           String   @id @default(cuid())
+  leaseId      String
+  periodNumber Int
+  periodStart  DateTime
+  periodEnd    DateTime
+  paymentDate  DateTime
+
+  openingLiability   Decimal
+  leasePayment       Decimal
+  interestCharge     Decimal
+  principalRepayment Decimal
+  closingLiability   Decimal
+
+  isCurrentPeriod Boolean @default(false)
+
+  isPosted       Boolean   @default(false)
+  journalEntryId String?
+  postedAt       DateTime?
+
+  lease Lease @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  @@unique([leaseId, periodNumber])
+  @@index([leaseId, periodStart])
+  @@map("lease_schedule_entries")
+}
+
+model RouDepreciationEntry {
+  id          String   @id @default(cuid())
+  rouAssetId  String
+  periodStart DateTime
+  periodEnd   DateTime
+
+  openingNBV         Decimal
+  depreciationCharge Decimal
+  closingNBV         Decimal
+
+  isPosted       Boolean   @default(false)
+  journalEntryId String?
+  postedAt       DateTime?
+
+  rouAsset RouAsset @relation(fields: [rouAssetId], references: [id], onDelete: Cascade)
+
+  @@index([rouAssetId, periodStart])
+  @@map("rou_depreciation_entries")
+}
+
+// ─── Payroll COA Integration ──────────────────────────────────────────────────
+
+model PayrollCOAMapping {
+  id                  String  @id @default(cuid())
+  orgId               String
+  componentType       String
+  debitAccountId      String
+  creditAccountId     String
+  defaultCostCentreId String?
+  description         String?
+  isActive            Boolean @default(true)
+
+  org           Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  debitAccount  ChartOfAccount @relation("PayrollDebitAccount",  fields: [debitAccountId],  references: [id])
+  creditAccount ChartOfAccount @relation("PayrollCreditAccount", fields: [creditAccountId], references: [id])
+
+  @@unique([orgId, componentType])
+  @@map("payroll_coa_mappings")
+}
+
+model EmployeeAllocationRule {
+  id                String    @id @default(cuid())
+  orgId             String
+  employeeId        String
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  isActive          Boolean   @default(true)
+  totalMustEqual100 Boolean   @default(true)
+
+  org        Organization              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employee   Employee                  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  splitLines EmployeeAllocationSplit[]
+
+  @@index([orgId, employeeId, effectiveFrom])
+  @@map("employee_allocation_rules")
+}
+
+model EmployeeAllocationSplit {
+  id                String  @id @default(cuid())
+  ruleId            String
+  allocationPercent Decimal @db.Decimal(5, 2)
+
+  costCentreId   String?
+  projectId      String?
+  grantId        String?
+  analysisCodeId String?
+
+  componentTypes String[]
+
+  rule    EmployeeAllocationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  project Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  grant   Grant?                 @relation(fields: [grantId], references: [id], onDelete: SetNull)
+
+  @@index([ruleId])
+  @@map("employee_allocation_splits")
+}
+
+model PayrollJournalEntry {
+  id           String   @id @default(cuid())
+  orgId        String
+  payrollRunId String   @unique
+  journalDate  DateTime
+  description  String
+  reference    String
+  status       String   @default("DRAFT")
+  reversalOf   String?
+
+  totalGross           Decimal
+  totalEmployerNI      Decimal
+  totalEmployerPension Decimal
+  totalNetPay          Decimal
+
+  postedAt  DateTime?
+  postedBy  String?
+  createdAt DateTime @default(now())
+
+  org        Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  payrollRun PayrollRun           @relation(fields: [payrollRunId], references: [id])
+  lines      PayrollJournalLine[]
+
+  @@index([orgId, journalDate])
+  @@map("payroll_journal_entries")
+}
+
+model PayrollJournalLine {
+  id             String  @id @default(cuid())
+  journalId      String
+  lineNumber     Int
+  accountId      String
+  costCentreId   String?
+  projectId      String?
+  grantId        String?
+  analysisCodeId String?
+  debit          Decimal  @default(0) @db.Decimal(19, 4)
+  credit         Decimal  @default(0) @db.Decimal(19, 4)
+  description    String
+  componentType  String
+  employeeCount  Int      @default(0)
+  employeeIds    String[]
+
+  journal  PayrollJournalEntry @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  account  ChartOfAccount      @relation(fields: [accountId], references: [id])
+  project  Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  grant    Grant?              @relation(fields: [grantId], references: [id], onDelete: SetNull)
+
+  @@index([journalId])
+  @@index([accountId])
+  @@index([costCentreId])
+  @@index([projectId])
+  @@index([grantId])
+  @@map("payroll_journal_lines")
 }
