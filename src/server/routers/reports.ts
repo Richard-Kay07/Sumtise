@@ -12,7 +12,7 @@ import { z } from "zod"
 import { createTRPCRouter, orgScopedProcedure, requirePermissionProcedure } from "@/lib/trpc"
 import { Permission } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
-import { Decimal } from "decimal.js"
+import { Prisma } from "@prisma/client"
 
 const paginationSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -66,16 +66,16 @@ export const reportsRouter = createTRPCRouter({
           (t) => t.accountId === account.id
         )
 
-        let debitTotal = new Decimal(0)
-        let creditTotal = new Decimal(0)
+        let debitTotal = new Prisma.Decimal(0)
+        let creditTotal = new Prisma.Decimal(0)
 
         accountTransactions.forEach((tx) => {
-          debitTotal = debitTotal.plus(new Decimal(tx.debit.toString()))
-          creditTotal = creditTotal.plus(new Decimal(tx.credit.toString()))
+          debitTotal = debitTotal.plus(new Prisma.Decimal(tx.debit.toString()))
+          creditTotal = creditTotal.plus(new Prisma.Decimal(tx.credit.toString()))
         })
 
         // Add opening balance
-        const openingBalance = new Decimal(account.openingBalance?.toString() || 0)
+        const openingBalance = new Prisma.Decimal(account.openingBalance?.toString() || 0)
         
         // For asset accounts: balance = opening + debits - credits
         // For liability/equity/revenue accounts: balance = opening + credits - debits
@@ -114,12 +114,12 @@ export const reportsRouter = createTRPCRouter({
 
       // Calculate totals
       const totalDebits = accountBalances.reduce(
-        (sum, item) => sum.plus(new Decimal(item.debit)),
-        new Decimal(0)
+        (sum, item) => sum.plus(new Prisma.Decimal(item.debit)),
+        new Prisma.Decimal(0)
       )
       const totalCredits = accountBalances.reduce(
-        (sum, item) => sum.plus(new Decimal(item.credit)),
-        new Decimal(0)
+        (sum, item) => sum.plus(new Prisma.Decimal(item.credit)),
+        new Prisma.Decimal(0)
       )
 
       return {
@@ -205,15 +205,15 @@ export const reportsRouter = createTRPCRouter({
       const operatingRevenue = transactions
         .filter((t) => revenueAccounts.some((acc) => acc.id === t.accountId))
         .reduce(
-          (sum, t) => sum.plus(new Decimal(t.credit.toString())),
-          new Decimal(0)
+          (sum, t) => sum.plus(new Prisma.Decimal(t.credit.toString())),
+          new Prisma.Decimal(0)
         )
 
       const operatingExpenses = transactions
         .filter((t) => expenseAccounts.some((acc) => acc.id === t.accountId))
         .reduce(
-          (sum, t) => sum.plus(new Decimal(t.debit.toString())),
-          new Decimal(0)
+          (sum, t) => sum.plus(new Prisma.Decimal(t.debit.toString())),
+          new Prisma.Decimal(0)
         )
 
       // Get non-cash adjustments (depreciation, amortization)
@@ -228,8 +228,8 @@ export const reportsRouter = createTRPCRouter({
       const nonCashAdjustments = transactions
         .filter((t) => depreciationAccounts.some((acc) => acc.id === t.accountId))
         .reduce(
-          (sum, t) => sum.plus(new Decimal(t.debit.toString())),
-          new Decimal(0)
+          (sum, t) => sum.plus(new Prisma.Decimal(t.debit.toString())),
+          new Prisma.Decimal(0)
         )
 
       // Calculate investing activities (asset purchases/sales)
@@ -245,8 +245,8 @@ export const reportsRouter = createTRPCRouter({
       const investingCashFlow = transactions
         .filter((t) => investingAccounts.some((acc) => acc.id === t.accountId))
         .reduce(
-          (sum, t) => sum.plus(new Decimal(t.debit.toString())).minus(new Decimal(t.credit.toString())),
-          new Decimal(0)
+          (sum, t) => sum.plus(new Prisma.Decimal(t.debit.toString())).minus(new Prisma.Decimal(t.credit.toString())),
+          new Prisma.Decimal(0)
         )
 
       // Calculate financing activities (loans, equity)
@@ -261,8 +261,8 @@ export const reportsRouter = createTRPCRouter({
       const financingCashFlow = transactions
         .filter((t) => financingAccounts.some((acc) => acc.id === t.accountId))
         .reduce(
-          (sum, t) => sum.plus(new Decimal(t.credit.toString())).minus(new Decimal(t.debit.toString())),
-          new Decimal(0)
+          (sum, t) => sum.plus(new Prisma.Decimal(t.credit.toString())).minus(new Prisma.Decimal(t.debit.toString())),
+          new Prisma.Decimal(0)
         )
 
       // Calculate net cash flow
@@ -276,8 +276,8 @@ export const reportsRouter = createTRPCRouter({
 
       // Calculate beginning and ending cash
       const beginningCash = bankAccounts.reduce(
-        (sum, acc) => sum.plus(new Decimal(acc.openingBalance?.toString() || 0)),
-        new Decimal(0)
+        (sum, acc) => sum.plus(new Prisma.Decimal(acc.openingBalance?.toString() || 0)),
+        new Prisma.Decimal(0)
       )
 
       const endingCash = beginningCash.plus(netCashFlow)
@@ -359,8 +359,8 @@ export const reportsRouter = createTRPCRouter({
           const metadata = (invoice.metadata as any) || {}
           const metadataPayments = metadata.payments || []
           const totalPaid = metadataPayments.reduce(
-            (sum: Decimal, p: any) => sum.plus(new Decimal(p.amount || 0)),
-            new Decimal(0)
+            (sum: Decimal, p: any) => sum.plus(new Prisma.Decimal(p.amount || 0)),
+            new Prisma.Decimal(0)
           )
 
           // Also check for credit notes applied
@@ -377,11 +377,11 @@ export const reportsRouter = createTRPCRouter({
             const cnApplications = cnMetadata.applications || []
             const cnAppliedToThisInvoice = cnApplications
               .filter((app: any) => app.invoiceId === invoice.id)
-              .reduce((s: number, app: any) => s.plus(new Decimal(app.amount || 0)), new Decimal(0))
+              .reduce((s: number, app: any) => s.plus(new Prisma.Decimal(app.amount || 0)), new Prisma.Decimal(0))
             return sum.plus(cnAppliedToThisInvoice)
-          }, new Decimal(0))
+          }, new Prisma.Decimal(0))
 
-          const balance = new Decimal(invoice.total.toString()).minus(totalPaid).minus(creditNotesApplied)
+          const balance = new Prisma.Decimal(invoice.total.toString()).minus(totalPaid).minus(creditNotesApplied)
 
           // Calculate days overdue
           const daysOverdue = Math.floor(
@@ -389,10 +389,10 @@ export const reportsRouter = createTRPCRouter({
           )
 
           // Categorize into aging buckets
-          let bucket0_30 = new Decimal(0)
-          let bucket31_60 = new Decimal(0)
-          let bucket61_90 = new Decimal(0)
-          let bucket90Plus = new Decimal(0)
+          let bucket0_30 = new Prisma.Decimal(0)
+          let bucket31_60 = new Prisma.Decimal(0)
+          let bucket61_90 = new Prisma.Decimal(0)
+          let bucket90Plus = new Prisma.Decimal(0)
 
           if (daysOverdue <= 0) {
             bucket0_30 = balance
@@ -531,11 +531,11 @@ export const reportsRouter = createTRPCRouter({
           )
 
           const totalPaid = payments.reduce(
-            (sum, p) => sum.plus(new Decimal(p.amount.toString())),
-            new Decimal(metadataPaid)
+            (sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())),
+            new Prisma.Decimal(metadataPaid)
           )
 
-          const balance = new Decimal(bill.total.toString()).minus(totalPaid)
+          const balance = new Prisma.Decimal(bill.total.toString()).minus(totalPaid)
 
           // Calculate days overdue
           const daysOverdue = Math.floor(
@@ -543,10 +543,10 @@ export const reportsRouter = createTRPCRouter({
           )
 
           // Categorize into aging buckets
-          let bucket0_30 = new Decimal(0)
-          let bucket31_60 = new Decimal(0)
-          let bucket61_90 = new Decimal(0)
-          let bucket90Plus = new Decimal(0)
+          let bucket0_30 = new Prisma.Decimal(0)
+          let bucket31_60 = new Prisma.Decimal(0)
+          let bucket61_90 = new Prisma.Decimal(0)
+          let bucket90Plus = new Prisma.Decimal(0)
 
           if (daysOverdue <= 0) {
             bucket0_30 = balance

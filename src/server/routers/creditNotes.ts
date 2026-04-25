@@ -20,8 +20,7 @@ import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { postDoubleEntry, type JournalLine } from "@/lib/posting"
-import Decimal from "decimal.js"
-import { CreditNoteStatus, InvoiceStatus } from "@prisma/client"
+import { Prisma, CreditNoteStatus, InvoiceStatus } from "@prisma/client"
 
 /**
  * Credit note list query schema with filters
@@ -47,13 +46,13 @@ function calculateCreditNoteTotals(items: Array<{
   quantity: number
   unitPrice: number
   taxRate: number
-}>): { subtotal: Decimal; taxAmount: Decimal; total: Decimal } {
-  let subtotal = new Decimal(0)
-  let taxAmount = new Decimal(0)
+}>): { subtotal: Prisma.Decimal; taxAmount: Prisma.Decimal; total: Prisma.Decimal } {
+  let subtotal = new Prisma.Decimal(0)
+  let taxAmount = new Prisma.Decimal(0)
 
   for (const item of items) {
-    const lineSubtotal = new Decimal(item.quantity).times(new Decimal(item.unitPrice))
-    const lineTax = lineSubtotal.times(new Decimal(item.taxRate).div(100))
+    const lineSubtotal = new Prisma.Decimal(item.quantity).times(new Prisma.Decimal(item.unitPrice))
+    const lineTax = lineSubtotal.times(new Prisma.Decimal(item.taxRate).div(100))
     subtotal = subtotal.plus(lineSubtotal)
     taxAmount = taxAmount.plus(lineTax)
   }
@@ -263,7 +262,7 @@ export const creditNotesRouter = createTRPCRouter({
           (sum: number, app: any) => sum + (app.amount || 0),
           0
         )
-        const remaining = new Decimal(cn.total.toString()).minus(new Decimal(totalApplied))
+        const remaining = new Prisma.Decimal(cn.total.toString()).minus(new Prisma.Decimal(totalApplied))
 
         return {
           ...cn,
@@ -326,7 +325,7 @@ export const creditNotesRouter = createTRPCRouter({
         (sum: number, app: any) => sum + (app.amount || 0),
         0
       )
-      const remaining = new Decimal(creditNote.total.toString()).minus(new Decimal(totalApplied))
+      const remaining = new Prisma.Decimal(creditNote.total.toString()).minus(new Prisma.Decimal(totalApplied))
 
       return {
         ...creditNote,
@@ -446,10 +445,10 @@ export const creditNotesRouter = createTRPCRouter({
           items: {
             create: creditNoteItems.map((item) => ({
               description: item.description,
-              quantity: new Decimal(item.quantity),
-              unitPrice: new Decimal(item.unitPrice),
-              total: new Decimal(item.quantity * item.unitPrice * (1 + item.taxRate / 100)),
-              taxRate: new Decimal(item.taxRate),
+              quantity: new Prisma.Decimal(item.quantity),
+              unitPrice: new Prisma.Decimal(item.unitPrice),
+              total: new Prisma.Decimal(item.quantity * item.unitPrice * (1 + item.taxRate / 100)),
+              taxRate: new Prisma.Decimal(item.taxRate),
             })),
           },
         },
@@ -546,8 +545,8 @@ export const creditNotesRouter = createTRPCRouter({
         (sum: number, app: any) => sum + (app.amount || 0),
         0
       )
-      const creditNoteTotal = new Decimal(creditNote.total.toString())
-      const remaining = creditNoteTotal.minus(new Decimal(totalApplied))
+      const creditNoteTotal = new Prisma.Decimal(creditNote.total.toString())
+      const remaining = creditNoteTotal.minus(new Prisma.Decimal(totalApplied))
 
       if (remaining.lessThanOrEqualTo(0)) {
         throw new TRPCError({
@@ -557,18 +556,18 @@ export const creditNotesRouter = createTRPCRouter({
       }
 
       // Determine application targets
-      let applicationTargets: Array<{ invoiceId: string; amount: Decimal }> = []
+      let applicationTargets: Array<{ invoiceId: string; amount: Prisma.Decimal }> = []
 
       if (input.applyToMultiple && input.applyToMultiple.length > 0) {
         // Apply to multiple invoices
         applicationTargets = input.applyToMultiple.map((target) => ({
           invoiceId: target.invoiceId,
-          amount: new Decimal(target.amount),
+          amount: new Prisma.Decimal(target.amount),
         }))
       } else if (input.targetInvoiceId) {
         // Apply to single invoice
         const amount = input.amount 
-          ? new Decimal(input.amount)
+          ? new Prisma.Decimal(input.amount)
           : remaining // Apply full remaining if amount not specified
         applicationTargets = [{ invoiceId: input.targetInvoiceId, amount }]
       } else {
@@ -581,7 +580,7 @@ export const creditNotesRouter = createTRPCRouter({
       // Validate total application amount doesn't exceed remaining
       const totalToApply = applicationTargets.reduce(
         (sum, target) => sum.plus(target.amount),
-        new Decimal(0)
+        new Prisma.Decimal(0)
       )
 
       if (totalToApply.greaterThan(remaining)) {
@@ -639,12 +638,12 @@ export const creditNotesRouter = createTRPCRouter({
               const cnAppliedToThisInvoice = cnApplications
                 .filter((app: any) => app.invoiceId === target.invoiceId)
                 .reduce((s: number, app: any) => s + (app.amount || 0), 0)
-              return sum.plus(new Decimal(cnAppliedToThisInvoice))
+              return sum.plus(new Prisma.Decimal(cnAppliedToThisInvoice))
             },
-            new Decimal(0)
+            new Prisma.Decimal(0)
           )
 
-          const invoiceTotal = new Decimal(targetInvoice.total.toString())
+          const invoiceTotal = new Prisma.Decimal(targetInvoice.total.toString())
           const invoiceBalance = invoiceTotal.minus(creditNotesApplied)
 
           // Prevent over-application
@@ -712,7 +711,7 @@ export const creditNotesRouter = createTRPCRouter({
           (sum, app) => sum + (app.amount || 0),
           0
         )
-        const newRemaining = creditNoteTotal.minus(new Decimal(newTotalApplied))
+        const newRemaining = creditNoteTotal.minus(new Prisma.Decimal(newTotalApplied))
 
         // Update status to APPLIED if fully applied
         let newStatus = creditNote.status

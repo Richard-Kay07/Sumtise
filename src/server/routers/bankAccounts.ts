@@ -18,8 +18,7 @@ import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { matchBankTransaction, suggestMatches, calculateReconciledBalance } from "@/lib/reconciliation/matching"
-import Decimal from "decimal.js"
-import { ReconciliationStatus, MatchType } from "@prisma/client"
+import { Prisma, ReconciliationStatus, MatchType } from "@prisma/client"
 
 /**
  * Bank account list query schema
@@ -97,8 +96,8 @@ export const bankAccountsRouter = createTRPCRouter({
         data: {
           ...input,
           organizationId: ctx.organizationId,
-          openingBalance: new Decimal(input.openingBalance),
-          currentBalance: new Decimal(input.openingBalance),
+          openingBalance: new Prisma.Decimal(input.openingBalance),
+          currentBalance: new Prisma.Decimal(input.openingBalance),
         },
       })
     }),
@@ -417,7 +416,7 @@ export const bankAccountsRouter = createTRPCRouter({
       const bankTxsForMatching = bankTransactions.map((tx) => ({
         id: tx.id,
         date: tx.date,
-        amount: new Decimal(tx.amount.toString()),
+        amount: new Prisma.Decimal(tx.amount.toString()),
         description: tx.description,
         payee: tx.payee || undefined,
         memo: tx.memo || undefined,
@@ -427,8 +426,8 @@ export const bankAccountsRouter = createTRPCRouter({
       const ledgerTxsForMatching = ledgerTransactions.map((tx) => ({
         id: tx.id,
         date: tx.date,
-        debit: new Decimal(tx.debit.toString()),
-        credit: new Decimal(tx.credit.toString()),
+        debit: new Prisma.Decimal(tx.debit.toString()),
+        credit: new Prisma.Decimal(tx.credit.toString()),
         description: tx.description,
         reference: tx.reference || undefined,
         accountId: tx.accountId,
@@ -480,7 +479,7 @@ export const bankAccountsRouter = createTRPCRouter({
           organizationId: ctx.organizationId,
           bankAccountId,
           statementDate,
-          statementBalance: new Decimal(statementBalance),
+          statementBalance: new Prisma.Decimal(statementBalance),
           status: ReconciliationStatus.IN_PROGRESS,
           notes,
         },
@@ -488,7 +487,7 @@ export const bankAccountsRouter = createTRPCRouter({
 
       // Create reconciliation lines and mark transactions as reconciled
       const reconciliationLines = []
-      let reconciledBalance = new Decimal(0)
+      let reconciledBalance = new Prisma.Decimal(0)
 
       for (const match of matches) {
         // Update bank transaction
@@ -507,18 +506,18 @@ export const bankAccountsRouter = createTRPCRouter({
             reconciliationId: reconciliation.id,
             bankTransactionId: match.bankTransactionId,
             transactionId: match.transactionId || null,
-            amount: new Decimal(match.amount),
+            amount: new Prisma.Decimal(match.amount),
             matchType: match.matchType as MatchType,
             notes: match.notes || null,
           },
         })
 
         reconciliationLines.push(line)
-        reconciledBalance = reconciledBalance.plus(new Decimal(match.amount))
+        reconciledBalance = reconciledBalance.plus(new Prisma.Decimal(match.amount))
       }
 
       // Calculate difference
-      const difference = new Decimal(statementBalance).minus(reconciledBalance)
+      const difference = new Prisma.Decimal(statementBalance).minus(reconciledBalance)
 
       // Update reconciliation
       const updatedReconciliation = await prisma.reconciliation.update({
@@ -594,7 +593,7 @@ export const bankAccountsRouter = createTRPCRouter({
       const after = await prisma.bankAccount.update({
         where: { id: input.id },
         data: {
-          currentBalance: new Decimal(input.balance),
+          currentBalance: new Prisma.Decimal(input.balance),
           metadata: {
             ...((before.metadata as any) || {}),
             balanceUpdatedAt: new Date().toISOString(),
@@ -677,7 +676,7 @@ export const bankAccountsRouter = createTRPCRouter({
       })
 
       // Get GL balance (sum of transactions)
-      let glBalance = new Decimal(0)
+      let glBalance = new Prisma.Decimal(0)
       if (glAccount) {
         const transactions = await prisma.transaction.findMany({
           where: {
@@ -688,8 +687,8 @@ export const bankAccountsRouter = createTRPCRouter({
         })
 
         glBalance = transactions.reduce(
-          (sum, tx) => sum.plus(new Decimal(tx.debit.toString())).minus(new Decimal(tx.credit.toString())),
-          new Decimal(glAccount.openingBalance?.toString() || 0)
+          (sum, tx) => sum.plus(new Prisma.Decimal(tx.debit.toString())).minus(new Prisma.Decimal(tx.credit.toString())),
+          new Prisma.Decimal(glAccount.openingBalance?.toString() || 0)
         )
       }
 
@@ -705,8 +704,8 @@ export const bankAccountsRouter = createTRPCRouter({
       })
 
       const unreconciledAmount = unreconciled.reduce(
-        (sum, tx) => sum.plus(new Decimal(tx.amount.toString())),
-        new Decimal(0)
+        (sum, tx) => sum.plus(new Prisma.Decimal(tx.amount.toString())),
+        new Prisma.Decimal(0)
       )
 
       // Calculate difference
@@ -807,12 +806,12 @@ export const bankAccountsRouter = createTRPCRouter({
 
       let transactions: Array<{
         date: Date
-        amount: Decimal
+        amount: Prisma.Decimal
         description: string
         payee?: string
         memo?: string
         reference?: string
-        balance?: Decimal
+        balance?: Prisma.Decimal
         transactionHash: string
       }> = []
       let errors: Array<{ row: number; message: string }> = []

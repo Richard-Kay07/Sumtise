@@ -20,8 +20,7 @@ import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { postDoubleEntry, type JournalLine } from "@/lib/posting"
-import Decimal from "decimal.js"
-import { PaymentRunStatus, BillStatus, PaymentMethod, PaymentStatus } from "@prisma/client"
+import { Prisma, PaymentRunStatus, BillStatus, PaymentMethod, PaymentStatus } from "@prisma/client"
 
 /**
  * Payment run list query schema with filters
@@ -140,11 +139,11 @@ async function getOutstandingBillsByCriteria(
   const outstandingBills = bills
     .map((bill) => {
       const totalPaid = bill.payments.reduce(
-        (sum, p) => sum.plus(new Decimal(p.amount.toString())),
-        new Decimal(0)
+        (sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())),
+        new Prisma.Decimal(0)
       )
 
-      const balance = new Decimal(bill.total.toString()).minus(totalPaid)
+      const balance = new Prisma.Decimal(bill.total.toString()).minus(totalPaid)
 
       // Apply minAmount filter if specified
       if (criteria.minAmount !== undefined && balance.lessThan(criteria.minAmount)) {
@@ -431,8 +430,8 @@ export const paymentRunsRouter = createTRPCRouter({
 
       // Calculate total amount
       const totalAmount = outstandingBills.reduce(
-        (sum, bill) => sum.plus(new Decimal(bill.balance)),
-        new Decimal(0)
+        (sum, bill) => sum.plus(new Prisma.Decimal(bill.balance)),
+        new Prisma.Decimal(0)
       )
 
       // Generate run number
@@ -683,7 +682,7 @@ export const paymentRunsRouter = createTRPCRouter({
 
         // Process each bill
         const createdPayments: Array<{ id: string; billId: string; amount: number }> = []
-        let totalProcessed = new Decimal(0)
+        let totalProcessed = new Prisma.Decimal(0)
 
         for (const snapshot of billSnapshots) {
           // Get current bill state
@@ -705,14 +704,14 @@ export const paymentRunsRouter = createTRPCRouter({
 
           // Calculate current balance
           const totalPaid = bill.payments.reduce(
-            (sum, p) => sum.plus(new Decimal(p.amount.toString())),
-            new Decimal(0)
+            (sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())),
+            new Prisma.Decimal(0)
           )
-          const billTotal = new Decimal(bill.total.toString())
+          const billTotal = new Prisma.Decimal(bill.total.toString())
           const currentBalance = billTotal.minus(totalPaid)
 
           // Use snapshot balance or current balance (whichever is smaller to prevent over-payment)
-          const paymentAmount = Decimal.min(new Decimal(snapshot.balance), currentBalance)
+          const paymentAmount = Decimal.min(new Prisma.Decimal(snapshot.balance), currentBalance)
 
           if (paymentAmount.lessThanOrEqualTo(0)) {
             console.warn(`Bill ${snapshot.billId} has no remaining balance, skipping`)

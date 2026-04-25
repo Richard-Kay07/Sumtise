@@ -18,8 +18,7 @@ import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { postDoubleEntry, type JournalLine } from "@/lib/posting"
-import Decimal from "decimal.js"
-import { BillStatus } from "@prisma/client"
+import { Prisma, BillStatus } from "@prisma/client"
 
 /**
  * Bill list query schema with filters
@@ -55,13 +54,13 @@ function calculateBillTotals(items: Array<{
   quantity: number
   unitPrice: number
   taxRate: number
-}>): { subtotal: Decimal; taxAmount: Decimal; total: Decimal } {
-  let subtotal = new Decimal(0)
-  let taxAmount = new Decimal(0)
+}>): { subtotal: Prisma.Decimal; taxAmount: Prisma.Decimal; total: Prisma.Decimal } {
+  let subtotal = new Prisma.Decimal(0)
+  let taxAmount = new Prisma.Decimal(0)
 
   for (const item of items) {
-    const lineSubtotal = new Decimal(item.quantity).times(new Decimal(item.unitPrice))
-    const lineTax = lineSubtotal.times(new Decimal(item.taxRate).div(100))
+    const lineSubtotal = new Prisma.Decimal(item.quantity).times(new Prisma.Decimal(item.unitPrice))
+    const lineTax = lineSubtotal.times(new Prisma.Decimal(item.taxRate).div(100))
     subtotal = subtotal.plus(lineSubtotal)
     taxAmount = taxAmount.plus(lineTax)
   }
@@ -203,9 +202,9 @@ export const billsRouter = createTRPCRouter({
       const billsWithBalance = bills.map((bill) => {
         const totalPaid = bill.payments
           .filter((p) => p.status === "COMPLETED")
-          .reduce((sum, p) => sum.plus(new Decimal(p.amount.toString())), new Decimal(0))
+          .reduce((sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())), new Prisma.Decimal(0))
 
-        const balance = new Decimal(bill.total.toString()).minus(totalPaid)
+        const balance = new Prisma.Decimal(bill.total.toString()).minus(totalPaid)
 
         // Apply balance filters if specified
         if (minBalance !== undefined && balance.lessThan(minBalance)) {
@@ -304,9 +303,9 @@ export const billsRouter = createTRPCRouter({
       // Calculate balance
       const totalPaid = bill.payments
         .filter((p) => p.status === "COMPLETED")
-        .reduce((sum, p) => sum.plus(new Decimal(p.amount.toString())), new Decimal(0))
+        .reduce((sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())), new Prisma.Decimal(0))
 
-      const balance = new Decimal(bill.total.toString()).minus(totalPaid)
+      const balance = new Prisma.Decimal(bill.total.toString()).minus(totalPaid)
 
       return {
         ...bill,
@@ -428,10 +427,10 @@ export const billsRouter = createTRPCRouter({
           items: {
             create: items.map((item) => ({
               description: item.description,
-              quantity: new Decimal(item.quantity),
-              unitPrice: new Decimal(item.unitPrice),
-              total: new Decimal(item.quantity * item.unitPrice * (1 + item.taxRate / 100)),
-              taxRate: new Decimal(item.taxRate),
+              quantity: new Prisma.Decimal(item.quantity),
+              unitPrice: new Prisma.Decimal(item.unitPrice),
+              total: new Prisma.Decimal(item.quantity * item.unitPrice * (1 + item.taxRate / 100)),
+              taxRate: new Prisma.Decimal(item.taxRate),
               taxCodeId: item.taxCodeId,
               accountId: item.accountId,
               lineMemo: item.lineMemo,
@@ -588,10 +587,10 @@ export const billsRouter = createTRPCRouter({
         updateData.items = {
           create: input.data.items.map((item) => ({
             description: item.description,
-            quantity: new Decimal(item.quantity),
-            unitPrice: new Decimal(item.unitPrice),
-            total: new Decimal(item.quantity * item.unitPrice * (1 + item.taxRate / 100)),
-            taxRate: new Decimal(item.taxRate),
+            quantity: new Prisma.Decimal(item.quantity),
+            unitPrice: new Prisma.Decimal(item.unitPrice),
+            total: new Prisma.Decimal(item.quantity * item.unitPrice * (1 + item.taxRate / 100)),
+            taxRate: new Prisma.Decimal(item.taxRate),
             taxCodeId: item.taxCodeId,
             accountId: item.accountId,
             lineMemo: item.lineMemo,
@@ -760,11 +759,11 @@ export const billsRouter = createTRPCRouter({
       const outstandingBills = bills
         .map((bill) => {
           const totalPaid = bill.payments.reduce(
-            (sum, p) => sum.plus(new Decimal(p.amount.toString())),
-            new Decimal(0)
+            (sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())),
+            new Prisma.Decimal(0)
           )
 
-          const balance = new Decimal(bill.total.toString()).minus(totalPaid)
+          const balance = new Prisma.Decimal(bill.total.toString()).minus(totalPaid)
 
           // Apply amount filters
           if (input.minAmount !== undefined && balance.lessThan(input.minAmount)) {
@@ -881,7 +880,7 @@ export const billsRouter = createTRPCRouter({
           })
         }
 
-        const lineTotal = new Decimal(item.total.toString())
+        const lineTotal = new Prisma.Decimal(item.total.toString())
         journalLines.push({
           accountId: item.accountId,
           debit: lineTotal.toNumber(),
@@ -897,7 +896,7 @@ export const billsRouter = createTRPCRouter({
       }
 
       // CR AP control account
-      const totalAmount = new Decimal(bill.total.toString())
+      const totalAmount = new Prisma.Decimal(bill.total.toString())
       journalLines.push({
         accountId: apAccount.id,
         debit: 0,
@@ -1017,11 +1016,11 @@ export const billsRouter = createTRPCRouter({
 
       // Calculate total paid
       const totalPaid = bill.payments.reduce(
-        (sum, p) => sum.plus(new Decimal(p.amount.toString())),
-        new Decimal(0)
+        (sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())),
+        new Prisma.Decimal(0)
       )
 
-      const billTotal = new Decimal(bill.total.toString())
+      const billTotal = new Prisma.Decimal(bill.total.toString())
       const balance = billTotal.minus(totalPaid)
 
       // Determine new status

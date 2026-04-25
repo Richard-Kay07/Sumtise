@@ -7,7 +7,7 @@ import { createOrganizationSchema, createChartOfAccountSchema, createTransaction
 import { generateInvoiceNumber } from "@/lib/utils"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { recordAudit } from "@/lib/audit"
-import Decimal from "decimal.js"
+import { Prisma } from "@prisma/client"
 import { helloRouter } from "./hello"
 import { vendorsRouter } from "./vendors"
 import { billsRouter } from "./bills"
@@ -85,7 +85,7 @@ async function generateAndStorePDF(invoice: any, organizationId: string): Promis
 /**
  * Calculate invoice balance (total - payments - credit notes)
  */
-async function calculateInvoiceBalance(invoiceId: string, organizationId: string): Promise<Decimal> {
+async function calculateInvoiceBalance(invoiceId: string, organizationId: string): Promise<Prisma.Decimal> {
   // Get invoice
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
@@ -98,7 +98,7 @@ async function calculateInvoiceBalance(invoiceId: string, organizationId: string
     })
   }
 
-  const invoiceTotal = new Decimal(invoice.total.toString())
+  const invoiceTotal = new Prisma.Decimal(invoice.total.toString())
 
   // Get payments from metadata
   const metadata = (invoice.metadata as any) || {}
@@ -119,11 +119,11 @@ async function calculateInvoiceBalance(invoiceId: string, organizationId: string
     const cnAppliedToThisInvoice = cnApplications
       .filter((app: any) => app.invoiceId === invoiceId)
       .reduce((s: number, app: any) => s + (app.amount || 0), 0)
-    return sum.plus(new Decimal(cnAppliedToThisInvoice))
-  }, new Decimal(0))
+    return sum.plus(new Prisma.Decimal(cnAppliedToThisInvoice))
+  }, new Prisma.Decimal(0))
 
   // Balance = total - payments - credit notes
-  const balance = invoiceTotal.minus(new Decimal(totalPaid)).minus(creditNotesApplied)
+  const balance = invoiceTotal.minus(new Prisma.Decimal(totalPaid)).minus(creditNotesApplied)
 
   return balance
 }
@@ -1091,7 +1091,7 @@ export const appRouter = createTRPCRouter({
         const currentBalance = await calculateInvoiceBalance(id, ctx.organizationId)
 
         // Check if payment exceeds balance (allow overpayment for on-account credit)
-        const paymentAmount = new Decimal(amount)
+        const paymentAmount = new Prisma.Decimal(amount)
         const newBalance = currentBalance.minus(paymentAmount)
 
         // Get accounts for posting

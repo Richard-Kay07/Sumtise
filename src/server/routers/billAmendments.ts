@@ -19,8 +19,7 @@ import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { postDoubleEntry, type JournalLine } from "@/lib/posting"
-import Decimal from "decimal.js"
-import { AmendmentType, AmendmentStatus, BillStatus, AccountType } from "@prisma/client"
+import { Prisma, AmendmentType, AmendmentStatus, BillStatus, AccountType } from "@prisma/client"
 
 /**
  * Amendment list query schema with filters
@@ -47,13 +46,13 @@ function calculateBillTotals(items: Array<{
   quantity: number
   unitPrice: number
   taxRate: number
-}>): { subtotal: Decimal; taxAmount: Decimal; total: Decimal } {
-  let subtotal = new Decimal(0)
-  let taxAmount = new Decimal(0)
+}>): { subtotal: Prisma.Decimal; taxAmount: Prisma.Decimal; total: Prisma.Decimal } {
+  let subtotal = new Prisma.Decimal(0)
+  let taxAmount = new Prisma.Decimal(0)
 
   for (const item of items) {
-    const lineSubtotal = new Decimal(item.quantity).times(new Decimal(item.unitPrice))
-    const lineTax = lineSubtotal.times(new Decimal(item.taxRate).div(100))
+    const lineSubtotal = new Prisma.Decimal(item.quantity).times(new Prisma.Decimal(item.unitPrice))
+    const lineTax = lineSubtotal.times(new Prisma.Decimal(item.taxRate).div(100))
     subtotal = subtotal.plus(lineSubtotal)
     taxAmount = taxAmount.plus(lineTax)
   }
@@ -68,15 +67,15 @@ function calculateBillTotals(items: Array<{
  */
 function hasFinancialImpact(originalData: any, amendedData: any): boolean {
   // Check amount changes
-  const originalTotal = new Decimal(originalData.total || 0)
-  const amendedTotal = new Decimal(amendedData.total || 0)
+  const originalTotal = new Prisma.Decimal(originalData.total || 0)
+  const amendedTotal = new Prisma.Decimal(amendedData.total || 0)
   if (!originalTotal.equals(amendedTotal)) {
     return true
   }
 
   // Check tax changes
-  const originalTax = new Decimal(originalData.taxAmount || 0)
-  const amendedTax = new Decimal(amendedData.taxAmount || 0)
+  const originalTax = new Prisma.Decimal(originalData.taxAmount || 0)
+  const amendedTax = new Prisma.Decimal(amendedData.taxAmount || 0)
   if (!originalTax.equals(amendedTax)) {
     return true
   }
@@ -99,8 +98,8 @@ function hasFinancialImpact(originalData: any, amendedData: any): boolean {
     }
     
     // Check amount changes per item
-    const origItemTotal = new Decimal(origItem.total || origItem.quantity * origItem.unitPrice || 0)
-    const amendItemTotal = new Decimal(amendItem.total || amendItem.quantity * amendItem.unitPrice || 0)
+    const origItemTotal = new Prisma.Decimal(origItem.total || origItem.quantity * origItem.unitPrice || 0)
+    const amendItemTotal = new Prisma.Decimal(amendItem.total || amendItem.quantity * amendItem.unitPrice || 0)
     if (!origItemTotal.equals(amendItemTotal)) {
       return true
     }
@@ -473,10 +472,10 @@ export const billAmendmentsRouter = createTRPCRouter({
       // Check if bill can be amended
       // For paid bills with zero balance, only allow memo/notes updates
       const totalPaid = bill.payments.reduce(
-        (sum, p) => sum.plus(new Decimal(p.amount.toString())),
-        new Decimal(0)
+        (sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())),
+        new Prisma.Decimal(0)
       )
-      const billBalance = new Decimal(bill.total.toString()).minus(totalPaid)
+      const billBalance = new Prisma.Decimal(bill.total.toString()).minus(totalPaid)
 
       if (billBalance.lessThanOrEqualTo(0) && bill.status === BillStatus.PAID) {
         // Only allow non-financial changes
@@ -680,9 +679,9 @@ export const billAmendmentsRouter = createTRPCRouter({
           })
 
           // Create new items
-          updateData.subtotal = new Decimal(amendedData.subtotal)
-          updateData.taxAmount = new Decimal(amendedData.taxAmount)
-          updateData.total = new Decimal(amendedData.total)
+          updateData.subtotal = new Prisma.Decimal(amendedData.subtotal)
+          updateData.taxAmount = new Prisma.Decimal(amendedData.taxAmount)
+          updateData.total = new Prisma.Decimal(amendedData.total)
 
           await tx.bill.update({
             where: { id: amendment.billId },
@@ -691,10 +690,10 @@ export const billAmendmentsRouter = createTRPCRouter({
               items: {
                 create: amendedData.items.map((item: any) => ({
                   description: item.description,
-                  quantity: new Decimal(item.quantity),
-                  unitPrice: new Decimal(item.unitPrice),
-                  total: new Decimal(item.quantity * item.unitPrice * (1 + (item.taxRate || 0) / 100)),
-                  taxRate: new Decimal(item.taxRate || 0),
+                  quantity: new Prisma.Decimal(item.quantity),
+                  unitPrice: new Prisma.Decimal(item.unitPrice),
+                  total: new Prisma.Decimal(item.quantity * item.unitPrice * (1 + (item.taxRate || 0) / 100)),
+                  taxRate: new Prisma.Decimal(item.taxRate || 0),
                   accountId: item.accountId || undefined,
                   taxCodeId: item.taxCodeId || undefined,
                   lineMemo: item.lineMemo || undefined,
@@ -714,8 +713,8 @@ export const billAmendmentsRouter = createTRPCRouter({
         let adjustmentJournal = null
         if (financialImpact) {
           const apAccount = await getAPAccount(ctx.organizationId)
-          const originalTotal = new Decimal(originalData.total || 0)
-          const amendedTotal = new Decimal(amendedData.total || 0)
+          const originalTotal = new Prisma.Decimal(originalData.total || 0)
+          const amendedTotal = new Prisma.Decimal(amendedData.total || 0)
           const difference = amendedTotal.minus(originalTotal)
 
           if (!difference.equals(0)) {
@@ -727,7 +726,7 @@ export const billAmendmentsRouter = createTRPCRouter({
               // Reverse original expense postings
               for (const origItem of originalData.items) {
                 if (origItem.accountId) {
-                  const origItemTotal = new Decimal(origItem.total || origItem.quantity * origItem.unitPrice || 0)
+                  const origItemTotal = new Prisma.Decimal(origItem.total || origItem.quantity * origItem.unitPrice || 0)
                   journalLines.push({
                     accountId: origItem.accountId,
                     debit: 0,
@@ -746,7 +745,7 @@ export const billAmendmentsRouter = createTRPCRouter({
               // Post new expense postings
               for (const amendItem of amendedData.items) {
                 if (amendItem.accountId) {
-                  const amendItemTotal = new Decimal(amendItem.total || amendItem.quantity * amendItem.unitPrice || 0)
+                  const amendItemTotal = new Prisma.Decimal(amendItem.total || amendItem.quantity * amendItem.unitPrice || 0)
                   journalLines.push({
                     accountId: amendItem.accountId,
                     debit: amendItemTotal.toNumber(),

@@ -56,7 +56,7 @@ async function generateInvoicePDFForEmail(invoice: any, organizationId: string):
   return await generateInvoicePDF(pdfData)
 }
 
-import Decimal from "decimal.js"
+import { Prisma } from "@prisma/client"
 
 /**
  * Email list query schema

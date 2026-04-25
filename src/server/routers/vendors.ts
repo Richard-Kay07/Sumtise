@@ -18,7 +18,7 @@ import { paginationSchema, createVendorSchema, updateVendorSchema } from "@/type
 import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
-import Decimal from "decimal.js"
+import { Prisma } from "@prisma/client"
 
 /**
  * Vendor list query schema with filters
@@ -73,7 +73,7 @@ type VendorDetailResponse = {
   updatedAt: Date
   // Joined counts
   billsCount: number
-  totalOutstanding: Decimal
+  totalOutstanding: Prisma.Decimal
   lastPaymentDate: Date | null
   defaultExpenseAccount?: {
     id: string
@@ -287,8 +287,8 @@ export const vendorsRouter = createTRPCRouter({
 
       const billsCount = bills.length
       const totalOutstanding = bills.reduce(
-        (sum, bill) => sum.plus(new Decimal(bill.total.toString())),
-        new Decimal(0)
+        (sum, bill) => sum.plus(new Prisma.Decimal(bill.total.toString())),
+        new Prisma.Decimal(0)
       )
 
       // Get last payment date
@@ -565,8 +565,8 @@ export const vendorsRouter = createTRPCRouter({
 
         if (outstandingBills.length > 0) {
           const totalOutstanding = outstandingBills.reduce(
-            (sum, bill) => sum.plus(new Decimal(bill.total.toString())),
-            new Decimal(0)
+            (sum, bill) => sum.plus(new Prisma.Decimal(bill.total.toString())),
+            new Prisma.Decimal(0)
           )
 
           throw new TRPCError({

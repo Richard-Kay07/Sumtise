@@ -20,8 +20,7 @@ import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { createAndSendEmail } from "@/lib/email/outbox"
 import { getTemplate, renderTemplate } from "@/lib/email/templates"
-import Decimal from "decimal.js"
-import { InvoiceStatus, ReminderType, ReminderStatus } from "@prisma/client"
+import { Prisma, InvoiceStatus, ReminderType, ReminderStatus } from "@prisma/client"
 
 /**
  * Reminder list query schema with filters

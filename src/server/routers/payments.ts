@@ -21,8 +21,7 @@ import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { postDoubleEntry, type JournalLine } from "@/lib/posting"
-import Decimal from "decimal.js"
-import { PaymentStatus, BillStatus, PaymentMethod } from "@prisma/client"
+import { Prisma, PaymentStatus, BillStatus, PaymentMethod } from "@prisma/client"
 
 /**
  * Payment list query schema with filters
@@ -112,18 +111,18 @@ async function getPrepaymentAccount(organizationId: string) {
  * Returns array of { itemId, amount } for tracking
  */
 function applyPaymentToBillItems(
-  items: Array<{ id: string; total: Decimal }>,
-  existingPayments: Array<{ amount: Decimal }>,
-  paymentAmount: Decimal
-): Array<{ itemId: string; amount: Decimal }> {
+  items: Array<{ id: string; total: Prisma.Decimal }>,
+  existingPayments: Array<{ amount: Prisma.Decimal }>,
+  paymentAmount: Prisma.Decimal
+): Array<{ itemId: string; amount: Prisma.Decimal }> {
   // Calculate total already paid
   const totalPaid = existingPayments.reduce(
     (sum, p) => sum.plus(p.amount),
-    new Decimal(0)
+    new Prisma.Decimal(0)
   )
 
   // Calculate bill total
-  const billTotal = items.reduce((sum, item) => sum.plus(item.total), new Decimal(0))
+  const billTotal = items.reduce((sum, item) => sum.plus(item.total), new Prisma.Decimal(0))
 
   // Calculate remaining balance
   const remainingBalance = billTotal.minus(totalPaid)
@@ -137,7 +136,7 @@ function applyPaymentToBillItems(
   }
 
   // Track how much has been paid per item (oldest first)
-  const applications: Array<{ itemId: string; amount: Decimal }> = []
+  const applications: Array<{ itemId: string; amount: Prisma.Decimal }> = []
   let remainingPayment = paymentAmount
 
   // Sort items by creation order (oldest first) - items are typically in order
@@ -152,10 +151,10 @@ function applyPaymentToBillItems(
       // For simplicity, we'll distribute existing payments proportionally
       // In a real system, you'd track item-level payments
       return sum
-    }, new Decimal(0))
+    }, new Prisma.Decimal(0))
 
     const itemRemaining = itemTotal.minus(itemPaid)
-    const amountToApply = Decimal.min(remainingPayment, itemRemaining)
+    const amountToApply = Prisma.Decimal.min(remainingPayment, itemRemaining)
 
     if (amountToApply.greaterThan(0)) {
       applications.push({
@@ -390,12 +389,12 @@ export const paymentsRouter = createTRPCRouter({
 
         // Check if payment would over-apply
         const totalPaid = bill.payments.reduce(
-          (sum, p) => sum.plus(new Decimal(p.amount.toString())),
-          new Decimal(0)
+          (sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())),
+          new Prisma.Decimal(0)
         )
-        const billTotal = new Decimal(bill.total.toString())
+        const billTotal = new Prisma.Decimal(bill.total.toString())
         const remainingBalance = billTotal.minus(totalPaid)
-        const paymentAmount = new Decimal(amount)
+        const paymentAmount = new Prisma.Decimal(amount)
 
         if (paymentAmount.greaterThan(remainingBalance)) {
           throw new TRPCError({
@@ -522,7 +521,7 @@ export const paymentsRouter = createTRPCRouter({
             billId: billId || null,
             vendorId: finalVendorId!,
             bankAccountId,
-            amount: new Decimal(amount),
+            amount: new Prisma.Decimal(amount),
             currency: currency || "GBP",
             paymentDate: date,
             paymentMethod: method as PaymentMethod,
@@ -617,10 +616,10 @@ export const paymentsRouter = createTRPCRouter({
 
           if (bill) {
             const totalPaid = bill.payments.reduce(
-              (sum, p) => sum.plus(new Decimal(p.amount.toString())),
-              new Decimal(0)
+              (sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())),
+              new Prisma.Decimal(0)
             )
-            const billTotal = new Decimal(bill.total.toString())
+            const billTotal = new Prisma.Decimal(bill.total.toString())
             const balance = billTotal.minus(totalPaid)
 
             let newStatus = bill.status
@@ -820,11 +819,11 @@ export const paymentsRouter = createTRPCRouter({
         const totalPaid = bill.payments
           .filter((p) => p.id !== payment.id && p.status === "COMPLETED")
           .reduce(
-            (sum, p) => sum.plus(new Decimal(p.amount.toString())),
-            new Decimal(0)
+            (sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())),
+            new Prisma.Decimal(0)
           )
 
-        const billTotal = new Decimal(bill.total.toString())
+        const billTotal = new Prisma.Decimal(bill.total.toString())
         const balance = billTotal.minus(totalPaid)
 
         let newStatus = BillStatus.APPROVED
@@ -923,9 +922,9 @@ export const paymentsRouter = createTRPCRouter({
       })
 
       // Calculate running balance
-      let runningBalance = new Decimal(0)
+      let runningBalance = new Prisma.Decimal(0)
       const history = payments.map((payment) => {
-        const amount = new Decimal(payment.amount.toString())
+        const amount = new Prisma.Decimal(payment.amount.toString())
         
         if (payment.status === "REVERSED") {
           runningBalance = runningBalance.minus(amount)

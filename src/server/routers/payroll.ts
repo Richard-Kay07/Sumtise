@@ -12,7 +12,7 @@ import { createTRPCRouter, orgScopedProcedure, requirePermissionProcedure } from
 import { Permission } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { TRPCError } from "@trpc/server"
-import Decimal from "decimal.js"
+import { Prisma } from "@prisma/client"
 
 export const payrollRouter = createTRPCRouter({
   /**
@@ -156,8 +156,8 @@ export const payrollRouter = createTRPCRouter({
           data: {
             ...data,
             organizationId: ctx.organizationId,
-            salary: data.salary ? new Decimal(data.salary) : null,
-            hourlyRate: data.hourlyRate ? new Decimal(data.hourlyRate) : null,
+            salary: data.salary ? new Prisma.Decimal(data.salary) : null,
+            hourlyRate: data.hourlyRate ? new Prisma.Decimal(data.hourlyRate) : null,
           },
           include: {
             user: {
@@ -313,9 +313,9 @@ export const payrollRouter = createTRPCRouter({
             ...data,
             organizationId: ctx.organizationId,
             status: "DRAFT",
-            totalGross: new Decimal(0),
-            totalDeductions: new Decimal(0),
-            totalNet: new Decimal(0),
+            totalGross: new Prisma.Decimal(0),
+            totalDeductions: new Prisma.Decimal(0),
+            totalNet: new Prisma.Decimal(0),
             employeeCount: 0,
           },
         })
@@ -409,12 +409,12 @@ export const payrollRouter = createTRPCRouter({
         }
 
         // Calculate deductions and net pay
-        const deductions = new Decimal(taxAmount)
+        const deductions = new Prisma.Decimal(taxAmount)
           .plus(nationalInsurance)
           .plus(pensionEmployee)
           .plus(otherDeductions)
 
-        const netPay = new Decimal(grossPay).minus(deductions)
+        const netPay = new Prisma.Decimal(grossPay).minus(deductions)
 
         // Create entry
         const entry = await prisma.payrollEntry.create({
@@ -422,14 +422,14 @@ export const payrollRouter = createTRPCRouter({
             organizationId: ctx.organizationId,
             payrollRunId,
             employeeId,
-            grossPay: new Decimal(grossPay),
+            grossPay: new Prisma.Decimal(grossPay),
             deductions,
             netPay,
-            taxAmount: new Decimal(taxAmount),
-            nationalInsurance: new Decimal(nationalInsurance),
-            pensionEmployee: new Decimal(pensionEmployee),
-            pensionEmployer: new Decimal(pensionEmployer),
-            otherDeductions: new Decimal(otherDeductions),
+            taxAmount: new Prisma.Decimal(taxAmount),
+            nationalInsurance: new Prisma.Decimal(nationalInsurance),
+            pensionEmployee: new Prisma.Decimal(pensionEmployee),
+            pensionEmployer: new Prisma.Decimal(pensionEmployer),
+            otherDeductions: new Prisma.Decimal(otherDeductions),
             ...rest,
           },
         })

@@ -20,8 +20,7 @@ import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { postDoubleEntry, type JournalLine } from "@/lib/posting"
-import Decimal from "decimal.js"
-import { DebitNoteStatus, BillStatus, AccountType } from "@prisma/client"
+import { Prisma, DebitNoteStatus, BillStatus, AccountType } from "@prisma/client"
 
 /**
  * Debit note list query schema with filters
@@ -48,13 +47,13 @@ function calculateDebitNoteTotals(items: Array<{
   quantity: number
   unitPrice: number
   taxRate: number
-}>): { subtotal: Decimal; taxAmount: Decimal; total: Decimal } {
-  let subtotal = new Decimal(0)
-  let taxAmount = new Decimal(0)
+}>): { subtotal: Prisma.Decimal; taxAmount: Prisma.Decimal; total: Prisma.Decimal } {
+  let subtotal = new Prisma.Decimal(0)
+  let taxAmount = new Prisma.Decimal(0)
 
   for (const item of items) {
-    const lineSubtotal = new Decimal(item.quantity).times(new Decimal(item.unitPrice))
-    const lineTax = lineSubtotal.times(new Decimal(item.taxRate).div(100))
+    const lineSubtotal = new Prisma.Decimal(item.quantity).times(new Prisma.Decimal(item.unitPrice))
+    const lineTax = lineSubtotal.times(new Prisma.Decimal(item.taxRate).div(100))
     subtotal = subtotal.plus(lineSubtotal)
     taxAmount = taxAmount.plus(lineTax)
   }
@@ -310,7 +309,7 @@ export const debitNotesRouter = createTRPCRouter({
             }
           }
 
-          const remaining = new Decimal(dn.total.toString()).minus(new Decimal(totalApplied))
+          const remaining = new Prisma.Decimal(dn.total.toString()).minus(new Prisma.Decimal(totalApplied))
 
           return {
             ...dn,
@@ -409,7 +408,7 @@ export const debitNotesRouter = createTRPCRouter({
         }
       }
 
-      const remaining = new Decimal(debitNote.total.toString()).minus(new Decimal(totalApplied))
+      const remaining = new Prisma.Decimal(debitNote.total.toString()).minus(new Prisma.Decimal(totalApplied))
 
       return {
         ...debitNote,
@@ -514,10 +513,10 @@ export const debitNotesRouter = createTRPCRouter({
           items: {
             create: debitNoteItems.map((item) => ({
               description: item.description,
-              quantity: new Decimal(item.quantity),
-              unitPrice: new Decimal(item.unitPrice),
-              total: new Decimal(item.quantity * item.unitPrice * (1 + item.taxRate / 100)),
-              taxRate: new Decimal(item.taxRate),
+              quantity: new Prisma.Decimal(item.quantity),
+              unitPrice: new Prisma.Decimal(item.unitPrice),
+              total: new Prisma.Decimal(item.quantity * item.unitPrice * (1 + item.taxRate / 100)),
+              taxRate: new Prisma.Decimal(item.taxRate),
             })),
           },
         },
@@ -634,10 +633,10 @@ export const debitNotesRouter = createTRPCRouter({
         }
       }
 
-      const debitNoteTotal = new Decimal(debitNote.total.toString())
-      const appliedAmount = new Decimal(totalApplied)
+      const debitNoteTotal = new Prisma.Decimal(debitNote.total.toString())
+      const appliedAmount = new Prisma.Decimal(totalApplied)
       const remainingAmount = debitNoteTotal.minus(appliedAmount)
-      const applyAmount = new Decimal(input.amount)
+      const applyAmount = new Prisma.Decimal(input.amount)
 
       // Prevent over-application
       if (applyAmount.greaterThan(remainingAmount)) {
@@ -685,19 +684,19 @@ export const debitNotesRouter = createTRPCRouter({
 
       // Calculate bill balance (total - payments - debit notes applied)
       const totalPaid = targetBill.payments.reduce(
-        (sum, p) => sum.plus(new Decimal(p.amount.toString())),
-        new Decimal(0)
+        (sum, p) => sum.plus(new Prisma.Decimal(p.amount.toString())),
+        new Prisma.Decimal(0)
       )
 
       // Calculate debit notes applied to this bill from bill metadata
       const billMetadata = (targetBill.metadata as any) || {}
       const billDebitNotes = billMetadata.debitNotes || []
       const debitNotesApplied = billDebitNotes.reduce(
-        (sum: Decimal, app: any) => sum.plus(new Decimal(app.amount || 0)),
-        new Decimal(0)
+        (sum: Prisma.Decimal, app: any) => sum.plus(new Prisma.Decimal(app.amount || 0)),
+        new Prisma.Decimal(0)
       )
 
-      const billTotal = new Decimal(targetBill.total.toString())
+      const billTotal = new Prisma.Decimal(targetBill.total.toString())
       const billBalance = billTotal.minus(totalPaid).minus(debitNotesApplied)
 
       // Prevent over-application to bill
@@ -716,7 +715,7 @@ export const debitNotesRouter = createTRPCRouter({
       const result = await prisma.$transaction(async (tx) => {
         // Calculate new totals
         const newTotalApplied = totalApplied + applyAmount.toNumber()
-        const newRemaining = debitNoteTotal.minus(new Decimal(newTotalApplied))
+        const newRemaining = debitNoteTotal.minus(new Prisma.Decimal(newTotalApplied))
 
       // Update debit note status
       // Store application tracking in notes field as JSON (since metadata field doesn't exist)
