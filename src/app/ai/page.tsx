@@ -1,103 +1,89 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { trpc } from "@/lib/trpc-client"
-import { 
-  Bot, 
-  Send, 
-  Lightbulb, 
-  TrendingUp, 
-  AlertTriangle,
+import {
+  Bot,
+  Send,
+  Lightbulb,
+  TrendingUp,
+  AlertCircle,
   CheckCircle,
-  Clock,
-  Brain
+  Brain,
+  Loader2,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
 
-interface AIResponse {
-  answer: string
-  data?: any
+interface ChatMessage {
+  role: "user" | "assistant"
+  content: string
   suggestions?: string[]
 }
 
+const EXAMPLE_QUERIES = [
+  "Show me all travel expenses over £500 last quarter",
+  "What was our revenue last month?",
+  "Which customers owe us money?",
+  "How much did we spend on marketing this year?",
+  "What's our cash flow trend?",
+  "Find duplicate transactions",
+  "Show me overdue invoices",
+  "What are our top expense categories?",
+]
+
 export default function AIPage() {
   const [query, setQuery] = useState("")
-  const [responses, setResponses] = useState<AIResponse[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Get user's organizations
   const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
+  const orgId = organizations?.[0]?.id ?? ""
 
-  const handleQuery = async () => {
-    if (!query.trim()) return
+  const { data: insights, isLoading: insightsLoading } = trpc.ai.generateInsights.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId }
+  )
 
-    setIsLoading(true)
-    const userQuery = query.trim()
+  const processQuery = trpc.ai.processQuery.useMutation({
+    onSuccess: (result) => {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: result.answer, suggestions: result.suggestions },
+      ])
+    },
+    onError: (err) => {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `Error: ${err.message}. Please try again.` },
+      ])
+    },
+  })
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages, processQuery.isPending])
+
+  const handleQuery = () => {
+    const q = query.trim()
+    if (!q || !orgId) return
     setQuery("")
-
-    // Add user query to responses
-    setResponses(prev => [...prev, { answer: userQuery, data: null }])
-
-    try {
-      // This would call the AI service
-      // For now, we'll simulate a response
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      const mockResponse: AIResponse = {
-        answer: `Based on your query "${userQuery}", here's what I found:
-
-For the last quarter, you had 12 travel expenses totaling £3,450. The largest expense was £850 for a business trip to London in March. 
-
-Key insights:
-- Travel expenses increased 15% compared to the previous quarter
-- Average expense per trip: £287
-- Most common expense type: Accommodation (40%)
-
-Would you like me to break this down further or show you the detailed expense report?`,
-        suggestions: [
-          "View detailed travel expense report",
-          "Compare with previous quarter",
-          "Export expense data",
-          "Set up travel expense alerts"
-        ]
-      }
-
-      setResponses(prev => [...prev, mockResponse])
-    } catch (error) {
-      setResponses(prev => [...prev, {
-        answer: "I'm sorry, I couldn't process your query. Please try again.",
-        suggestions: []
-      }])
-    } finally {
-      setIsLoading(false)
-    }
+    setMessages((prev) => [...prev, { role: "user", content: q }])
+    processQuery.mutate({ organizationId: orgId, query: q })
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleQuery()
     }
   }
 
-  const exampleQueries = [
-    "Show me all travel expenses over £500 last quarter",
-    "What was our revenue last month?",
-    "Which customers owe us money?",
-    "How much did we spend on marketing this year?",
-    "What's our cash flow trend?",
-    "Find duplicate transactions",
-    "Show me overdue invoices",
-    "What are our top expense categories?"
-  ]
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <div className="mr-4 flex">
@@ -116,10 +102,9 @@ Would you like me to break this down further or show you the detailed expense re
         </div>
       </div>
 
-      {/* Main Content */}
       <main className="container mx-auto py-6">
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Chat Interface */}
+          {/* Chat */}
           <div className="lg:col-span-2">
             <Card className="h-[600px] flex flex-col">
               <CardHeader>
@@ -127,36 +112,34 @@ Would you like me to break this down further or show you the detailed expense re
                   <Bot className="mr-2 h-5 w-5" />
                   Ask me anything about your finances
                 </CardTitle>
-                <CardDescription>
-                  Use natural language to query your financial data
-                </CardDescription>
+                <CardDescription>Use natural language to query your financial data</CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col">
-                {/* Chat Messages */}
-                <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-                  {responses.length === 0 ? (
+              <CardContent className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-1">
+                  {messages.length === 0 ? (
                     <div className="text-center text-muted-foreground py-8">
-                      <Bot className="mx-auto h-12 w-12 mb-4" />
+                      <Bot className="mx-auto h-12 w-12 mb-4 opacity-40" />
                       <p>Start a conversation by asking about your financial data</p>
                     </div>
                   ) : (
-                    responses.map((response, index) => (
-                      <div key={index} className={`flex ${index % 2 === 0 ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] p-4 rounded-lg ${
-                          index % 2 === 0 
-                            ? 'bg-primary text-primary-foreground' 
-                            : 'bg-muted'
-                        }`}>
-                          <p className="whitespace-pre-wrap">{response.answer}</p>
-                          {response.suggestions && response.suggestions.length > 0 && (
+                    messages.map((msg, i) => (
+                      <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                        <div
+                          className={`max-w-[80%] p-4 rounded-lg ${
+                            msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                          {msg.suggestions && msg.suggestions.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
-                              {response.suggestions.map((suggestion, i) => (
-                                <Badge 
-                                  key={i} 
-                                  variant={index % 2 === 0 ? "secondary" : "outline"}
-                                  className="cursor-pointer hover:bg-primary/10"
+                              {msg.suggestions.map((s, j) => (
+                                <Badge
+                                  key={j}
+                                  variant="outline"
+                                  className="cursor-pointer hover:bg-primary/10 text-xs"
+                                  onClick={() => setQuery(s)}
                                 >
-                                  {suggestion}
+                                  {s}
                                 </Badge>
                               ))}
                             </div>
@@ -165,28 +148,26 @@ Would you like me to break this down further or show you the detailed expense re
                       </div>
                     ))
                   )}
-                  {isLoading && (
+                  {processQuery.isPending && (
                     <div className="flex justify-start">
-                      <div className="bg-muted p-4 rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                          <span>Thinking...</span>
-                        </div>
+                      <div className="bg-muted p-4 rounded-lg flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Thinking…
                       </div>
                     </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input */}
-                <div className="flex space-x-2">
+                <div className="flex gap-2">
                   <Input
                     placeholder="Ask me about your finances..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    disabled={isLoading}
+                    onKeyDown={handleKeyDown}
+                    disabled={processQuery.isPending || !orgId}
                   />
-                  <Button onClick={handleQuery} disabled={isLoading || !query.trim()}>
+                  <Button onClick={handleQuery} disabled={processQuery.isPending || !query.trim() || !orgId}>
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
@@ -203,15 +184,13 @@ Would you like me to break this down further or show you the detailed expense re
                   <Lightbulb className="mr-2 h-5 w-5" />
                   Example Queries
                 </CardTitle>
-                <CardDescription>
-                  Try these sample questions
-                </CardDescription>
+                <CardDescription>Try these sample questions</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {exampleQueries.map((example, index) => (
+                  {EXAMPLE_QUERIES.map((example, i) => (
                     <Button
-                      key={index}
+                      key={i}
                       variant="outline"
                       className="w-full justify-start text-left h-auto p-3"
                       onClick={() => setQuery(example)}
@@ -230,76 +209,52 @@ Would you like me to break this down further or show you the detailed expense re
                   <TrendingUp className="mr-2 h-5 w-5" />
                   AI Insights
                 </CardTitle>
-                <CardDescription>
-                  Automated financial insights
-                </CardDescription>
+                <CardDescription>Automated financial insights</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium">Cash Flow Positive</p>
-                      <p className="text-xs text-muted-foreground">
-                        Your cash flow improved 12% this month
-                      </p>
-                    </div>
+                {insightsLoading ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
-                  
-                  <div className="flex items-start space-x-3">
-                    <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium">Expense Alert</p>
-                      <p className="text-xs text-muted-foreground">
-                        Travel expenses increased 25% this quarter
-                      </p>
-                    </div>
+                ) : insights && insights.length > 0 ? (
+                  <div className="space-y-4">
+                    {insights.map((insight, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        {i % 2 === 0 ? (
+                          <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                        )}
+                        <p className="text-sm text-muted-foreground leading-snug">{insight}</p>
+                      </div>
+                    ))}
                   </div>
-                  
-                  <div className="flex items-start space-x-3">
-                    <Clock className="h-5 w-5 text-blue-500 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium">Payment Reminder</p>
-                      <p className="text-xs text-muted-foreground">
-                        3 invoices are overdue by more than 30 days
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    {orgId ? "No insights available yet." : "Sign in to an organisation to see insights."}
+                  </p>
+                )}
               </CardContent>
             </Card>
 
-            {/* AI Capabilities */}
+            {/* Capabilities */}
             <Card>
-              <CardHeader>
-                <CardTitle>What I Can Help With</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>What I Can Help With</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Financial data analysis</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Expense categorization</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Anomaly detection</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Cash flow predictions</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Invoice data extraction</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Tax compliance insights</span>
-                  </div>
+                  {[
+                    "Financial data analysis",
+                    "Expense categorization",
+                    "Anomaly detection",
+                    "Cash flow predictions",
+                    "Invoice data extraction",
+                    "Tax compliance insights",
+                  ].map((cap) => (
+                    <div key={cap} className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      <span className="text-sm">{cap}</span>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

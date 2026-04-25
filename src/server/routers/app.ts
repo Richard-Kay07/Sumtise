@@ -22,6 +22,7 @@ import { bankAccountsRouter } from "./bankAccounts"
 import { reportsRouter } from "./reports"
 import { settingsRouter } from "./settings"
 import { payrollRouter } from "./payroll"
+import { aiRouter } from "./ai"
 
 /**
  * Generate and store invoice PDF
@@ -1575,6 +1576,9 @@ export const appRouter = createTRPCRouter({
 
   // Payroll routes
   payroll: payrollRouter,
+
+  // AI routes
+  ai: aiRouter,
 
   // Dashboard routes
   dashboard: createTRPCRouter({
