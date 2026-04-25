@@ -104,6 +104,7 @@ export function Nav() {
             <NavDropdown label="Projects & Grants">
               <NavItem href="/projects">Project Accounting</NavItem>
               <NavItem href="/grants">Grants Management (NFP)</NavItem>
+              <NavItem href="/leases">Lease Register (IFRS 16)</NavItem>
             </NavDropdown>
 
             {/* Reports */}
@@ -118,6 +119,10 @@ export function Nav() {
               <NavItem href="/reports/cost-analysis">Cost Analysis</NavItem>
               <NavItem href="/reports/project-profitability">Project Profitability</NavItem>
               <NavItem href="/reports/forecasting">Smart Forecasting</NavItem>
+              <Divider />
+              <SectionLabel>Tagging &amp; Analysis</SectionLabel>
+              <NavItem href="/reports/tagged-transactions">Tagged Transactions</NavItem>
+              <NavItem href="/reports/analysis-code-breakdown">Analysis Code Breakdown</NavItem>
               <Divider />
               <SectionLabel>Cashflow Reports</SectionLabel>
               <NavItem href="/reports/cashflow">Cashflow Statement</NavItem>
@@ -162,6 +167,12 @@ export function Nav() {
               <NavItem href="/settings/organisation">Organisation</NavItem>
               <NavItem href="/settings/integrations">Integrations</NavItem>
               <NavItem href="/settings/billing">Billing</NavItem>
+              <Divider />
+              <SectionLabel>Feature Modules</SectionLabel>
+              <NavItem href="/settings/modules">Module Settings</NavItem>
+              <NavItem href="/settings/payroll-coa">Payroll COA</NavItem>
+              <NavItem href="/settings/related-parties">Related Parties</NavItem>
+              <NavItem href="/settings/wga-codes">WGA / CPID Codes</NavItem>
             </NavDropdown>
           </div>
 
