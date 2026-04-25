@@ -11,7 +11,6 @@
  */
 
 import PDFDocument from 'pdfkit'
-import { Decimal } from 'decimal.js'
 import crypto from 'crypto'
 
 export interface InvoicePDFData {

@@ -5,7 +5,9 @@
  * Supports OFX 1.x and 2.x formats
  */
 
-import Decimal from 'decimal.js';
+import { Prisma } from '@prisma/client';
+const Decimal = Prisma.Decimal;
+type Decimal = Prisma.Decimal;
 
 export interface ParsedOFXTransaction {
   date: Date;

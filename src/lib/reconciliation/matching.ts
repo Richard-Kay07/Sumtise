@@ -8,7 +8,8 @@
  * - Reference matching
  */
 
-import Decimal from 'decimal.js';
+import { Prisma } from '@prisma/client';
+type Decimal = Prisma.Decimal;
 
 export interface BankTransaction {
   id: string;

@@ -8,7 +8,9 @@
  * - Negative amount detection
  */
 
-import Decimal from 'decimal.js';
+import { Prisma } from '@prisma/client';
+const Decimal = Prisma.Decimal;
+type Decimal = Prisma.Decimal;
 
 export interface CSVColumnMapping {
   date?: string; // Column name for date

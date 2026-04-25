@@ -5,7 +5,8 @@
  */
 
 import { InvoicePDFData } from './invoice'
-import { Decimal } from 'decimal.js'
+import { Prisma } from '@prisma/client'
+type Decimal = Prisma.Decimal
 
 interface InvoiceWithRelations {
   id: string
