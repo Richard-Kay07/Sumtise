@@ -9,9 +9,27 @@ import {
   extractReceiptData,
   categorizeExpense,
   detectAnomalies,
+  getModelSnapshot,
 } from "@/lib/ai/ai-service"
 
+// Reusable optional model override schema
+const modelOverrideSchema = z.object({
+  fast:      z.string().optional(),
+  smart:     z.string().optional(),
+  vision:    z.string().optional(),
+  reasoning: z.string().optional(),
+}).optional()
+
 export const aiRouter = createTRPCRouter({
+  // ── Model discovery ─────────────────────────────────────────────────────────
+
+  getModels: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.REPORTS_VIEW))
+    .input(z.object({ organizationId: z.string() }))
+    .query(async () => {
+      return getModelSnapshot()
+    }),
+
   // ── Natural language query ──────────────────────────────────────────────────
 
   processQuery: orgScopedProcedure
@@ -19,9 +37,13 @@ export const aiRouter = createTRPCRouter({
     .input(z.object({
       organizationId: z.string(),
       query: z.string().min(1).max(1000),
+      modelOverrides: modelOverrideSchema,
     }))
     .mutation(async ({ ctx, input }) => {
-      return processQuery(input.query, ctx.organizationId)
+      return processQuery(input.query, ctx.organizationId, {
+        fast:  input.modelOverrides?.fast,
+        smart: input.modelOverrides?.smart,
+      })
     }),
 
   // ── Insights from real financial context ────────────────────────────────────
@@ -31,9 +53,10 @@ export const aiRouter = createTRPCRouter({
     .input(z.object({
       organizationId: z.string(),
       period: z.string().optional(),
+      modelOverrides: modelOverrideSchema,
     }))
     .query(async ({ ctx, input }) => {
-      return generateInsights(ctx.organizationId, input.period)
+      return generateInsights(ctx.organizationId, input.period, input.modelOverrides?.smart)
     }),
 
   // ── Expense categorization against real COA ─────────────────────────────────
@@ -45,14 +68,11 @@ export const aiRouter = createTRPCRouter({
       description: z.string().min(1).max(500),
       amount: z.number().min(0),
       merchantName: z.string().optional(),
+      modelOverrides: modelOverrideSchema,
     }))
     .mutation(async ({ ctx, input }) => {
       const expenseAccounts = await prisma.chartOfAccount.findMany({
-        where: {
-          organizationId: ctx.organizationId,
-          type: "EXPENSE",
-          isActive: true,
-        },
+        where: { organizationId: ctx.organizationId, type: "EXPENSE", isActive: true },
         select: { id: true, name: true, code: true },
         orderBy: { code: "asc" },
       })
@@ -62,6 +82,7 @@ export const aiRouter = createTRPCRouter({
         input.amount,
         input.merchantName,
         expenseAccounts,
+        input.modelOverrides?.fast,
       )
     }),
 
@@ -71,15 +92,17 @@ export const aiRouter = createTRPCRouter({
     .use(requirePermissionProcedure(Permission.BILLS_CREATE))
     .input(z.object({
       organizationId: z.string(),
-      // base64-encoded image content
       imageBase64: z.string().min(10),
       mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]).default("image/jpeg"),
+      modelOverrides: modelOverrideSchema,
     }))
     .mutation(async ({ ctx, input }) => {
       const imageBuffer = Buffer.from(input.imageBase64, "base64")
-      const result = await extractReceiptData(imageBuffer, input.mimeType)
+      const result = await extractReceiptData(imageBuffer, input.mimeType, {
+        fast:   input.modelOverrides?.fast,
+        vision: input.modelOverrides?.vision,
+      })
 
-      // Augment with COA suggestion for the first item if we have account info
       const expenseAccounts = await prisma.chartOfAccount.findMany({
         where: { organizationId: ctx.organizationId, type: "EXPENSE", isActive: true },
         select: { id: true, name: true, code: true },
@@ -93,6 +116,7 @@ export const aiRouter = createTRPCRouter({
           result.total ?? 0,
           result.vendorName,
           expenseAccounts,
+          input.modelOverrides?.fast,
         )
         const found = expenseAccounts.find(a => a.id === categorized.suggestedAccountId)
         if (found) suggestedAccount = found

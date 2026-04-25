@@ -9,6 +9,7 @@
 
 import OpenAI from "openai"
 import { prisma } from "@/lib/prisma"
+import { resolveModels, getModelId, type ModelTier } from "./model-registry"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -40,11 +41,12 @@ export interface NLQueryResult {
   answer: string
   data: any
   suggestions: string[]
+  modelUsed?: string
 }
 
 // ── Intent classification ─────────────────────────────────────────────────────
 
-export async function classifyIntent(query: string): Promise<IntentClassification> {
+export async function classifyIntent(query: string, fastModel?: string): Promise<IntentClassification> {
   const today = new Date().toISOString().split("T")[0]
   const prompt = `Today is ${today}. Classify this accounting question into one intent.
 
@@ -64,8 +66,9 @@ Return JSON only:
 }`
 
   try {
+    const model = fastModel ?? getModelId("FAST")
     const res = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
       temperature: 0,
@@ -257,9 +260,16 @@ async function fetchDuplicateCheck(orgId: string) {
 export async function resolveNLQuery(
   query: string,
   organizationId: string,
-  contextSummary: string
+  contextSummary: string,
+  modelOverrides?: { fast?: string; smart?: string }
 ): Promise<NLQueryResult> {
-  const classification = await classifyIntent(query)
+  // Warm the model cache (no-op if already warm)
+  await resolveModels(openai)
+
+  const fastModel  = modelOverrides?.fast  ?? getModelId("FAST")
+  const smartModel = modelOverrides?.smart ?? getModelId("SMART")
+
+  const classification = await classifyIntent(query, fastModel)
   const { intent, params } = classification
 
   let rawData: any = {}
@@ -311,7 +321,7 @@ Write a clear, helpful answer in 2-4 sentences. If there is no data, say so hone
   let answer = "I couldn't retrieve data at this time."
   try {
     const res = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: smartModel,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -342,5 +352,6 @@ Write a clear, helpful answer in 2-4 sentences. If there is no data, say so hone
     answer,
     data: rawData,
     suggestions: suggestionMap[intent] ?? [],
+    modelUsed: smartModel,
   }
 }

@@ -10,7 +10,7 @@ import { trpc } from "@/lib/trpc-client"
 import {
   Bot, Send, Lightbulb, TrendingUp, AlertCircle, CheckCircle,
   Loader2, ScanLine, Upload, X, ArrowRight, Info, RefreshCw,
-  AlertTriangle, Sparkles,
+  AlertTriangle, Sparkles, ChevronDown, Zap, Brain, Eye,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -28,6 +28,109 @@ const EXAMPLE_QUERIES = [
 ]
 
 type Tab = "chat" | "scanner" | "insights"
+
+// ── Model picker ──────────────────────────────────────────────────────────────
+
+type ModelTier = "FAST" | "SMART" | "VISION" | "REASONING"
+
+const TIER_META: Record<ModelTier, { label: string; icon: React.ReactNode; color: string; hint: string }> = {
+  FAST:      { label: "Fast",      icon: <Zap className="h-3.5 w-3.5" />,   color: "#F59E0B", hint: "Low latency, low cost" },
+  SMART:     { label: "Smart",     icon: <Brain className="h-3.5 w-3.5" />, color: BRAND,     hint: "Best accuracy" },
+  VISION:    { label: "Vision",    icon: <Eye className="h-3.5 w-3.5" />,   color: "#8B5CF6", hint: "Image understanding" },
+  REASONING: { label: "Reasoning", icon: <Sparkles className="h-3.5 w-3.5" />, color: "#10B981", hint: "Deep analysis" },
+}
+
+function ModelBadge({ modelId, tier }: { modelId?: string; tier?: ModelTier }) {
+  if (!modelId && !tier) return null
+  const meta = tier ? TIER_META[tier] : null
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-gray-100 text-gray-500 border border-gray-200">
+      {meta && <span style={{ color: meta.color }}>{meta.icon}</span>}
+      {modelId ?? tier}
+    </span>
+  )
+}
+
+function ModelPicker({
+  orgId,
+  selectedTier,
+  onSelectTier,
+  resolvedModel,
+}: {
+  orgId: string
+  selectedTier: ModelTier
+  onSelectTier: (tier: ModelTier) => void
+  resolvedModel?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const { data: modelData } = trpc.ai.getModels.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, staleTime: 60 * 60 * 1000 }
+  )
+
+  const snapshot = modelData as any
+  const tiers = snapshot?.tiers as Record<ModelTier, { modelId: string; displayName: string; description: string }> | undefined
+  const resolvedId = tiers?.[selectedTier]?.modelId ?? resolvedModel
+
+  const source: "live" | "fallback" = snapshot?.source ?? "fallback"
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 text-xs font-medium text-gray-700 bg-white transition-colors"
+      >
+        <span style={{ color: TIER_META[selectedTier].color }}>{TIER_META[selectedTier].icon}</span>
+        {TIER_META[selectedTier].label}
+        {resolvedId && <span className="font-mono text-gray-400 text-[10px]">({resolvedId})</span>}
+        <ChevronDown className="h-3 w-3 text-gray-400" />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl shadow-lg border border-gray-100 z-50 py-1">
+            <div className="px-3 py-2 border-b border-gray-50 flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-600">Model Tier</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${source === "live" ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"}`}>
+                {source === "live" ? "● Live from OpenAI" : "○ Cached defaults"}
+              </span>
+            </div>
+            {(["FAST", "SMART", "VISION", "REASONING"] as ModelTier[]).map(tier => {
+              const meta = TIER_META[tier]
+              const modelId = tiers?.[tier]?.modelId
+              const desc   = tiers?.[tier]?.description ?? meta.hint
+              return (
+                <button
+                  key={tier}
+                  onClick={() => { onSelectTier(tier); setOpen(false) }}
+                  className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors ${selectedTier === tier ? "bg-gray-50" : ""}`}
+                >
+                  <span className="mt-0.5 flex-shrink-0" style={{ color: meta.color }}>{meta.icon}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-800">{meta.label}</span>
+                      {selectedTier === tier && <span className="text-[10px] px-1 py-0.5 rounded bg-blue-50 text-blue-600">active</span>}
+                    </div>
+                    {modelId && <span className="block text-[10px] font-mono text-gray-400">{modelId}</span>}
+                    <span className="block text-xs text-gray-500 mt-0.5">{desc}</span>
+                  </div>
+                </button>
+              )
+            })}
+            {snapshot?.allModels?.length > 0 && (
+              <div className="border-t border-gray-50 px-3 py-2">
+                <p className="text-[10px] text-gray-400">
+                  {snapshot.allModels.length} models available · refreshed {new Date(snapshot.resolvedAt).toLocaleTimeString()}
+                </p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 // ── Chat Message ──────────────────────────────────────────────────────────────
 
@@ -100,10 +203,17 @@ function DataTable({ data, intent }: { data: any; intent?: string }) {
   return null
 }
 
-function ChatTab({ orgId }: { orgId: string }) {
+function ChatTab({ orgId, tier, resolvedModel }: { orgId: string; tier: ModelTier; resolvedModel?: string }) {
   const [query, setQuery] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const endRef = useRef<HTMLDivElement>(null)
+
+  const { data: modelData } = trpc.ai.getModels.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, staleTime: 60 * 60 * 1000 }
+  )
+  const tiers = (modelData as any)?.tiers
+  const smartModel = tiers?.[tier]?.modelId ?? tiers?.SMART?.modelId
 
   const processQuery = trpc.ai.processQuery.useMutation({
     onSuccess: (result) => {
@@ -113,6 +223,7 @@ function ChatTab({ orgId }: { orgId: string }) {
         suggestions: result.suggestions,
         data: result.data,
         intent: result.intent,
+        modelUsed: (result as any).modelUsed ?? smartModel,
       }])
     },
     onError: (err) => {
@@ -127,7 +238,11 @@ function ChatTab({ orgId }: { orgId: string }) {
     if (!q || !orgId) return
     setQuery("")
     setMessages(prev => [...prev, { role: "user", content: q }])
-    processQuery.mutate({ organizationId: orgId, query: q })
+    processQuery.mutate({
+      organizationId: orgId,
+      query: q,
+      modelOverrides: smartModel ? { smart: smartModel } : undefined,
+    })
   }
 
   return (
@@ -163,6 +278,11 @@ function ChatTab({ orgId }: { orgId: string }) {
                 <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                 {msg.role === "assistant" && msg.data && (
                   <DataTable data={msg.data} intent={msg.intent} />
+                )}
+                {msg.role === "assistant" && (msg as any).modelUsed && (
+                  <div className="mt-2">
+                    <ModelBadge modelId={(msg as any).modelUsed} />
+                  </div>
                 )}
                 {msg.suggestions && msg.suggestions.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -209,7 +329,7 @@ function ChatTab({ orgId }: { orgId: string }) {
 
 // ── Receipt Scanner ───────────────────────────────────────────────────────────
 
-function ScannerTab({ orgId }: { orgId: string }) {
+function ScannerTab({ orgId, tier }: { orgId: string; tier: ModelTier }) {
   const [imageBase64, setImageBase64] = useState<string | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [mimeType, setMimeType] = useState<"image/jpeg" | "image/png" | "image/webp">("image/jpeg")
@@ -226,6 +346,14 @@ function ScannerTab({ orgId }: { orgId: string }) {
     { organizationId: orgId },
     { enabled: !!orgId }
   )
+
+  const { data: modelData } = trpc.ai.getModels.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, staleTime: 60 * 60 * 1000 }
+  )
+  const tiers = (modelData as any)?.tiers
+  const visionModel = tiers?.["VISION"]?.modelId
+  const fastModel   = tiers?.["FAST"]?.modelId
 
   const scanMutation = trpc.ai.scanReceipt.useMutation({
     onSuccess: (data) => {
@@ -327,7 +455,12 @@ function ScannerTab({ orgId }: { orgId: string }) {
           {imageBase64 && !scanned && (
             <Button className="w-full rounded-xl gap-2" style={{ backgroundColor: BRAND }}
               disabled={scanMutation.isPending}
-              onClick={() => scanMutation.mutate({ organizationId: orgId, imageBase64, mimeType })}>
+              onClick={() => scanMutation.mutate({
+              organizationId: orgId,
+              imageBase64,
+              mimeType,
+              modelOverrides: { vision: visionModel, fast: fastModel },
+            })}>
               {scanMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Scanning…</> : <><ScanLine className="h-4 w-4" /> Scan Receipt</>}
             </Button>
           )}
@@ -400,11 +533,12 @@ function ScannerTab({ orgId }: { orgId: string }) {
               </div>
 
               <div className="pt-1">
-                <div className="flex items-center gap-1 mb-2">
+                <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs text-gray-400">Confidence:</span>
                   <span className={`text-xs font-medium ${scanned.confidence >= 0.8 ? "text-green-600" : scanned.confidence >= 0.6 ? "text-yellow-600" : "text-red-500"}`}>
                     {Math.round((scanned.confidence ?? 0) * 100)}%
                   </span>
+                  <ModelBadge modelId={visionModel} tier="VISION" />
                 </div>
                 <Button className="w-full rounded-xl gap-2" style={{ backgroundColor: BRAND }}
                   disabled={!vendorId || !accountId || createBillMutation.isPending}
@@ -424,9 +558,16 @@ function ScannerTab({ orgId }: { orgId: string }) {
 
 // ── Insights Tab ──────────────────────────────────────────────────────────────
 
-function InsightsTab({ orgId }: { orgId: string }) {
-  const { data: insights, isLoading, refetch } = trpc.ai.generateInsights.useQuery(
+function InsightsTab({ orgId, tier }: { orgId: string; tier: ModelTier }) {
+  const { data: modelData } = trpc.ai.getModels.useQuery(
     { organizationId: orgId },
+    { enabled: !!orgId, staleTime: 60 * 60 * 1000 }
+  )
+  const tiers = (modelData as any)?.tiers
+  const smartModel = tiers?.[tier]?.modelId ?? tiers?.SMART?.modelId
+
+  const { data: insights, isLoading, refetch } = trpc.ai.generateInsights.useQuery(
+    { organizationId: orgId, modelOverrides: smartModel ? { smart: smartModel } : undefined },
     { enabled: !!orgId }
   )
 
@@ -450,6 +591,7 @@ function InsightsTab({ orgId }: { orgId: string }) {
           <CardTitle className="text-sm flex items-center gap-2">
             <TrendingUp className="h-4 w-4" style={{ color: BRAND }} />
             Financial Insights
+            <ModelBadge modelId={smartModel} tier={tier} />
           </CardTitle>
           <button onClick={() => refetch()} disabled={isLoading} className="text-gray-400 hover:text-gray-600">
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
@@ -508,14 +650,21 @@ function InsightsTab({ orgId }: { orgId: string }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AIPage() {
-  const [tab, setTab] = useState<Tab>("chat")
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const [tab, setTab]   = useState<Tab>("chat")
+  const [tier, setTier] = useState<ModelTier>("SMART")
+  const { data: orgs }  = trpc.organization.getUserOrganizations.useQuery()
+  const orgId           = orgs?.[0]?.id ?? ""
+
+  const { data: modelData } = trpc.ai.getModels.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, staleTime: 60 * 60 * 1000 }
+  )
+  const resolvedModel = (modelData as any)?.tiers?.[tier]?.modelId
 
   const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
-    { id: "chat",     label: "Ask AI",           icon: <Bot className="h-4 w-4" /> },
-    { id: "scanner",  label: "Receipt Scanner",   icon: <ScanLine className="h-4 w-4" /> },
-    { id: "insights", label: "Insights",          icon: <Sparkles className="h-4 w-4" /> },
+    { id: "chat",     label: "Ask AI",          icon: <Bot className="h-4 w-4" /> },
+    { id: "scanner",  label: "Receipt Scanner",  icon: <ScanLine className="h-4 w-4" /> },
+    { id: "insights", label: "Insights",         icon: <Sparkles className="h-4 w-4" /> },
   ]
 
   return (
@@ -523,7 +672,7 @@ export default function AIPage() {
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 flex h-14 items-center gap-4">
           <h1 className="text-xl font-bold" style={{ color: "#1A1D24" }}>AI Assistant</h1>
-          <div className="flex items-center gap-1 ml-4">
+          <div className="flex items-center gap-1 ml-2">
             {tabs.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -535,6 +684,16 @@ export default function AIPage() {
               </button>
             ))}
           </div>
+          {orgId && (
+            <div className="ml-auto">
+              <ModelPicker
+                orgId={orgId}
+                selectedTier={tier}
+                onSelectTier={setTier}
+                resolvedModel={resolvedModel}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -547,9 +706,9 @@ export default function AIPage() {
         ) : (
           <div className="grid gap-5 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              {tab === "chat"     && <ChatTab orgId={orgId} />}
-              {tab === "scanner"  && <ScannerTab orgId={orgId} />}
-              {tab === "insights" && <InsightsTab orgId={orgId} />}
+              {tab === "chat"     && <ChatTab orgId={orgId} tier={tier} resolvedModel={resolvedModel} />}
+              {tab === "scanner"  && <ScannerTab orgId={orgId} tier={tier} />}
+              {tab === "insights" && <InsightsTab orgId={orgId} tier={tier} />}
             </div>
 
             {/* Sidebar */}

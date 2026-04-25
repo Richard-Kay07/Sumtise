@@ -8,6 +8,7 @@
  */
 
 import OpenAI from "openai"
+import { resolveModels, getModelId } from "./model-registry"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -45,7 +46,8 @@ async function runTesseract(imageBuffer: Buffer): Promise<{ text: string; confid
   return { text: data.text ?? "", confidence: (data.confidence ?? 0) / 100 }
 }
 
-async function parseTextWithGPT(text: string): Promise<ReceiptData> {
+async function parseTextWithGPT(text: string, modelOverride?: string): Promise<ReceiptData> {
+  const model = modelOverride ?? getModelId("FAST")
   const prompt = `Extract structured data from this receipt/invoice text.
 
 TEXT:
@@ -68,7 +70,7 @@ Return JSON matching this schema exactly (use null for missing fields):
 }`
 
   const res = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
     temperature: 0,
@@ -79,14 +81,15 @@ Return JSON matching this schema exactly (use null for missing fields):
   return { ...parsed, items: parsed.items ?? [], confidence: 0.75 }
 }
 
-// ── GPT-4o vision path ───────────────────────────────────────────────────────
+// ── GPT vision path ──────────────────────────────────────────────────────────
 
-async function extractWithVision(imageBuffer: Buffer, mimeType = "image/jpeg"): Promise<ReceiptData> {
+async function extractWithVision(imageBuffer: Buffer, mimeType = "image/jpeg", modelOverride?: string): Promise<ReceiptData> {
+  const model = modelOverride ?? getModelId("VISION")
   const base64 = imageBuffer.toString("base64")
   const dataUrl = `data:${mimeType};base64,${base64}`
 
   const res = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model,
     messages: [
       {
         role: "user",
@@ -125,20 +128,23 @@ async function extractWithVision(imageBuffer: Buffer, mimeType = "image/jpeg"): 
 
 export async function scanReceipt(
   imageBuffer: Buffer,
-  mimeType = "image/jpeg"
+  mimeType = "image/jpeg",
+  modelOverrides?: { fast?: string; vision?: string }
 ): Promise<ReceiptData> {
+  // Warm the model cache before use
+  await resolveModels(openai)
   try {
     const { text, confidence } = await runTesseract(imageBuffer)
 
     if (confidence >= 0.55 && text.replace(/\s/g, "").length > 80) {
-      const result = await parseTextWithGPT(text)
+      const result = await parseTextWithGPT(text, modelOverrides?.fast)
       return { ...result, rawText: text.slice(0, 2000) }
     }
   } catch {
     // tesseract not available or failed — fall through to vision
   }
 
-  return extractWithVision(imageBuffer, mimeType)
+  return extractWithVision(imageBuffer, mimeType, modelOverrides?.vision)
 }
 
 // ── Expense categorization against real COA ──────────────────────────────────
@@ -155,7 +161,8 @@ export async function categorizeAgainstCOA(
   description: string,
   amount: number,
   merchantName: string | undefined,
-  expenseAccounts: Array<{ id: string; name: string; code: string }>
+  expenseAccounts: Array<{ id: string; name: string; code: string }>,
+  modelOverride?: string
 ): Promise<CategorizedExpense> {
   if (expenseAccounts.length === 0) {
     return {
@@ -187,8 +194,9 @@ Return JSON:
   "reasoning": "<one sentence>"
 }`
 
+  const model = modelOverride ?? getModelId("FAST")
   const res = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
     temperature: 0,

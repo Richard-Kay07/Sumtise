@@ -2,6 +2,9 @@ import OpenAI from "openai"
 import { buildFinancialContext, formatContextForPrompt } from "./financial-context"
 import { resolveNLQuery, type NLQueryResult } from "./nl-router"
 import { scanReceipt, categorizeAgainstCOA, type ReceiptData, type CategorizedExpense } from "./receipt-ocr"
+import { resolveModels, getModelId, type ModelSnapshot, type ModelTier } from "./model-registry"
+
+export type { ModelSnapshot, ModelTier }
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -12,22 +15,35 @@ export interface AIInsight {
   type: "positive" | "warning" | "info"
 }
 
+// ── Model resolution ──────────────────────────────────────────────────────────
+
+export async function getModelSnapshot(): Promise<ModelSnapshot> {
+  return resolveModels(openai)
+}
+
 // ── Natural language query ────────────────────────────────────────────────────
 
-export async function processQuery(query: string, organizationId: string): Promise<NLQueryResult> {
+export async function processQuery(
+  query: string,
+  organizationId: string,
+  modelOverrides?: { fast?: string; smart?: string }
+): Promise<NLQueryResult> {
   const ctx = await buildFinancialContext(organizationId)
   const contextSummary = formatContextForPrompt(ctx)
-  return resolveNLQuery(query, organizationId, contextSummary)
+  return resolveNLQuery(query, organizationId, contextSummary, modelOverrides)
 }
 
 // ── Financial insights from real data ────────────────────────────────────────
 
 export async function generateInsights(
   organizationId: string,
-  period = "last 30 days"
+  period = "last 30 days",
+  modelOverride?: string
 ): Promise<AIInsight[]> {
   const ctx = await buildFinancialContext(organizationId)
   const contextSummary = formatContextForPrompt(ctx)
+
+  const model = modelOverride ?? getModelId("SMART")
 
   const prompt = `You are a financial advisor. Based ONLY on the real data below, generate 5 concise actionable insights.
 Each insight must be grounded in the actual numbers. Do not invent data.
@@ -42,7 +58,7 @@ Return JSON array (exactly 5 items):
 
   try {
     const res = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
       temperature: 0.3,
@@ -80,9 +96,10 @@ Return JSON array (exactly 5 items):
 
 export async function extractReceiptData(
   imageBuffer: Buffer,
-  mimeType = "image/jpeg"
+  mimeType = "image/jpeg",
+  modelOverrides?: { fast?: string; vision?: string }
 ): Promise<ReceiptData> {
-  return scanReceipt(imageBuffer, mimeType)
+  return scanReceipt(imageBuffer, mimeType, modelOverrides)
 }
 
 // ── Expense categorization against real COA ──────────────────────────────────
@@ -91,9 +108,10 @@ export async function categorizeExpense(
   description: string,
   amount: number,
   merchantName: string | undefined,
-  expenseAccounts: Array<{ id: string; name: string; code: string }>
+  expenseAccounts: Array<{ id: string; name: string; code: string }>,
+  modelOverride?: string
 ): Promise<CategorizedExpense> {
-  return categorizeAgainstCOA(description, amount, merchantName, expenseAccounts)
+  return categorizeAgainstCOA(description, amount, merchantName, expenseAccounts, modelOverride)
 }
 
 // ── Anomaly detection ─────────────────────────────────────────────────────────
