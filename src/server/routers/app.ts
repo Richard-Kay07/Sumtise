@@ -23,6 +23,10 @@ import { reportsRouter } from "./reports"
 import { settingsRouter } from "./settings"
 import { payrollRouter } from "./payroll"
 import { aiRouter } from "./ai"
+import { moduleSettingsRouter } from "./moduleSettings"
+import { transactionTagsRouter } from "./transactionTags"
+import { leasesRouter } from "./leases"
+import { payrollCOARouter } from "./payrollCOA"
 
 /**
  * Generate and store invoice PDF
@@ -1579,6 +1583,18 @@ export const appRouter = createTRPCRouter({
 
   // AI routes
   ai: aiRouter,
+
+  // Module settings (feature toggles)
+  modules: moduleSettingsRouter,
+
+  // Transaction tagging
+  tags: transactionTagsRouter,
+
+  // IFRS 16 / FRS 102 leases
+  leases: leasesRouter,
+
+  // Payroll COA integration
+  payrollCOA: payrollCOARouter,
 
   // Dashboard routes
   dashboard: createTRPCRouter({
