@@ -27,6 +27,13 @@ import { moduleSettingsRouter } from "./moduleSettings"
 import { transactionTagsRouter } from "./transactionTags"
 import { leasesRouter } from "./leases"
 import { payrollCOARouter } from "./payrollCOA"
+import { projectsRouter } from "./projects"
+import { fixedAssetsRouter } from "./fixedAssets"
+import { taxRouter } from "./tax"
+import { budgetsRouter } from "./budgets"
+import { grantsRouter } from "./grants"
+import { inventoryRouter } from "./inventory"
+import { recurringInvoicesRouter } from "./recurringInvoices"
 
 /**
  * Generate and store invoice PDF
@@ -1595,6 +1602,27 @@ export const appRouter = createTRPCRouter({
 
   // Payroll COA integration
   payrollCOA: payrollCOARouter,
+
+  // Projects
+  projects: projectsRouter,
+
+  // Fixed Assets
+  fixedAssets: fixedAssetsRouter,
+
+  // Tax (VAT + Corporation Tax + RTI)
+  tax: taxRouter,
+
+  // Budgets
+  budgets: budgetsRouter,
+
+  // Grants
+  grants: grantsRouter,
+
+  // Inventory
+  inventory: inventoryRouter,
+
+  // Recurring Invoices
+  recurringInvoices: recurringInvoicesRouter,
 
   // Dashboard routes
   dashboard: createTRPCRouter({
