@@ -11,6 +11,7 @@ import {
   Bot, Send, Lightbulb, TrendingUp, AlertCircle, CheckCircle,
   Loader2, ScanLine, Upload, X, ArrowRight, Info, RefreshCw,
   AlertTriangle, Sparkles, ChevronDown, Zap, Brain, Eye,
+  BookOpen, ChevronRight, Database, RotateCcw, PlusCircle,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -27,7 +28,7 @@ const EXAMPLE_QUERIES = [
   "Show me our net profit for this year",
 ]
 
-type Tab = "chat" | "scanner" | "insights"
+type Tab = "chat" | "scanner" | "insights" | "accountant"
 
 // ── Model picker ──────────────────────────────────────────────────────────────
 
@@ -647,6 +648,317 @@ function InsightsTab({ orgId, tier }: { orgId: string; tier: ModelTier }) {
   )
 }
 
+// ── Accountant Tab ────────────────────────────────────────────────────────────
+
+const ACCOUNTANT_EXAMPLES = [
+  "Show me the last 10 journal entries",
+  "What's the balance on the accruals account?",
+  "How do I record a prepayment for annual insurance of £2,400?",
+  "How do I reverse entry JNL-042?",
+  "Record an electricity accrual of £850 for March",
+  "Show me a trial balance snapshot",
+  "How do I account for a deposit received in advance?",
+]
+
+interface AccountantMessage {
+  role: "user" | "assistant"
+  content: string
+  proposedEntries?: ProposedEntry[]
+  toolCalls?: { name: string; summary: string }[]
+  modelUsed?: string
+  postedRefs?: string[]
+  rejectedRefs?: string[]
+}
+
+interface ProposedEntry {
+  reference: string
+  description: string
+  date: string
+  lines: { accountCode: string; accountName: string; description: string; debit: number; credit: number }[]
+  type: string
+  reversalDate?: string
+  notes: string
+}
+
+function EntryCard({
+  entry,
+  orgId,
+  onPosted,
+  onRejected,
+}: {
+  entry: ProposedEntry
+  orgId: string
+  onPosted: (ref: string) => void
+  onRejected: (ref: string) => void
+}) {
+  const postMutation = trpc.ai.postProposedEntry.useMutation({
+    onSuccess: () => onPosted(entry.reference),
+  })
+  const [rejected, setRejected] = useState(false)
+  const totalDr = entry.lines.reduce((s, l) => s + l.debit, 0)
+  const totalCr = entry.lines.reduce((s, l) => s + l.credit, 0)
+  const balanced = Math.abs(totalDr - totalCr) < 0.01
+
+  if (rejected) return (
+    <div className="border border-gray-200 rounded-xl p-3 text-xs text-gray-400 text-center">
+      Entry {entry.reference} rejected
+    </div>
+  )
+
+  if (postMutation.isSuccess) return (
+    <div className="border border-green-200 bg-green-50 rounded-xl p-3 flex items-center gap-2">
+      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+      <span className="text-sm text-green-700 font-medium">Posted: {entry.reference}</span>
+    </div>
+  )
+
+  return (
+    <div className="border border-blue-100 bg-blue-50/40 rounded-xl overflow-hidden text-sm">
+      <div className="px-3 py-2 border-b border-blue-100 flex items-center justify-between bg-blue-50">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-3.5 w-3.5 text-blue-500" />
+          <span className="font-mono text-xs text-blue-600">{entry.reference}</span>
+          <span className="text-xs text-gray-500">{entry.date}</span>
+          <Badge className="text-[10px] bg-blue-100 text-blue-700 border-0 capitalize">{entry.type}</Badge>
+        </div>
+        {entry.reversalDate && (
+          <span className="text-[10px] text-amber-600 flex items-center gap-1">
+            <RotateCcw className="h-3 w-3" /> Auto-reversal {entry.reversalDate}
+          </span>
+        )}
+      </div>
+
+      <div className="px-3 py-2">
+        <p className="text-xs text-gray-600 mb-2">{entry.description}</p>
+
+        <table className="w-full text-xs mb-2">
+          <thead className="text-gray-400">
+            <tr>
+              <th className="text-left font-normal pb-1">Account</th>
+              <th className="text-left font-normal pb-1 hidden sm:table-cell">Description</th>
+              <th className="text-right font-normal pb-1">Debit</th>
+              <th className="text-right font-normal pb-1">Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entry.lines.map((line, i) => (
+              <tr key={i} className="border-t border-gray-100">
+                <td className="py-1 pr-2">
+                  <span className="font-mono text-gray-500">[{line.accountCode}]</span>{" "}
+                  <span className="text-gray-700">{line.accountName}</span>
+                </td>
+                <td className="py-1 pr-2 text-gray-400 hidden sm:table-cell">{line.description}</td>
+                <td className="py-1 text-right font-mono">{line.debit > 0 ? `£${line.debit.toLocaleString("en-GB", { minimumFractionDigits: 2 })}` : ""}</td>
+                <td className="py-1 text-right font-mono">{line.credit > 0 ? `£${line.credit.toLocaleString("en-GB", { minimumFractionDigits: 2 })}` : ""}</td>
+              </tr>
+            ))}
+            <tr className="border-t-2 border-gray-200 font-semibold">
+              <td className="pt-1 text-gray-500" colSpan={2}>Total</td>
+              <td className="pt-1 text-right font-mono">£{totalDr.toLocaleString("en-GB", { minimumFractionDigits: 2 })}</td>
+              <td className="pt-1 text-right font-mono">£{totalCr.toLocaleString("en-GB", { minimumFractionDigits: 2 })}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {!balanced && (
+          <div className="text-xs text-red-500 mb-2 flex items-center gap-1">
+            <AlertCircle className="h-3.5 w-3.5" /> Entry is not balanced — cannot post
+          </div>
+        )}
+
+        {entry.notes && (
+          <p className="text-xs text-gray-400 italic border-l-2 border-gray-200 pl-2 mb-2">{entry.notes}</p>
+        )}
+
+        <div className="flex gap-2 mt-1">
+          <Button
+            size="sm"
+            className="rounded-lg text-xs gap-1.5 h-8"
+            style={{ backgroundColor: BRAND }}
+            disabled={!balanced || postMutation.isPending || !orgId}
+            onClick={() => postMutation.mutate({
+              organizationId: orgId,
+              reference: entry.reference,
+              description: entry.description,
+              date: entry.date,
+              lines: entry.lines,
+              type: entry.type as any,
+              reversalDate: entry.reversalDate,
+              notes: entry.notes,
+            })}
+          >
+            {postMutation.isPending
+              ? <><Loader2 className="h-3 w-3 animate-spin" /> Posting…</>
+              : <><PlusCircle className="h-3 w-3" /> Post Entry</>}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-lg text-xs h-8"
+            onClick={() => { setRejected(true); onRejected(entry.reference) }}
+          >
+            Reject
+          </Button>
+          {postMutation.isError && (
+            <span className="text-xs text-red-500 self-center">{postMutation.error.message}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AccountantTab({ orgId, tier }: { orgId: string; tier: ModelTier }) {
+  const [input, setInput] = useState("")
+  const [messages, setMessages] = useState<AccountantMessage[]>([])
+  const endRef = useRef<HTMLDivElement>(null)
+
+  const { data: modelData } = trpc.ai.getModels.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, staleTime: 60 * 60 * 1000 }
+  )
+  const tiers = (modelData as any)?.tiers
+  const smartModel = tiers?.[tier]?.modelId ?? tiers?.SMART?.modelId
+
+  const chatMutation = trpc.ai.accountantChat.useMutation({
+    onSuccess: (result) => {
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: result.answer,
+        proposedEntries: result.proposedEntries as ProposedEntry[],
+        toolCalls: result.toolCalls,
+        modelUsed: result.modelUsed,
+      }])
+    },
+    onError: (err) => {
+      setMessages(prev => [...prev, { role: "assistant", content: `Error: ${err.message}` }])
+    },
+  })
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }) }, [messages, chatMutation.isPending])
+
+  const handleSend = () => {
+    const q = input.trim()
+    if (!q || !orgId) return
+    setInput("")
+    const newMsg: AccountantMessage = { role: "user", content: q }
+    setMessages(prev => {
+      const updated = [...prev, newMsg]
+      const conversation = updated.map(m => ({ role: m.role, content: m.content }))
+      chatMutation.mutate({
+        organizationId: orgId,
+        conversation,
+        modelOverrides: smartModel ? { smart: smartModel } : undefined,
+      })
+      return updated
+    })
+  }
+
+  return (
+    <Card className="h-[700px] flex flex-col rounded-xl">
+      <CardHeader className="pb-2 flex-row items-center justify-between">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <BookOpen className="h-4 w-4" style={{ color: BRAND }} />
+          AI Accountant
+          {smartModel && <ModelBadge modelId={smartModel} tier={tier} />}
+        </CardTitle>
+        {messages.length > 0 && (
+          <button onClick={() => setMessages([])} className="text-xs text-gray-400 hover:text-gray-600">
+            Clear
+          </button>
+        )}
+      </CardHeader>
+      <CardContent className="flex-1 flex flex-col overflow-hidden pt-0">
+        <div className="flex-1 overflow-y-auto space-y-3 mb-3 pr-1">
+          {messages.length === 0 ? (
+            <div className="text-center text-gray-400 py-10">
+              <BookOpen className="mx-auto h-10 w-10 mb-3 opacity-30" />
+              <p className="text-sm font-medium text-gray-500 mb-1">Agentic AI Accountant</p>
+              <p className="text-xs text-gray-400 mb-4">Queries your live ledger · Proposes journal entries · Explains FRS 102 treatment</p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {ACCOUNTANT_EXAMPLES.slice(0, 4).map((ex, i) => (
+                  <button key={i} onClick={() => setInput(ex)}
+                    className="text-xs px-3 py-1.5 rounded-full border border-gray-200 hover:border-[#50B0E0] hover:text-[#50B0E0] transition-colors">
+                    {ex}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[90%] space-y-2 ${msg.role === "user" ? "" : "w-full"}`}>
+                <div className={`p-3 rounded-xl text-sm ${
+                  msg.role === "user"
+                    ? "text-white"
+                    : "bg-gray-50 border border-gray-100 text-gray-800"
+                }`} style={msg.role === "user" ? { backgroundColor: BRAND } : {}}>
+                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+
+                  {msg.role === "assistant" && msg.toolCalls && msg.toolCalls.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {msg.toolCalls.map((tc, j) => (
+                        <div key={j} className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                          <Database className="h-3 w-3 flex-shrink-0" />
+                          {tc.summary}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {msg.role === "assistant" && msg.modelUsed && (
+                    <div className="mt-2">
+                      <ModelBadge modelId={msg.modelUsed} />
+                    </div>
+                  )}
+                </div>
+
+                {msg.role === "assistant" && msg.proposedEntries && msg.proposedEntries.length > 0 && (
+                  <div className="space-y-2 w-full">
+                    {msg.proposedEntries.map((entry, j) => (
+                      <EntryCard
+                        key={j}
+                        entry={entry}
+                        orgId={orgId}
+                        onPosted={(ref) => setMessages(prev => prev.map((m, mi) => mi === i ? { ...m, postedRefs: [...(m.postedRefs ?? []), ref] } : m))}
+                        onRejected={(ref) => setMessages(prev => prev.map((m, mi) => mi === i ? { ...m, rejectedRefs: [...(m.rejectedRefs ?? []), ref] } : m))}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {chatMutation.isPending && (
+            <div className="flex justify-start">
+              <div className="bg-gray-50 border border-gray-100 p-3 rounded-xl flex items-center gap-2 text-xs text-gray-400">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Querying ledger data…</span>
+              </div>
+            </div>
+          )}
+          <div ref={endRef} />
+        </div>
+
+        <div className="flex gap-2">
+          <Input
+            placeholder="e.g. Record an accrual for electricity £850 for March"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+            disabled={chatMutation.isPending || !orgId}
+            className="rounded-xl"
+          />
+          <Button onClick={handleSend} disabled={chatMutation.isPending || !input.trim() || !orgId}
+            className="rounded-xl" style={{ backgroundColor: BRAND }}>
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AIPage() {
@@ -662,9 +974,10 @@ export default function AIPage() {
   const resolvedModel = (modelData as any)?.tiers?.[tier]?.modelId
 
   const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
-    { id: "chat",     label: "Ask AI",          icon: <Bot className="h-4 w-4" /> },
-    { id: "scanner",  label: "Receipt Scanner",  icon: <ScanLine className="h-4 w-4" /> },
-    { id: "insights", label: "Insights",         icon: <Sparkles className="h-4 w-4" /> },
+    { id: "chat",       label: "Ask AI",          icon: <Bot className="h-4 w-4" /> },
+    { id: "accountant", label: "Accountant",       icon: <BookOpen className="h-4 w-4" /> },
+    { id: "scanner",    label: "Receipt Scanner",  icon: <ScanLine className="h-4 w-4" /> },
+    { id: "insights",   label: "Insights",         icon: <Sparkles className="h-4 w-4" /> },
   ]
 
   return (
@@ -706,9 +1019,10 @@ export default function AIPage() {
         ) : (
           <div className="grid gap-5 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              {tab === "chat"     && <ChatTab orgId={orgId} tier={tier} resolvedModel={resolvedModel} />}
-              {tab === "scanner"  && <ScannerTab orgId={orgId} tier={tier} />}
-              {tab === "insights" && <InsightsTab orgId={orgId} tier={tier} />}
+              {tab === "chat"       && <ChatTab orgId={orgId} tier={tier} resolvedModel={resolvedModel} />}
+              {tab === "accountant" && <AccountantTab orgId={orgId} tier={tier} />}
+              {tab === "scanner"    && <ScannerTab orgId={orgId} tier={tier} />}
+              {tab === "insights"   && <InsightsTab orgId={orgId} tier={tier} />}
             </div>
 
             {/* Sidebar */}
@@ -733,6 +1047,27 @@ export default function AIPage() {
                 </Card>
               )}
 
+              {tab === "accountant" && (
+                <Card className="rounded-xl">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Lightbulb className="h-4 w-4" style={{ color: BRAND }} />
+                      Try asking
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1.5">
+                      {ACCOUNTANT_EXAMPLES.map((ex, i) => (
+                        <div key={i} className="flex items-start gap-1.5 text-xs px-3 py-2 rounded-lg border border-gray-100 text-gray-600">
+                          <ChevronRight className="h-3 w-3 mt-0.5 flex-shrink-0 text-gray-300" />
+                          {ex}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <Card className="rounded-xl">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm">AI Capabilities</CardTitle>
@@ -741,10 +1076,10 @@ export default function AIPage() {
                   <div className="space-y-2">
                     {[
                       ["Ask AI",          "Query real financial data in plain English"],
+                      ["Accountant",      "Agentic AI: journal entries, accruals, reversals"],
                       ["Receipt Scanner", "OCR receipts → auto-create bill drafts"],
                       ["Insights",        "AI-generated insights from your actual P&L"],
                       ["Anomaly detection","Spot duplicates and unusual transactions"],
-                      ["Expense matching", "Match expenses to your chart of accounts"],
                     ].map(([title, desc]) => (
                       <div key={title} className="flex items-start gap-2">
                         <CheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" />

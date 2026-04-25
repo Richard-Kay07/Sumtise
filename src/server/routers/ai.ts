@@ -11,6 +11,8 @@ import {
   detectAnomalies,
   getModelSnapshot,
 } from "@/lib/ai/ai-service"
+import { runAccountantAgent, resolveAccountCode } from "@/lib/ai/accountant-agent"
+import { postDoubleEntry, reversePosting } from "@/lib/posting"
 
 // Reusable optional model override schema
 const modelOverrideSchema = z.object({
@@ -201,6 +203,109 @@ export const aiRouter = createTRPCRouter({
       })
 
       return { billId: bill.id, billNumber: finalBillNumber, total }
+    }),
+
+  // ── Agentic accountant chat ──────────────────────────────────────────────────
+
+  accountantChat: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.REPORTS_VIEW))
+    .input(z.object({
+      organizationId: z.string(),
+      conversation: z.array(z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string(),
+      })),
+      modelOverrides: modelOverrideSchema,
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return runAccountantAgent(
+        input.conversation,
+        ctx.organizationId,
+        input.modelOverrides?.smart,
+      )
+    }),
+
+  // ── Post a proposed journal entry ───────────────────────────────────────────
+
+  postProposedEntry: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.BILLS_CREATE))
+    .input(z.object({
+      organizationId: z.string(),
+      reference: z.string(),
+      description: z.string(),
+      date: z.string(),
+      lines: z.array(z.object({
+        accountCode: z.string(),
+        accountName: z.string(),
+        description: z.string(),
+        debit: z.number(),
+        credit: z.number(),
+      })),
+      type: z.enum(["journal", "accrual", "prepayment", "deferred_revenue", "reversal", "correction"]),
+      reversalDate: z.string().optional(),
+      notes: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Resolve account codes to IDs
+      const resolvedLines = await Promise.all(
+        input.lines.map(async (line) => {
+          const accountId = await resolveAccountCode(line.accountCode, ctx.organizationId)
+          if (!accountId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Account code "${line.accountCode}" (${line.accountName}) not found in chart of accounts`,
+            })
+          }
+          return { accountId, debit: line.debit, credit: line.credit, description: line.description }
+        })
+      )
+
+      const result = await postDoubleEntry({
+        date: new Date(input.date),
+        lines: resolvedLines,
+        docRef: input.reference,
+        orgId: ctx.organizationId,
+        userId: ctx.userId,
+        description: input.description,
+        metadata: { type: input.type, notes: input.notes, reversalDate: input.reversalDate },
+      })
+
+      return { ...result, reference: input.reference }
+    }),
+
+  // ── Reverse a journal entry by reference ─────────────────────────────────────
+
+  reverseJournalEntry: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.BILLS_CREATE))
+    .input(z.object({
+      organizationId: z.string(),
+      reference: z.string(),
+      reversalDate: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const txns = await prisma.transaction.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          reference: { contains: input.reference, mode: "insensitive" },
+        },
+        select: { id: true },
+      })
+
+      if (txns.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: `No transactions found with reference "${input.reference}"` })
+      }
+
+      const result = await reversePosting(
+        txns.map(t => t.id),
+        {
+          orgId: ctx.organizationId,
+          userId: ctx.userId,
+          date: input.reversalDate ? new Date(input.reversalDate) : new Date(),
+          description: `Reversal of ${input.reference}`,
+        }
+      )
+
+      return result
     }),
 
   // ── Anomaly detection ────────────────────────────────────────────────────────
