@@ -161,6 +161,15 @@ export function Nav() {
               <NavItem href="/tax/settings">Tax Settings</NavItem>
             </NavDropdown>
 
+            {/* AI */}
+            <Link
+              href="/ai"
+              className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-white hover:bg-[#50B0E0] rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              <span className="text-xs">✦</span>
+              AI
+            </Link>
+
             {/* Settings */}
             <NavDropdown label="Sumtise Settings">
               <NavItem href="/settings/profile">Profile</NavItem>

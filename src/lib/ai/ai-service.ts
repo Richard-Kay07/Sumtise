@@ -1,313 +1,144 @@
 import OpenAI from "openai"
+import { buildFinancialContext, formatContextForPrompt } from "./financial-context"
+import { resolveNLQuery, type NLQueryResult } from "./nl-router"
+import { scanReceipt, categorizeAgainstCOA, type ReceiptData, type CategorizedExpense } from "./receipt-ocr"
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-export interface AIQueryResult {
-  answer: string
-  data?: any
-  suggestions?: string[]
+export type { NLQueryResult, ReceiptData, CategorizedExpense }
+
+export interface AIInsight {
+  text: string
+  type: "positive" | "warning" | "info"
 }
 
-export interface ExpenseCategorization {
-  category: string
-  confidence: number
-  subcategory?: string
-  description?: string
+// ── Natural language query ────────────────────────────────────────────────────
+
+export async function processQuery(query: string, organizationId: string): Promise<NLQueryResult> {
+  const ctx = await buildFinancialContext(organizationId)
+  const contextSummary = formatContextForPrompt(ctx)
+  return resolveNLQuery(query, organizationId, contextSummary)
 }
 
-export interface InvoiceData {
-  invoiceNumber?: string
-  date?: string
-  dueDate?: string
-  customerName?: string
-  items?: Array<{
-    description: string
-    quantity: number
-    unitPrice: number
-    total: number
-  }>
-  subtotal?: number
-  taxAmount?: number
-  total?: number
-  currency?: string
+// ── Financial insights from real data ────────────────────────────────────────
+
+export async function generateInsights(
+  organizationId: string,
+  period = "last 30 days"
+): Promise<AIInsight[]> {
+  const ctx = await buildFinancialContext(organizationId)
+  const contextSummary = formatContextForPrompt(ctx)
+
+  const prompt = `You are a financial advisor. Based ONLY on the real data below, generate 5 concise actionable insights.
+Each insight must be grounded in the actual numbers. Do not invent data.
+
+${contextSummary}
+
+Return JSON array (exactly 5 items):
+[
+  { "text": "...", "type": "positive" | "warning" | "info" },
+  ...
+]`
+
+  try {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      max_tokens: 600,
+    })
+    const raw = JSON.parse(res.choices[0]?.message?.content ?? "{}") as any
+    const items: AIInsight[] = Array.isArray(raw) ? raw : (raw.insights ?? raw.items ?? [])
+    return items.slice(0, 5)
+  } catch {
+    // Fallback: derive rule-based insights from real context
+    const insights: AIInsight[] = []
+    const sym = ctx.currency === "GBP" ? "£" : ctx.currency
+    const fmt = (n: number) => `${sym}${Math.abs(n).toLocaleString("en-GB", { maximumFractionDigits: 0 })}`
+
+    if (ctx.overdueInvoiceCount > 0) {
+      insights.push({ text: `${ctx.overdueInvoiceCount} overdue invoice${ctx.overdueInvoiceCount > 1 ? "s" : ""} totalling ${fmt(ctx.overdueInvoiceTotal)} require immediate follow-up.`, type: "warning" })
+    }
+    if (ctx.netProfit < 0) {
+      insights.push({ text: `Net loss of ${fmt(Math.abs(ctx.netProfit))} over the past 12 months — review top expense accounts.`, type: "warning" })
+    } else {
+      insights.push({ text: `Net profit of ${fmt(ctx.netProfit)} over the past 12 months.`, type: "positive" })
+    }
+    if (ctx.totalReceivables > ctx.totalPayables * 2) {
+      insights.push({ text: `Strong receivables position: ${fmt(ctx.totalReceivables)} owed to you vs ${fmt(ctx.totalPayables)} payable.`, type: "positive" })
+    }
+    if (ctx.topExpenseAccounts[0]) {
+      insights.push({ text: `Largest expense category: ${ctx.topExpenseAccounts[0].name} (${fmt(ctx.topExpenseAccounts[0].total)}).`, type: "info" })
+    }
+    insights.push({ text: `${ctx.recentTransactionCount} transactions recorded in the last 12 months.`, type: "info" })
+    return insights.slice(0, 5)
+  }
 }
 
-export class AIService {
-  /**
-   * Process natural language queries about financial data
-   */
-  static async processQuery(query: string, organizationId: string): Promise<AIQueryResult> {
-    try {
-      const systemPrompt = `You are an AI assistant for Sumtise, an accounting software for SMEs in UK and African markets. 
-      You help users understand their financial data through natural language queries.
-      
-      When users ask questions like:
-      - "Show me all travel expenses over £500 last quarter"
-      - "What was our revenue last month?"
-      - "Which customers owe us money?"
-      - "How much did we spend on marketing this year?"
-      
-      Provide helpful, accurate responses based on the context provided. If you need specific data, 
-      suggest the appropriate reports or data points to look at.`
+// ── Receipt OCR ───────────────────────────────────────────────────────────────
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: query }
-        ],
-        temperature: 0.3,
-        max_tokens: 500,
-      })
+export async function extractReceiptData(
+  imageBuffer: Buffer,
+  mimeType = "image/jpeg"
+): Promise<ReceiptData> {
+  return scanReceipt(imageBuffer, mimeType)
+}
 
-      const answer = response.choices[0]?.message?.content || "I couldn't process your query."
+// ── Expense categorization against real COA ──────────────────────────────────
 
-      return {
-        answer,
-        suggestions: [
-          "View detailed expense report",
-          "Check customer aging report",
-          "Generate profit & loss statement",
-          "Review cash flow analysis"
-        ]
-      }
-    } catch (error) {
-      console.error("AI query processing error:", error)
-      return {
-        answer: "I'm sorry, I couldn't process your query at the moment. Please try again later.",
-        suggestions: []
-      }
+export async function categorizeExpense(
+  description: string,
+  amount: number,
+  merchantName: string | undefined,
+  expenseAccounts: Array<{ id: string; name: string; code: string }>
+): Promise<CategorizedExpense> {
+  return categorizeAgainstCOA(description, amount, merchantName, expenseAccounts)
+}
+
+// ── Anomaly detection ─────────────────────────────────────────────────────────
+
+export interface Anomaly {
+  type: "duplicate" | "unusual_amount" | "round_number"
+  description: string
+  severity: "low" | "medium" | "high"
+  transactionId?: string
+}
+
+export function detectAnomalies(transactions: Array<{ id: string; description: string; debit: number; credit: number; date: string }>): Anomaly[] {
+  const anomalies: Anomaly[] = []
+  const amounts = transactions.map(t => Math.abs(t.debit + t.credit))
+  const avg = amounts.reduce((s, a) => s + a, 0) / (amounts.length || 1)
+
+  for (const tx of transactions) {
+    const amt = Math.abs(tx.debit + tx.credit)
+
+    // Unusually large
+    if (amt > avg * 4 && amt > 1000) {
+      anomalies.push({ type: "unusual_amount", description: `Unusually large: ${tx.description} (${amt.toFixed(2)})`, severity: "medium", transactionId: tx.id })
+    }
+
+    // Suspicious round number
+    if (amt > 500 && amt % 1000 === 0) {
+      anomalies.push({ type: "round_number", description: `Suspicious round amount: ${tx.description} (${amt.toFixed(2)})`, severity: "low", transactionId: tx.id })
     }
   }
 
-  /**
-   * Categorize expenses using AI
-   */
-  static async categorizeExpense(description: string, amount: number, merchant?: string): Promise<ExpenseCategorization> {
-    try {
-      const prompt = `Categorize this business expense:
-      
-      Description: ${description}
-      Amount: £${amount}
-      ${merchant ? `Merchant: ${merchant}` : ''}
-      
-      Choose the most appropriate category from these options:
-      - Office Supplies
-      - Travel & Transport
-      - Marketing & Advertising
-      - Professional Services
-      - Utilities
-      - Rent & Property
-      - Equipment & Technology
-      - Training & Development
-      - Insurance
-      - Other
-      
-      Respond with JSON format:
-      {
-        "category": "category name",
-        "confidence": 0.95,
-        "subcategory": "optional subcategory",
-        "description": "brief explanation"
-      }`
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.1,
-        max_tokens: 200,
-      })
-
-      const result = JSON.parse(response.choices[0]?.message?.content || "{}")
-      
-      return {
-        category: result.category || "Other",
-        confidence: result.confidence || 0.5,
-        subcategory: result.subcategory,
-        description: result.description
-      }
-    } catch (error) {
-      console.error("Expense categorization error:", error)
-      return {
-        category: "Other",
-        confidence: 0.1,
-        description: "Unable to categorize automatically"
+  // Duplicates: same description + amount within any 7-day window
+  for (let i = 0; i < transactions.length; i++) {
+    for (let j = i + 1; j < transactions.length; j++) {
+      const a = transactions[i], b = transactions[j]
+      const daysDiff = Math.abs(new Date(a.date).getTime() - new Date(b.date).getTime()) / 86400000
+      if (
+        a.description === b.description &&
+        Math.abs(a.debit - b.debit) < 0.01 &&
+        Math.abs(a.credit - b.credit) < 0.01 &&
+        daysDiff <= 7
+      ) {
+        anomalies.push({ type: "duplicate", description: `Possible duplicate: "${a.description}" appears ${daysDiff.toFixed(0)} day(s) apart`, severity: "high", transactionId: a.id })
       }
     }
   }
 
-  /**
-   * Extract data from invoice images/PDFs
-   */
-  static async extractInvoiceData(imageBase64: string): Promise<InvoiceData> {
-    try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4-vision-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Extract all relevant information from this invoice image. Return JSON format with fields: invoiceNumber, date, dueDate, customerName, items (array with description, quantity, unitPrice, total), subtotal, taxAmount, total, currency."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/jpeg;base64,${imageBase64}`
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 1000,
-      })
-
-      const result = JSON.parse(response.choices[0]?.message?.content || "{}")
-      return result as InvoiceData
-    } catch (error) {
-      console.error("Invoice data extraction error:", error)
-      return {}
-    }
-  }
-
-  /**
-   * Generate financial insights and recommendations
-   */
-  static async generateInsights(organizationId: string, period: string = "last 30 days"): Promise<string[]> {
-    try {
-      const prompt = `Generate 5 actionable financial insights for an SME based on common patterns. 
-      Focus on:
-      - Cash flow optimization
-      - Expense reduction opportunities
-      - Revenue growth suggestions
-      - Tax optimization
-      - Financial health improvements
-      
-      Make insights specific and actionable for UK and African markets.`
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 800,
-      })
-
-      const insights = response.choices[0]?.message?.content || ""
-      return insights.split('\n').filter(line => line.trim().length > 0).slice(0, 5)
-    } catch (error) {
-      console.error("Insights generation error:", error)
-      return [
-        "Review your cash flow patterns to identify optimization opportunities",
-        "Consider automating recurring expenses to reduce manual work",
-        "Analyze customer payment patterns to improve collection times",
-        "Evaluate expense categories for potential cost savings",
-        "Monitor key financial ratios to maintain healthy business metrics"
-      ]
-    }
-  }
-
-  /**
-   * Detect anomalies in financial data
-   */
-  static async detectAnomalies(transactions: any[]): Promise<Array<{
-    type: string
-    description: string
-    severity: 'low' | 'medium' | 'high'
-    transactionId?: string
-  }>> {
-    try {
-      // This would typically involve more sophisticated anomaly detection
-      // For now, we'll use a simple rule-based approach with AI enhancement
-      
-      const anomalies: Array<{
-        type: string
-        description: string
-        severity: 'low' | 'medium' | 'high'
-        transactionId?: string
-      }> = []
-
-      // Check for unusually large transactions
-      const avgAmount = transactions.reduce((sum, t) => sum + Math.abs(t.debit + t.credit), 0) / transactions.length
-      const largeTransactions = transactions.filter(t => 
-        Math.abs(t.debit + t.credit) > avgAmount * 3
-      )
-
-      largeTransactions.forEach(transaction => {
-        anomalies.push({
-          type: "unusual_amount",
-          description: `Unusually large transaction: ${transaction.description}`,
-          severity: "medium",
-          transactionId: transaction.id
-        })
-      })
-
-      // Check for duplicate transactions
-      const duplicates = transactions.filter((t, i) => 
-        transactions.findIndex(other => 
-          other.description === t.description && 
-          Math.abs(other.debit - t.debit) < 0.01 &&
-          Math.abs(other.credit - t.credit) < 0.01 &&
-          other.id !== t.id
-        ) !== -1
-      )
-
-      duplicates.forEach(transaction => {
-        anomalies.push({
-          type: "duplicate",
-          description: `Potential duplicate transaction: ${transaction.description}`,
-          severity: "high",
-          transactionId: transaction.id
-        })
-      })
-
-      return anomalies
-    } catch (error) {
-      console.error("Anomaly detection error:", error)
-      return []
-    }
-  }
-
-  /**
-   * Generate cash flow predictions
-   */
-  static async predictCashFlow(historicalData: any[], days: number = 30): Promise<{
-    predictions: Array<{ date: string; predicted: number; confidence: number }>
-    insights: string[]
-  }> {
-    try {
-      // This would typically use time series analysis
-      // For now, we'll provide a simple trend-based prediction
-      
-      const recentData = historicalData.slice(-30) // Last 30 days
-      const avgDailyFlow = recentData.reduce((sum, day) => sum + day.netFlow, 0) / recentData.length
-      
-      const predictions = []
-      const insights = []
-      
-      for (let i = 1; i <= days; i++) {
-        const date = new Date()
-        date.setDate(date.getDate() + i)
-        
-        predictions.push({
-          date: date.toISOString().split('T')[0],
-          predicted: avgDailyFlow * i,
-          confidence: Math.max(0.6, 1 - (i / days) * 0.4) // Decreasing confidence over time
-        })
-      }
-
-      if (avgDailyFlow > 0) {
-        insights.push("Positive cash flow trend detected")
-      } else {
-        insights.push("Negative cash flow trend - consider cost reduction")
-      }
-
-      return { predictions, insights }
-    } catch (error) {
-      console.error("Cash flow prediction error:", error)
-      return { predictions: [], insights: ["Unable to generate predictions"] }
-    }
-  }
+  return anomalies
 }
