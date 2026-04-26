@@ -14,10 +14,16 @@ export const metadata: Metadata = {
   description: "Complete accounting solution for UK and African markets with AI-powered insights",
   keywords: ["accounting", "bookkeeping", "SME", "UK", "Africa", "finance", "invoicing"],
   authors: [{ name: "Sumtise Team" }],
+  icons: {
+    icon:             [{ url: "/favicon.png", sizes: "32x32", type: "image/png" }],
+    apple:            [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    shortcut:         "/favicon.png",
+  },
   openGraph: {
     title: "Sumtise - Modern Accounting Software",
     description: "Complete accounting solution for SMEs",
     type: "website",
+    images: [{ url: "/logo-full-dark-bg.png", width: 1200, height: 630, alt: "Sumtise" }],
   },
 }
 
