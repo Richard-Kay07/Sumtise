@@ -84,7 +84,7 @@ export default function InvoicesPage() {
 
   // Memoize summary calculations
   const summaryStats = useMemo(() => {
-    const totalValue = invoices.reduce((sum, invoice) => sum + invoice.total, 0)
+    const totalValue = invoices.reduce((sum, invoice) => sum + Number(invoice.total), 0)
     const paidCount = invoices.filter(invoice => invoice.status === "PAID").length
     const overdueCount = invoices.filter(invoice => invoice.status === "OVERDUE").length
     
@@ -244,7 +244,7 @@ export default function InvoicesPage() {
                         <td className="p-4">
                           <div className="flex items-center">
                             <DollarSign className="mr-2 h-4 w-4 text-muted-foreground" />
-                            {formatCurrency(invoice.total, invoice.currency)}
+                            {formatCurrency(Number(invoice.total), invoice.currency)}
                           </div>
                         </td>
                         <td className="p-4">
