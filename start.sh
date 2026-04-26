@@ -10,7 +10,7 @@ echo "NEXTAUTH_SECRET set: $([ -n "$NEXTAUTH_SECRET" ] && echo yes || echo NO)"
 echo "NEXTAUTH_URL: $NEXTAUTH_URL"
 
 echo "=== Syncing database schema ==="
-npx prisma db push
+node_modules/.bin/prisma db push
 
 echo "=== Starting Next.js server ==="
 exec node server.js

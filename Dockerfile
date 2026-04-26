@@ -34,7 +34,6 @@ WORKDIR /app
 ENV NODE_ENV production
 
 RUN apk add --no-cache openssl
-RUN npm install -g npm@11.13.0 --quiet
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
