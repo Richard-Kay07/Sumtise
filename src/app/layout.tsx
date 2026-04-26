@@ -10,6 +10,7 @@ import { Nav } from "@/components/nav"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://sumtise.up.railway.app"),
   title: "Sumtise - Modern Accounting Software for SMEs",
   description: "Complete accounting solution for UK and African markets with AI-powered insights",
   keywords: ["accounting", "bookkeeping", "SME", "UK", "Africa", "finance", "invoicing"],
