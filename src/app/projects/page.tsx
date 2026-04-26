@@ -1,269 +1,159 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Progress } from "@/components/ui/progress"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { trpc } from "@/lib/trpc-client"
-import { Briefcase, Plus, Search, TrendingUp, DollarSign, CheckCircle, Clock } from "lucide-react"
+import { FolderOpen, Plus, Search, ChevronRight } from "lucide-react"
+import Link from "next/link"
 
-const SAMPLE_PROJECTS = [
-  { id: "1", name: "Website Redesign", client: "Acme Corp", budget: 25000, spent: 18500, status: "Active", complete: 74, deadline: "2026-06-30" },
-  { id: "2", name: "ERP Implementation", client: "TechStart Ltd", budget: 80000, spent: 45000, status: "Active", complete: 56, deadline: "2026-09-15" },
-  { id: "3", name: "Mobile App Dev", client: "RetailPlus", budget: 40000, spent: 40000, status: "Completed", complete: 100, deadline: "2026-03-31" },
-  { id: "4", name: "Data Migration", client: "FinServ UK", budget: 15000, spent: 3000, status: "On Hold", complete: 20, deadline: "2026-08-01" },
-  { id: "5", name: "Security Audit", client: "Global Insure", budget: 12000, spent: 9600, status: "Active", complete: 80, deadline: "2026-05-15" },
-  { id: "6", name: "Cloud Migration", client: "ManufactCo", budget: 60000, spent: 0, status: "Planning", complete: 0, deadline: "2026-12-31" },
-  { id: "7", name: "CRM Integration", client: "SalesForce Ltd", budget: 22000, spent: 22500, status: "Completed", complete: 100, deadline: "2026-02-28" },
-]
+const BRAND = "#50B0E0"
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", minimumFractionDigits: 0 }).format(n)
+const STATUS_COLORS: Record<string, string> = {
+  DRAFT:     "bg-gray-100 text-gray-500",
+  ACTIVE:    "bg-green-100 text-green-700",
+  ON_HOLD:   "bg-yellow-100 text-yellow-700",
+  COMPLETED: "bg-blue-100 text-blue-700",
+  CANCELLED: "bg-red-100 text-red-700",
 }
 
-const getStatusVariant = (status: string) => {
-  switch (status) {
-    case "Active": return "default"
-    case "Completed": return "secondary"
-    case "On Hold": return "outline"
-    case "Planning": return "outline"
-    default: return "outline"
-  }
-}
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "Active": return "text-green-700 bg-green-50 border border-green-200"
-    case "Completed": return "text-blue-700 bg-blue-50 border border-blue-200"
-    case "On Hold": return "text-orange-700 bg-orange-50 border border-orange-200"
-    case "Planning": return "text-gray-700 bg-gray-50 border border-gray-200"
-    default: return "text-gray-700 bg-gray-50"
-  }
-}
-
-const getProgressColor = (complete: number, spent: number, budget: number) => {
-  if (spent > budget) return "bg-red-500"
-  if (complete === 100) return "bg-green-500"
-  return "#50B0E0"
-}
+const fmt = (n: number) =>
+  `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
 export default function ProjectsPage() {
+  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
+  const orgId = orgs?.[0]?.id ?? ""
+
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("All")
-  const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ name: "", client: "", budget: "", deadline: "" })
+  const [status, setStatus] = useState("")
+  const [page,   setPage]   = useState(1)
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
+  const { data, isLoading } = trpc.projects.list.useQuery(
+    {
+      organizationId: orgId,
+      search: search || undefined,
+      status: status ? (status as any) : undefined,
+      page,
+      limit: 20,
+    },
+    { enabled: !!orgId }
+  )
 
-  const filtered = SAMPLE_PROJECTS.filter((p) => {
-    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.client.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = statusFilter === "All" || p.status === statusFilter
-    return matchSearch && matchStatus
-  })
-
-  const totalBudget = SAMPLE_PROJECTS.reduce((s, p) => s + p.budget, 0)
-  const totalSpent = SAMPLE_PROJECTS.reduce((s, p) => s + p.spent, 0)
-  const activeCount = SAMPLE_PROJECTS.filter((p) => p.status === "Active").length
-  const completedCount = SAMPLE_PROJECTS.filter((p) => p.status === "Completed").length
+  const projects   = (data as any)?.projects ?? []
+  const pagination = (data as any)?.pagination
+  const activeCount = projects.filter((p: any) => p.status === "ACTIVE").length
+  const totalBudget = projects.reduce((s: number, p: any) => s + Number(p.budget ?? 0), 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6 px-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#1A1D24" }}>Projects</h1>
-            <p className="text-gray-600">Track project budgets, progress and profitability</p>
+      <div className="border-b bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 flex h-14 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FolderOpen className="h-5 w-5" style={{ color: BRAND }} />
+            <h1 className="text-xl font-bold" style={{ color: "#1A1D24" }}>Projects</h1>
           </div>
-          <Button className="text-white" style={{ backgroundColor: "#50B0E0" }} onClick={() => setShowModal(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
-          </Button>
+          <Link href="/projects/new">
+            <Button className="rounded-xl text-xs gap-1" style={{ backgroundColor: BRAND }}>
+              <Plus className="h-3.5 w-3.5" /> New Project
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-5">
+        <div className="grid gap-4 sm:grid-cols-4">
+          {[
+            { label: "Total Projects",  value: (pagination?.total ?? 0).toString() },
+            { label: "Active Projects", value: activeCount.toString() },
+            { label: "Total Budget",    value: fmt(totalBudget) },
+            { label: "On Hold",         value: projects.filter((p: any) => p.status === "ON_HOLD").length.toString() },
+          ].map(c => (
+            <Card key={c.label} className="rounded-xl">
+              <CardContent className="pt-5">
+                <p className="text-xs text-gray-500">{c.label}</p>
+                <p className="text-2xl font-bold mt-1">{c.value}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4 mb-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: "#50B0E020" }}>
-                  <Briefcase className="h-5 w-5" style={{ color: "#50B0E0" }} />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total Projects</p>
-                  <p className="text-2xl font-bold" style={{ color: "#1A1D24" }}>{SAMPLE_PROJECTS.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-50">
-                  <TrendingUp className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Active</p>
-                  <p className="text-2xl font-bold text-green-600">{activeCount}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-50">
-                  <DollarSign className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total Budget</p>
-                  <p className="text-2xl font-bold text-blue-600">{fmt(totalBudget)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-purple-50">
-                  <CheckCircle className="h-5 w-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total Spent</p>
-                  <p className="text-2xl font-bold text-purple-600">{fmt(totalSpent)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-gray-400" />
+            <Input placeholder="Search projects…" value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              className="pl-8 h-8 text-xs rounded-xl w-48" />
+          </div>
+          {(["", "DRAFT", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"] as const).map(s => (
+            <button key={s} onClick={() => { setStatus(s); setPage(1) }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                status === s ? "text-white border-transparent" : "text-gray-600 border-gray-200 hover:border-gray-300"
+              }`} style={status === s ? { backgroundColor: BRAND, borderColor: BRAND } : {}}>
+              {s ? s.replace(/_/g, " ") : "All"}
+            </button>
+          ))}
         </div>
 
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search projects or clients..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <div className="flex gap-2">
-                {["All", "Active", "Completed", "On Hold", "Planning"].map((s) => (
-                  <Button
-                    key={s}
-                    size="sm"
-                    variant={statusFilter === s ? "default" : "outline"}
-                    onClick={() => setStatusFilter(s)}
-                    style={statusFilter === s ? { backgroundColor: "#50B0E0" } : {}}
-                  >
-                    {s}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Projects Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Projects ({filtered.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card className="rounded-xl overflow-hidden">
+          {isLoading ? (
+            <CardContent className="py-12 text-center text-gray-400 text-sm">Loading…</CardContent>
+          ) : projects.length === 0 ? (
+            <CardContent className="py-12 text-center">
+              <FolderOpen className="mx-auto h-10 w-10 text-gray-200 mb-3" />
+              <p className="text-sm text-gray-500">No projects found.</p>
+            </CardContent>
+          ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-gray-50">
-                    <th className="text-left p-4 font-medium text-gray-600">Project</th>
-                    <th className="text-left p-4 font-medium text-gray-600">Client</th>
-                    <th className="text-right p-4 font-medium text-gray-600">Budget</th>
-                    <th className="text-right p-4 font-medium text-gray-600">Spent</th>
-                    <th className="text-left p-4 font-medium text-gray-600">Progress</th>
-                    <th className="text-left p-4 font-medium text-gray-600">Deadline</th>
-                    <th className="text-left p-4 font-medium text-gray-600">Status</th>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr className="text-left text-xs text-gray-500">
+                    <th className="px-4 py-3">Ref</th>
+                    <th className="px-4 py-3">Project Name</th>
+                    <th className="px-4 py-3">Customer</th>
+                    <th className="px-4 py-3 text-right">Budget</th>
+                    <th className="px-4 py-3 text-center">Entries</th>
+                    <th className="px-4 py-3">Start</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((project) => {
-                    const overBudget = project.spent > project.budget
-                    return (
-                      <tr key={project.id} className="border-b hover:bg-gray-50 transition-colors">
-                        <td className="p-4 font-medium" style={{ color: "#1A1D24" }}>{project.name}</td>
-                        <td className="p-4 text-gray-600">{project.client}</td>
-                        <td className="p-4 text-right">{fmt(project.budget)}</td>
-                        <td className={`p-4 text-right font-medium ${overBudget ? "text-red-600" : "text-gray-700"}`}>
-                          {fmt(project.spent)}
-                          {overBudget && <span className="text-xs ml-1 text-red-500">(over budget)</span>}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2 min-w-32">
-                            <div className="flex-1 bg-gray-100 rounded-full h-2">
-                              <div
-                                className="h-2 rounded-full transition-all"
-                                style={{
-                                  width: `${project.complete}%`,
-                                  backgroundColor: overBudget ? "#ef4444" : project.complete === 100 ? "#22c55e" : "#50B0E0"
-                                }}
-                              />
-                            </div>
-                            <span className="text-sm text-gray-600 w-10 text-right">{project.complete}%</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-gray-600 text-sm">{project.deadline}</td>
-                        <td className="p-4">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(project.status)}`}>
-                            {project.status}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {projects.map((p: any) => (
+                    <tr key={p.id} className="border-b last:border-0 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => (window.location.href = `/projects/${p.id}`)}>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.projectNumber}</td>
+                      <td className="px-4 py-3 font-medium">{p.name}</td>
+                      <td className="px-4 py-3 text-gray-500">{p.customer?.name ?? "—"}</td>
+                      <td className="px-4 py-3 text-right font-mono">{p.budget ? fmt(Number(p.budget)) : "—"}</td>
+                      <td className="px-4 py-3 text-center text-gray-500">{p._count?.entries ?? 0}</td>
+                      <td className="px-4 py-3 text-gray-500">{p.startDate ? new Date(p.startDate).toLocaleDateString("en-GB") : "—"}</td>
+                      <td className="px-4 py-3">
+                        <Badge className={`text-xs ${STATUS_COLORS[p.status] ?? "bg-gray-100 text-gray-500"}`}>
+                          {p.status.replace(/_/g, " ")}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3"><ChevronRight className="h-4 w-4 text-gray-300" /></td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-          </CardContent>
+          )}
         </Card>
-      </div>
 
-      {/* New Project Modal */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>New Project</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label>Project Name</Label>
-              <Input placeholder="Website Redesign" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <Label>Client</Label>
-              <Input placeholder="Client name" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <Label>Budget (£)</Label>
-              <Input type="number" placeholder="25000" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <Label>Deadline</Label>
-              <Input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className="mt-1" />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button className="flex-1 text-white" style={{ backgroundColor: "#50B0E0" }} onClick={() => setShowModal(false)}>
-                Create Project
-              </Button>
+        {pagination && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span>{pagination.total} projects</span>
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" className="h-7 rounded-lg" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</Button>
+              <span className="px-3 py-1">{page} / {pagination.totalPages}</span>
+              <Button variant="outline" size="sm" className="h-7 rounded-lg" disabled={page >= pagination.totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+      </main>
     </div>
   )
 }

@@ -83,8 +83,10 @@ export function Nav() {
             {/* Accounting */}
             <NavDropdown label="Accounting">
               <NavItem href="/invoices">Invoices</NavItem>
+              <NavItem href="/invoices/recurring">Recurring Invoices</NavItem>
+              <NavItem href="/budgets">Budgets</NavItem>
               <NavItem href="/expenses">Expenses</NavItem>
-              <NavItem href="/expenses/payment-run">Payment Run</NavItem>
+              <NavItem href="/expenses/payment-run">Payment Runs</NavItem>
               <NavItem href="/banking/reconciliation">Bank Reconciliation</NavItem>
               <NavItem href="/reports/trial-balance">Trial Balance</NavItem>
               <NavItem href="/transactions/journal">Journals</NavItem>

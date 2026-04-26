@@ -1,411 +1,151 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { trpc } from "@/lib/trpc-client"
-import { formatCurrency, formatDate } from "@/lib/utils"
-import { useDebounce } from "@/lib/hooks/useDebounce"
-import { 
-  AlertCircle,
-  Download,
-  Filter,
-  Search,
-  Banknote,
-  Calendar,
-  User,
-  DollarSign,
-  FileText,
-  Send,
-  CheckSquare,
-  Square
-} from "lucide-react"
+import { CreditCard, Plus, ChevronRight } from "lucide-react"
+import Link from "next/link"
 
-interface SupplierPayment {
-  id: string
-  supplierName: string
-  invoiceNumber: string
-  invoiceDate: string
-  dueDate: string
-  amount: number
-  currency: string
-  bankAccount: string
-  selected: boolean
+const BRAND = "#50B0E0"
+
+const STATUS_COLORS: Record<string, string> = {
+  PENDING:    "bg-yellow-100 text-yellow-700",
+  PROCESSING: "bg-blue-100 text-blue-700",
+  COMPLETED:  "bg-green-100 text-green-700",
+  FAILED:     "bg-red-100 text-red-700",
+  CANCELLED:  "bg-gray-100 text-gray-500",
 }
 
-export default function PaymentRunPage() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
-  const [paymentMethod, setPaymentMethod] = useState("bank-transfer")
-  const [selectedSupplierPayments, setSelectedSupplierPayments] = useState<Set<string>>(new Set())
-  const [showPreview, setShowPreview] = useState(false)
-  
-  // Debounce search to improve performance
-  const debouncedSearchTerm = useDebounce(searchTerm, 300)
+const fmt = (n: number) =>
+  `£${Number(n).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-  // Mock data - replace with actual tRPC query
-  const mockPayments: SupplierPayment[] = [
+export default function PaymentRunsPage() {
+  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
+  const orgId = orgs?.[0]?.id ?? ""
+
+  const [status, setStatus] = useState("")
+  const [page,   setPage]   = useState(1)
+
+  const { data, isLoading } = trpc.paymentRuns.getAll.useQuery(
     {
-      id: "1",
-      supplierName: "Office Supplies Ltd",
-      invoiceNumber: "INV-001",
-      invoiceDate: "2024-01-15",
-      dueDate: "2024-02-15",
-      amount: 1250.00,
-      currency: "GBP",
-      bankAccount: "GB29 NWBK 6016 1331 9268 19",
-      selected: false
+      organizationId: orgId,
+      status:         status ? (status as any) : undefined,
+      page,
+      limit: 20,
     },
-    {
-      id: "2",
-      supplierName: "Tech Solutions Inc",
-      invoiceNumber: "INV-002",
-      invoiceDate: "2024-01-20",
-      dueDate: "2024-02-20",
-      amount: 3500.00,
-      currency: "GBP",
-      bankAccount: "GB82 WEST 1234 5698 7654 32",
-      selected: false
-    },
-    {
-      id: "3",
-      supplierName: "Professional Services Co",
-      invoiceNumber: "INV-003",
-      invoiceDate: "2024-01-25",
-      dueDate: "2024-02-25",
-      amount: 2800.00,
-      currency: "GBP",
-      bankAccount: "GB33 BUKB 2020 1555 5555 55",
-      selected: false
-    },
-  ]
+    { enabled: !!orgId }
+  )
 
-  const [payments, setPayments] = useState<SupplierPayment[]>(mockPayments)
-
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selectedSupplierPayments)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelectedSupplierPayments(newSelected)
-  }
-
-  const toggleSelectAll = () => {
-    if (selectedSupplierPayments.size === payments.length) {
-      setSelectedSupplierPayments(new Set())
-    } else {
-      setSelectedSupplierPayments(new Set(payments.map(p => p.id)))
-    }
-  }
-
-  // Memoize filtered payments
-  const filteredPayments = useMemo(() => {
-    if (!debouncedSearchTerm) {
-      return payments
-    }
-    return payments.filter(payment =>
-      payment.supplierName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-      payment.invoiceNumber.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-    )
-  }, [payments, debouncedSearchTerm])
-
-  // Memoize selected payments calculations
-  const selectedPayments = useMemo(() => {
-    return payments.filter(p => selectedSupplierPayments.has(p.id))
-  }, [payments, selectedSupplierPayments])
-
-  const totalAmount = useMemo(() => {
-    return selectedPayments.reduce((sum, p) => sum + p.amount, 0)
-  }, [selectedPayments])
-
-  const paymentCount = selectedPayments.length
-
-  const handlePaymentRun = () => {
-    if (selectedPayments.length === 0) {
-      alert("Please select at least one invoice to pay")
-      return
-    }
-    // Process payment run
-    alert(`Processing payment run for ${paymentCount} invoice(s) totaling ${formatCurrency(totalAmount)}`)
-  }
-
-  const exportPaymentFile = () => {
-    if (selectedPayments.length === 0) {
-      alert("Please select at least one invoice to export")
-      return
-    }
-    // Export payment file (CSV, BACS, etc.)
-    alert("↵Exporting payment file for selected invoices...")
-  }
+  const runs       = (data as any)?.paymentRuns ?? []
+  const pagination = (data as any)?.pagination
+  const totalAmount = runs.reduce((s: number, r: any) => s + Number(r.totalAmount ?? 0), 0)
+  const completedCount = runs.filter((r: any) => r.status === "COMPLETED").length
+  const pendingCount   = runs.filter((r: any) => r.status === "PENDING" || r.status === "PROCESSING").length
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      <main className="container mx-auto py-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Payment Run</h1>
-            <p className="text-muted-foreground mt-1">
-              Process batch payments to suppliers
-            </p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="border-b bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 flex h-14 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" style={{ color: BRAND }} />
+            <h1 className="text-xl font-bold" style={{ color: "#1A1D24" }}>Payment Runs</h1>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" onClick={exportPaymentFile}>
-              <Download className="mr-2 h-4 w-4" />
-              Export File
+          <Link href="/expenses/payment-run/new">
+            <Button className="rounded-xl text-xs gap-1" style={{ backgroundColor: BRAND }}>
+              <Plus className="h-3.5 w-3.5" /> New Payment Run
             </Button>
-            <Button onClick={handlePaymentRun} disabled={selectedPayments.length === 0}>
-              <Send className="mr-2 h-4 w-4" />
-              Process Payment Run
-            </Button>
-          </div>
+          </Link>
+        </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-5">
+        <div className="grid gap-4 sm:grid-cols-4">
+          {[
+            { label: "Total Runs",        value: (pagination?.total ?? 0).toString() },
+            { label: "Completed",         value: completedCount.toString() },
+            { label: "Pending / In Progress", value: pendingCount.toString() },
+            { label: "Total Value (page)",   value: fmt(totalAmount) },
+          ].map(c => (
+            <Card key={c.label} className="rounded-xl">
+              <CardContent className="pt-5">
+                <p className="text-xs text-gray-500">{c.label}</p>
+                <p className="text-2xl font-bold mt-1">{c.value}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-4">
-          {/* Main Content */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Payment Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Settings</CardTitle>
-                <CardDescription>Configure payment run parameters</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="payment-date">Payment Date</Label>
-                    <Input
-                      id="payment-date"
-                      type="date"
-                      value={paymentDate}
-                      onChange={(e) => setPaymentDate(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="payment-method">Payment Method</Label>
-                    <select
-                      id="payment-method"
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
-                    >
-                      <option value="bank-transfer">Bank Transfer</option>
-                      <option value="bacs">BACS</option>
-                      <option value="fps">Faster Payments</option>
-                      <option value="chaps">CHAPS</option>
-                      <option value="cheque">Cheque</option>
-                    </select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Search and Filter */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                    <Label htmlFor="search">Search</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="search"
-                        placeholder="Search suppliers or invoice numbers..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Supplier Invoices */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Outstanding Invoices</CardTitle>
-                  <Button variant="outline" size="sm" onClick={toggleSelectAll}>
-                    {selectedSupplierPayments.size === payments.length ? (
-                      <>
-                        <CheckSquare className="mr-2 h-4 w-4" />
-                        Deselect All
-                      </>
-                    ) : (
-                      <>
-                        <Square className="mr-2 h-4 w-4" />
-                        Select All
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <CardDescription>
-                  Select invoices to include in this payment run
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {filteredPayments.length === 0 ? (
-                  <div className="text-center py-12">
-                    <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-4 text-lg font-semibold">No invoices found</h3>
-                    <p className="text-muted-foreground">
-                      No outstanding invoices match your search criteria.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-4 w-12">
-                            <Square className="h-4 w-4 text-muted-foreground" />
-                          </th>
-                          <th className="text-left p-4 font-medium">Supplier</th>
-                          <th className="text-left p-4 font-medium">Invoice</th>
-                          <th className="text-left p-4 font-medium">Due Date</th>
-                          <th className="text-left p-4 font-medium">Amount</th>
-                          <th className="text-left p-4 font-medium">Bank Details</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredPayments.map((payment) => (
-                          <tr 
-                            key={payment.id} 
-                            className="border-b hover:bg-muted/50 cursor-pointer"
-                            onClick={() => toggleSelect(payment.id)}
-                          >
-                            <td className="p-4">
-                              {selectedSupplierPayments.has(payment.id) ? (
-                                <CheckSquare className="h-4 w-4 text-primary" />
-                              ) : (
-                                <Square className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </td>
-                            <td className="p-4">
-                              <div className="flex items-center">
-                                <User className="mr-2 h-4 w-4 text-muted-foreground" />
-                                {payment.supplierName}
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="font-medium">{payment.invoiceNumber}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {formatDate(payment.invoiceDate)}
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="flex items-center">
-                                <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
-                                {formatDate(payment.dueDate)}
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="flex items-center">
-                                <DollarSign className="mr-2 h-4 w-4 text-muted-foreground" />
-                                {formatCurrency(payment.amount, payment.currency)}
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="text-sm text-muted-foreground">
-                                {payment.bankAccount}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar Summary */}
-          <div className="space-y-6">
-            {/* Summary Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Selected Invoices</span>
-                  <span className="font-medium">{paymentCount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Total Amount</span>
-                  <span className="text-2xl font-bold">
-                    {formatCurrency(totalAmount)}
-                  </span>
-                </div>
-                <div className="pt-4 border-t">
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Payment Date</span>
-                    <span className="font-medium">{formatDate(paymentDate)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Method</span>
-                    <Badge>{paymentMethod}</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setSearchTerm("")}
-                >
-                  <Filter className="mr-2 h-4 w-4" />
-                  Clear Filters
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setShowPreview(!showPreview)}
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Preview File
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  disabled
-                >
-                  <Banknote className="mr-2 h-4 w-4" />
-                  Payment History
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Info Card */}
-            <Card className="bg-muted">
-              <CardContent className="pt-6">
-                <div className="flex items-start">
-                  <AlertCircle className="h-5 w-5 text-blue-600 mr-2 mt-0.5" />
-                  <div className="text-sm text-muted-foreground">
-                    <p className="font-medium mb-1">Payment Run Info</p>
-                    <p>Selected invoices will be processed as a batch payment. Ensure all bank details are correct before proceeding.</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          {(["", "PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"] as const).map(s => (
+            <button key={s} onClick={() => { setStatus(s); setPage(1) }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                status === s ? "text-white border-transparent" : "text-gray-600 border-gray-200 hover:border-gray-300"
+              }`} style={status === s ? { backgroundColor: BRAND, borderColor: BRAND } : {}}>
+              {s || "All"}
+            </button>
+          ))}
         </div>
+
+        <Card className="rounded-xl overflow-hidden">
+          {isLoading ? (
+            <CardContent className="py-12 text-center text-gray-400 text-sm">Loading…</CardContent>
+          ) : runs.length === 0 ? (
+            <CardContent className="py-12 text-center">
+              <CreditCard className="mx-auto h-10 w-10 text-gray-200 mb-3" />
+              <p className="text-sm text-gray-500">No payment runs yet.</p>
+            </CardContent>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr className="text-left text-xs text-gray-500">
+                    <th className="px-4 py-3">Run No.</th>
+                    <th className="px-4 py-3">Bank Account</th>
+                    <th className="px-4 py-3">Payment Date</th>
+                    <th className="px-4 py-3">Method</th>
+                    <th className="px-4 py-3 text-center">Payments</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3">Initiated By</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {runs.map((r: any) => (
+                    <tr key={r.id} className="border-b last:border-0 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => (window.location.href = `/expenses/payment-run/${r.id}`)}>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{r.runNumber}</td>
+                      <td className="px-4 py-3 text-gray-600">{r.bankAccount?.name ?? "—"}</td>
+                      <td className="px-4 py-3 text-gray-500">{r.paymentDate ? new Date(r.paymentDate).toLocaleDateString("en-GB") : "—"}</td>
+                      <td className="px-4 py-3 text-xs text-gray-400">{(r.paymentMethod ?? "").replace(/_/g, " ")}</td>
+                      <td className="px-4 py-3 text-center text-gray-500">{r._count?.payments ?? 0}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold">{fmt(Number(r.totalAmount ?? 0))}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{r.initiator?.name ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <Badge className={`text-xs ${STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-500"}`}>{r.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3"><ChevronRight className="h-4 w-4 text-gray-300" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        {pagination && pagination.pages > 1 && (
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span>{pagination.total} runs</span>
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" className="h-7 rounded-lg" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</Button>
+              <span className="px-3 py-1">{page} / {pagination.pages}</span>
+              <Button variant="outline" size="sm" className="h-7 rounded-lg" disabled={page >= pagination.pages} onClick={() => setPage(p => p + 1)}>Next</Button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )
 }
-

@@ -1,266 +1,188 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { trpc } from "@/lib/trpc-client"
-import { Award, Plus, Search, DollarSign, TrendingDown, CheckCircle, Clock, AlertCircle } from "lucide-react"
+import { Award, Plus, Search, ChevronRight, Flag } from "lucide-react"
+import Link from "next/link"
 
-const SAMPLE_GRANTS = [
-  { id: "1", name: "Innovate UK R&D Grant", funder: "Innovate UK", amount: 150000, received: 90000, remaining: 60000, status: "Active", deadline: "2027-03-31", category: "R&D" },
-  { id: "2", name: "Arts Council England", funder: "Arts Council", amount: 25000, received: 25000, remaining: 0, status: "Completed", deadline: "2025-12-31", category: "Arts" },
-  { id: "3", name: "Horizon Europe", funder: "EU Commission", amount: 500000, received: 125000, remaining: 375000, status: "Active", deadline: "2028-01-01", category: "Research" },
-  { id: "4", name: "Local Enterprise Partnership", funder: "LEP South East", amount: 50000, received: 0, remaining: 50000, status: "Pending", deadline: "2026-06-30", category: "Growth" },
-  { id: "5", name: "UKRI Future Leaders", funder: "UKRI", amount: 200000, received: 180000, remaining: 20000, status: "Active", deadline: "2026-09-01", category: "Research" },
-  { id: "6", name: "Green Energy Fund", funder: "Dept for Energy", amount: 75000, received: 0, remaining: 75000, status: "Applied", deadline: "2026-12-31", category: "Sustainability" },
-]
+const BRAND = "#50B0E0"
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", minimumFractionDigits: 0 }).format(n)
+const STATUS_COLORS: Record<string, string> = {
+  PENDING:   "bg-yellow-100 text-yellow-700",
+  ACTIVE:    "bg-green-100 text-green-700",
+  REPORTING: "bg-blue-100 text-blue-700",
+  CLOSED:    "bg-gray-100 text-gray-500",
+  CANCELLED: "bg-red-100 text-red-700",
 }
 
-const getStatusStyle = (status: string) => {
-  switch (status) {
-    case "Active": return "text-green-700 bg-green-50 border border-green-200"
-    case "Completed": return "text-blue-700 bg-blue-50 border border-blue-200"
-    case "Pending": return "text-yellow-700 bg-yellow-50 border border-yellow-200"
-    case "Applied": return "text-purple-700 bg-purple-50 border border-purple-200"
-    case "Rejected": return "text-red-700 bg-red-50 border border-red-200"
-    default: return "text-gray-700 bg-gray-50 border border-gray-200"
-  }
+const TYPE_COLORS: Record<string, string> = {
+  RESTRICTED:   "bg-purple-100 text-purple-700",
+  UNRESTRICTED: "bg-teal-100 text-teal-700",
+  CAPITAL:      "bg-orange-100 text-orange-700",
+  REVENUE:      "bg-blue-100 text-blue-700",
 }
+
+const fmt = (n: number) =>
+  `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
 export default function GrantsPage() {
-  const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("All")
-  const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ name: "", funder: "", amount: "", deadline: "", category: "R&D" })
+  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
+  const orgId = orgs?.[0]?.id ?? ""
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
+  const [search,    setSearch]    = useState("")
+  const [status,    setStatus]    = useState("")
+  const [grantType, setGrantType] = useState("")
+  const [page,      setPage]      = useState(1)
 
-  const filtered = SAMPLE_GRANTS.filter((g) => {
-    const matchSearch = !search || g.name.toLowerCase().includes(search.toLowerCase()) || g.funder.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = statusFilter === "All" || g.status === statusFilter
-    return matchSearch && matchStatus
-  })
+  const { data, isLoading } = trpc.grants.list.useQuery(
+    {
+      organizationId: orgId,
+      search:    search    || undefined,
+      status:    status    ? (status as any)    : undefined,
+      grantType: grantType ? (grantType as any) : undefined,
+      page,
+      limit: 20,
+    },
+    { enabled: !!orgId }
+  )
 
-  const totalGranted = SAMPLE_GRANTS.reduce((s, g) => s + g.amount, 0)
-  const totalReceived = SAMPLE_GRANTS.reduce((s, g) => s + g.received, 0)
-  const totalRemaining = SAMPLE_GRANTS.reduce((s, g) => s + g.remaining, 0)
-  const activeCount = SAMPLE_GRANTS.filter((g) => g.status === "Active").length
+  const grants     = (data as any)?.grants ?? []
+  const pagination = (data as any)?.pagination
+
+  const totalAmount   = grants.reduce((s: number, g: any) => s + Number(g.totalAmount ?? 0), 0)
+  const totalReceived = grants.reduce((s: number, g: any) => s + Number(g.receivedAmount ?? 0), 0)
+  const totalSpent    = grants.reduce((s: number, g: any) => s + Number(g.spentAmount ?? 0), 0)
+  const activeCount   = grants.filter((g: any) => g.status === "ACTIVE").length
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6 px-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#1A1D24" }}>Grants</h1>
-            <p className="text-gray-600">Track grant funding, spending and compliance</p>
+      <div className="border-b bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 flex h-14 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Award className="h-5 w-5" style={{ color: BRAND }} />
+            <h1 className="text-xl font-bold" style={{ color: "#1A1D24" }}>Grants</h1>
           </div>
-          <Button className="text-white" style={{ backgroundColor: "#50B0E0" }} onClick={() => setShowModal(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Grant
-          </Button>
+          <Link href="/grants/new">
+            <Button className="rounded-xl text-xs gap-1" style={{ backgroundColor: BRAND }}>
+              <Plus className="h-3.5 w-3.5" /> New Grant
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-5">
+        <div className="grid gap-4 sm:grid-cols-4">
+          {[
+            { label: "Total Awarded",  value: fmt(totalAmount) },
+            { label: "Total Received", value: fmt(totalReceived) },
+            { label: "Total Spent",    value: fmt(totalSpent) },
+            { label: "Active Grants",  value: activeCount.toString() },
+          ].map(c => (
+            <Card key={c.label} className="rounded-xl">
+              <CardContent className="pt-5">
+                <p className="text-xs text-gray-500">{c.label}</p>
+                <p className="text-2xl font-bold mt-1">{c.value}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4 mb-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: "#50B0E020" }}>
-                  <Award className="h-5 w-5" style={{ color: "#50B0E0" }} />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total Grants</p>
-                  <p className="text-2xl font-bold" style={{ color: "#1A1D24" }}>{SAMPLE_GRANTS.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-50">
-                  <DollarSign className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total Awarded</p>
-                  <p className="text-2xl font-bold text-blue-600">{fmt(totalGranted)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-50">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Received</p>
-                  <p className="text-2xl font-bold text-green-600">{fmt(totalReceived)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-50">
-                  <TrendingDown className="h-5 w-5 text-orange-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Remaining to Claim</p>
-                  <p className="text-2xl font-bold text-orange-600">{fmt(totalRemaining)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-gray-400" />
+            <Input placeholder="Search grants…" value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              className="pl-8 h-8 text-xs rounded-xl w-48" />
+          </div>
+          {(["", "PENDING", "ACTIVE", "REPORTING", "CLOSED"] as const).map(s => (
+            <button key={s} onClick={() => { setStatus(s); setPage(1) }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                status === s ? "text-white border-transparent" : "text-gray-600 border-gray-200 hover:border-gray-300"
+              }`} style={status === s ? { backgroundColor: BRAND, borderColor: BRAND } : {}}>
+              {s || "All"}
+            </button>
+          ))}
+          <select value={grantType} onChange={e => { setGrantType(e.target.value); setPage(1) }}
+            className="h-8 px-2 text-xs rounded-xl border border-gray-200 bg-white text-gray-600">
+            <option value="">All Types</option>
+            {["RESTRICTED", "UNRESTRICTED", "CAPITAL", "REVENUE"].map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search grants or funders..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                {["All", "Active", "Completed", "Pending", "Applied"].map((s) => (
-                  <Button
-                    key={s}
-                    size="sm"
-                    variant={statusFilter === s ? "default" : "outline"}
-                    onClick={() => setStatusFilter(s)}
-                    style={statusFilter === s ? { backgroundColor: "#50B0E0" } : {}}
-                  >
-                    {s}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Grants Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Grants ({filtered.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card className="rounded-xl overflow-hidden">
+          {isLoading ? (
+            <CardContent className="py-12 text-center text-gray-400 text-sm">Loading…</CardContent>
+          ) : grants.length === 0 ? (
+            <CardContent className="py-12 text-center">
+              <Award className="mx-auto h-10 w-10 text-gray-200 mb-3" />
+              <p className="text-sm text-gray-500">No grants found.</p>
+            </CardContent>
+          ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-gray-50">
-                    <th className="text-left p-4 font-medium text-gray-600">Grant Name</th>
-                    <th className="text-left p-4 font-medium text-gray-600">Funder</th>
-                    <th className="text-right p-4 font-medium text-gray-600">Amount</th>
-                    <th className="text-right p-4 font-medium text-gray-600">Received</th>
-                    <th className="text-right p-4 font-medium text-gray-600">Remaining</th>
-                    <th className="text-left p-4 font-medium text-gray-600">Budget Tracking</th>
-                    <th className="text-left p-4 font-medium text-gray-600">Deadline</th>
-                    <th className="text-left p-4 font-medium text-gray-600">Status</th>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr className="text-left text-xs text-gray-500">
+                    <th className="px-4 py-3">Ref</th>
+                    <th className="px-4 py-3">Grant Name</th>
+                    <th className="px-4 py-3">Funder</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3 text-right">Received</th>
+                    <th className="px-4 py-3 text-right">Spent</th>
+                    <th className="px-4 py-3">Milestones</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((grant) => {
-                    const pct = grant.amount > 0 ? Math.round((grant.received / grant.amount) * 100) : 0
-                    return (
-                      <tr key={grant.id} className="border-b hover:bg-gray-50 transition-colors">
-                        <td className="p-4">
-                          <p className="font-medium" style={{ color: "#1A1D24" }}>{grant.name}</p>
-                          <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">{grant.category}</span>
-                        </td>
-                        <td className="p-4 text-gray-600">{grant.funder}</td>
-                        <td className="p-4 text-right font-medium">{fmt(grant.amount)}</td>
-                        <td className="p-4 text-right text-green-700 font-medium">{fmt(grant.received)}</td>
-                        <td className="p-4 text-right text-orange-700 font-medium">{fmt(grant.remaining)}</td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2 min-w-28">
-                            <div className="flex-1 bg-gray-100 rounded-full h-2">
-                              <div
-                                className="h-2 rounded-full"
-                                style={{ width: `${pct}%`, backgroundColor: pct === 100 ? "#22c55e" : "#50B0E0" }}
-                              />
-                            </div>
-                            <span className="text-xs text-gray-500 w-8">{pct}%</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-gray-600 text-sm">{grant.deadline}</td>
-                        <td className="p-4">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusStyle(grant.status)}`}>
-                            {grant.status}
+                  {grants.map((g: any) => (
+                    <tr key={g.id} className="border-b last:border-0 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => (window.location.href = `/grants/${g.id}`)}>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{g.grantNumber}</td>
+                      <td className="px-4 py-3 font-medium">{g.name}</td>
+                      <td className="px-4 py-3 text-gray-500">{g.funder}</td>
+                      <td className="px-4 py-3">
+                        <Badge className={`text-xs ${TYPE_COLORS[g.grantType] ?? "bg-gray-100 text-gray-500"}`}>{g.grantType}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(Number(g.totalAmount ?? 0))}</td>
+                      <td className="px-4 py-3 text-right font-mono text-green-600">{fmt(Number(g.receivedAmount ?? 0))}</td>
+                      <td className="px-4 py-3 text-right font-mono text-gray-500">{fmt(Number(g.spentAmount ?? 0))}</td>
+                      <td className="px-4 py-3">
+                        {(g._count?.milestones ?? 0) > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-gray-500">
+                            <Flag className="h-3 w-3" /> {g._count.milestones}
                           </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge className={`text-xs ${STATUS_COLORS[g.status] ?? "bg-gray-100 text-gray-500"}`}>{g.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3"><ChevronRight className="h-4 w-4 text-gray-300" /></td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-          </CardContent>
+          )}
         </Card>
-      </div>
 
-      {/* Add Grant Modal */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Grant</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label>Grant Name</Label>
-              <Input placeholder="Innovate UK R&D Grant" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <Label>Funder / Organisation</Label>
-              <Input placeholder="Innovate UK" value={form.funder} onChange={(e) => setForm({ ...form, funder: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <Label>Grant Amount (£)</Label>
-              <Input type="number" placeholder="50000" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <Label>Category</Label>
-              <select
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="w-full h-10 px-3 mt-1 border border-input bg-background rounded-md text-sm"
-              >
-                <option>R&D</option>
-                <option>Growth</option>
-                <option>Arts</option>
-                <option>Research</option>
-                <option>Sustainability</option>
-                <option>Other</option>
-              </select>
-            </div>
-            <div>
-              <Label>Grant End Date</Label>
-              <Input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className="mt-1" />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button className="flex-1 text-white" style={{ backgroundColor: "#50B0E0" }} onClick={() => setShowModal(false)}>
-                Add Grant
-              </Button>
+        {pagination && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span>{pagination.total} grants</span>
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" className="h-7 rounded-lg" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</Button>
+              <span className="px-3 py-1">{page} / {pagination.totalPages}</span>
+              <Button variant="outline" size="sm" className="h-7 rounded-lg" disabled={page >= pagination.totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+      </main>
     </div>
   )
 }
