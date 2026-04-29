@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-RUN npm install -g npm@11.13.0 && npm install --legacy-peer-deps
+RUN npm install -g npm@11.13.0 && npm ci --legacy-peer-deps
 
 # Rebuild the source code only when needed
 FROM base AS builder
