@@ -6,7 +6,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { EmailStatus } from '@prisma/client'
-import { emailService, SendEmailOptions } from './client'
+import { getEmailService, SendEmailOptions } from './client'
 import { renderTemplate, getTemplate } from './templates'
 
 export interface CreateOutboxEntryOptions {
@@ -108,7 +108,7 @@ export async function createAndSendEmail(options: CreateOutboxEntryOptions) {
       metadata,
     }
 
-    const result = await emailService.send(sendOptions)
+    const result = await getEmailService().send(sendOptions)
 
     // Update outbox entry with result
     await prisma.emailOutbox.update({
@@ -172,7 +172,7 @@ export async function retryEmail(outboxId: string) {
       text: outboxEntry.textBody || undefined,
     }
 
-    const result = await emailService.send(sendOptions)
+    const result = await getEmailService().send(sendOptions)
 
     // Update outbox entry
     await prisma.emailOutbox.update({
@@ -215,7 +215,6 @@ export async function processPendingEmails(limit: number = 10) {
   const pendingEmails = await prisma.emailOutbox.findMany({
     where: {
       status: EmailStatus.PENDING,
-      retryCount: { lt: prisma.emailOutbox.fields.maxRetries },
     },
     take: limit,
     orderBy: { createdAt: 'asc' },

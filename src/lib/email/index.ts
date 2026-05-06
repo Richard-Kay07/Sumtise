@@ -4,7 +4,7 @@
  * Main export for email functionality
  */
 
-export { EmailService, emailService, createEmailService } from './client'
+export { EmailService, emailService, createEmailService, getEmailService } from './client'
 export { EmailDriver } from './client'
 export * from './types'
 export * from './templates'

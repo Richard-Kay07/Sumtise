@@ -1,74 +1,54 @@
-/**
- * AWS SES Email Driver
- * 
- * Note: In production, install @aws-sdk/client-ses
- * For now, this is a stub implementation
- */
-
-import { EmailDriver, EmailConfig, SendEmailOptions, SendEmailResult } from '../types'
+import { SESClient } from "@aws-sdk/client-ses"
+import { SendRawEmailCommand } from "@aws-sdk/client-ses"
+import nodemailer from "nodemailer"
+import type { EmailDriver, EmailConfig, SendEmailOptions, SendEmailResult } from "../types"
 
 export class SESEmailDriver implements EmailDriver {
-  private config: EmailConfig
-  private sesClient: any // AWS SESClient type
+  private readonly config: EmailConfig
 
   constructor(config: EmailConfig) {
     this.config = config
-    this.initializeSES()
-  }
-
-  private initializeSES() {
-    // Stub - would initialize AWS SES
-    // import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses'
-    // this.sesClient = new SESClient({
-    //   region: this.config.ses?.region,
-    //   credentials: {
-    //     accessKeyId: this.config.ses?.accessKeyId || '',
-    //     secretAccessKey: this.config.ses?.secretAccessKey || '',
-    //   },
-    // })
-    
-    if (!this.config.ses?.accessKeyId || !this.config.ses?.secretAccessKey) {
-      throw new Error('AWS SES credentials not configured')
-    }
   }
 
   async send(options: SendEmailOptions): Promise<SendEmailResult> {
-    // Stub implementation
-    // In production:
-    // import { SendEmailCommand } from '@aws-sdk/client-ses'
-    // 
-    // const command = new SendEmailCommand({
-    //   Source: `${this.config.fromName} <${this.config.fromAddress}>`,
-    //   Destination: {
-    //     ToAddresses: options.to,
-    //     CcAddresses: options.cc,
-    //     BccAddresses: options.bcc,
-    //   },
-    //   Message: {
-    //     Subject: {
-    //       Data: options.subject,
-    //       Charset: 'UTF-8',
-    //     },
-    //     Body: {
-    //       Html: options.html ? { Data: options.html, Charset: 'UTF-8' } : undefined,
-    //       Text: options.text ? { Data: options.text, Charset: 'UTF-8' } : undefined,
-    //     },
-    //   },
-    //   ReplyToAddresses: options.replyTo ? [options.replyTo] : undefined,
-    // })
-    // 
-    // const response = await this.sesClient.send(command)
-    // 
-    // return {
-    //   messageId: response.MessageId || '',
-    //   provider: 'ses',
-    //   status: 'sent',
-    // }
-    
-    throw new Error('AWS SES not fully implemented. Install @aws-sdk/client-ses and configure credentials.')
+    const { accessKeyId, secretAccessKey, region } = this.config.ses ?? {}
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error(
+        "AWS SES credentials not configured (set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)"
+      )
+    }
+
+    const ses = new SESClient({
+      region: region ?? "us-east-1",
+      credentials: { accessKeyId, secretAccessKey },
+    })
+
+    // Use nodemailer's SES transport so attachments and MIME are handled automatically
+    const transporter = nodemailer.createTransport({
+      SES: { ses, aws: { SendRawEmailCommand } },
+    })
+
+    const info = await transporter.sendMail({
+      from:    `${this.config.fromName} <${this.config.fromAddress}>`,
+      to:      options.to,
+      cc:      options.cc,
+      bcc:     options.bcc,
+      replyTo: options.replyTo ?? this.config.replyTo,
+      subject: options.subject,
+      text:    options.text,
+      html:    options.html,
+      attachments: options.attachments?.map((att) => ({
+        filename:    att.filename,
+        content:     att.content,
+        contentType: att.contentType,
+        cid:         att.contentId,
+      })),
+    })
+
+    return {
+      messageId: info.messageId ?? "",
+      provider:  "ses",
+      status:    "sent",
+    }
   }
 }
-
-
-
-
