@@ -117,14 +117,28 @@ function MappingsTab({ orgId }: { orgId: string }) {
 
 // ── TAB 2: Employee Allocations ───────────────────────────────────────────────
 
-function AllocationRow({ rule }: { rule: any }) {
+function AllocationRow({ rule, onEdit }: { rule: any; onEdit: (rule: any) => void }) {
+  const empName = rule.employee
+    ? `${rule.employee.firstName ?? ""} ${rule.employee.lastName ?? ""}`.trim() ||
+      rule.employee.employeeNumber
+    : rule.employeeId
+
+  const splitDisplay = (rule.splitLines ?? [])
+    .map((s: any) => {
+      const dim = s.costCentreId ?? s.projectId ?? s.grantId ?? "—"
+      return `${dim} (${Number(s.allocationPercent)}%)`
+    })
+    .join(", ") || "—"
+
   return (
     <tr className="border-t hover:bg-gray-50">
-      <td className="px-4 py-3 font-medium text-sm">{rule.employeeName ?? rule.employeeId}</td>
-      <td className="px-4 py-3 text-xs text-gray-600">{rule.splits?.map((s: any) => `${s.costCentre ?? s.projectId ?? s.grantId ?? "—"} (${s.percentage}%)`).join(", ") ?? "—"}</td>
-      <td className="px-4 py-3 text-xs text-gray-500">{rule.effectiveFrom ? new Date(rule.effectiveFrom).toLocaleDateString("en-GB") : "—"}</td>
+      <td className="px-4 py-3 font-medium text-sm">{empName}</td>
+      <td className="px-4 py-3 text-xs text-gray-600">{splitDisplay}</td>
+      <td className="px-4 py-3 text-xs text-gray-500">
+        {rule.effectiveFrom ? new Date(rule.effectiveFrom).toLocaleDateString("en-GB") : "—"}
+      </td>
       <td className="px-4 py-3">
-        <Button variant="ghost" className="h-7 text-xs rounded-lg px-2" onClick={() => {}}>
+        <Button variant="ghost" className="h-7 text-xs rounded-lg px-2" onClick={() => onEdit(rule)}>
           Edit <ChevronRight className="h-3 w-3 ml-1" />
         </Button>
       </td>
@@ -132,79 +146,203 @@ function AllocationRow({ rule }: { rule: any }) {
   )
 }
 
-function AllocationsTab({ orgId }: { orgId: string }) {
-  const [showNew, setShowNew]   = useState(false)
-  const [splits, setSplits]     = useState([{ costCentre: "", percentage: 100 }])
-  const [empId, setEmpId]       = useState("")
-  const [effFrom, setEffFrom]   = useState(new Date().toISOString().split("T")[0])
-  const create = trpc.payrollCOA.createAllocationRule.useMutation({ onSuccess: () => setShowNew(false) })
+type SplitRow = { costCentre: string; percentage: number }
 
-  const { data: rules, isLoading } = trpc.payrollCOA.listAllocationRules.useQuery(
+function SplitEditor({
+  splits,
+  onChange,
+}: {
+  splits: SplitRow[]
+  onChange: (splits: SplitRow[]) => void
+}) {
+  const total = splits.reduce((s, r) => s + Number(r.percentage), 0)
+
+  return (
+    <div className="space-y-2">
+      {splits.map((row, i) => (
+        <div key={i} className="flex gap-2 items-center">
+          <Input
+            className="rounded-xl h-8 text-xs flex-1"
+            placeholder="Cost centre ID / project ID"
+            value={row.costCentre}
+            onChange={(e) =>
+              onChange(splits.map((s, j) => (j === i ? { ...s, costCentre: e.target.value } : s)))
+            }
+          />
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            className="rounded-xl h-8 text-xs w-20"
+            placeholder="%"
+            value={row.percentage}
+            onChange={(e) =>
+              onChange(splits.map((s, j) => (j === i ? { ...s, percentage: Number(e.target.value) } : s)))
+            }
+          />
+          {splits.length > 1 && (
+            <button
+              type="button"
+              onClick={() => onChange(splits.filter((_, j) => j !== i))}
+            >
+              <Trash2 className="h-3.5 w-3.5 text-red-400" />
+            </button>
+          )}
+        </div>
+      ))}
+      <button
+        type="button"
+        className="text-xs text-[#50B0E0] hover:underline"
+        onClick={() => onChange([...splits, { costCentre: "", percentage: 0 }])}
+      >
+        + Add row
+      </button>
+      {total !== 100 && (
+        <p className="text-xs text-red-500">Total must equal 100% (currently {total}%)</p>
+      )}
+    </div>
+  )
+}
+
+function AllocationsTab({ orgId }: { orgId: string }) {
+  // ── create state ──────────────────────────────────────────────────────────
+  const [showNew, setShowNew] = useState(false)
+  const [newSplits, setNewSplits] = useState<SplitRow[]>([{ costCentre: "", percentage: 100 }])
+  const [empId, setEmpId]     = useState("")
+  const [effFrom, setEffFrom] = useState(new Date().toISOString().split("T")[0])
+
+  // ── edit state ────────────────────────────────────────────────────────────
+  const [editingRule, setEditingRule]   = useState<any | null>(null)
+  const [editSplits, setEditSplits]     = useState<SplitRow[]>([])
+  const editTotal = editSplits.reduce((s, r) => s + Number(r.percentage), 0)
+
+  const { data: rules, isLoading, refetch } = trpc.payrollCOA.getAllocationRules.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId }
+    { enabled: !!orgId },
   )
 
-  const totalPct = splits.reduce((s, r) => s + Number(r.percentage), 0)
+  const create = trpc.payrollCOA.createAllocationRule.useMutation({
+    onSuccess: () => {
+      setShowNew(false)
+      setNewSplits([{ costCentre: "", percentage: 100 }])
+      setEmpId("")
+      void refetch()
+    },
+  })
+
+  const update = trpc.payrollCOA.updateAllocationRule.useMutation({
+    onSuccess: () => {
+      setEditingRule(null)
+      void refetch()
+    },
+  })
+
+  const newTotal = newSplits.reduce((s, r) => s + Number(r.percentage), 0)
+
+  const handleEdit = (rule: any) => {
+    const raw: any[] = rule.splitLines ?? []
+    setEditSplits(
+      raw.length > 0
+        ? raw.map((s) => ({
+            costCentre: s.costCentreId ?? s.projectId ?? s.grantId ?? "",
+            percentage: Number(s.allocationPercent),
+          }))
+        : [{ costCentre: "", percentage: 100 }],
+    )
+    setEditingRule(rule)
+  }
+
+  const handleCreate = () => {
+    create.mutate({
+      organizationId: orgId,
+      employeeId:     empId,
+      effectiveFrom:  new Date(effFrom),
+      splits: newSplits.map((s) => ({
+        allocationPercent: String(s.percentage),
+        costCentreId:      s.costCentre || undefined,
+      })),
+    })
+  }
+
+  const handleUpdate = () => {
+    if (!editingRule) return
+    update.mutate({
+      organizationId: orgId,
+      id:             editingRule.id,
+      splits: editSplits.map((s) => ({
+        allocationPercent: String(s.percentage),
+        costCentreId:      s.costCentre || undefined,
+      })),
+    })
+  }
+
+  const editingEmpName = editingRule?.employee
+    ? `${editingRule.employee.firstName ?? ""} ${editingRule.employee.lastName ?? ""}`.trim() ||
+      editingRule.employee.employeeNumber
+    : editingRule?.employeeId ?? ""
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-sm text-gray-500">Define how each employee's pay costs are allocated across dimensions.</p>
-        <Button className="rounded-xl text-xs gap-1" style={{ backgroundColor: BRAND }} onClick={() => setShowNew(true)}>
+        <p className="text-sm text-gray-500">
+          Define how each employee's pay costs are allocated across dimensions.
+        </p>
+        <Button
+          className="rounded-xl text-xs gap-1"
+          style={{ backgroundColor: BRAND }}
+          onClick={() => setShowNew(true)}
+        >
           <Plus className="h-3 w-3" /> New allocation
         </Button>
       </div>
 
+      {/* ── Create form ──────────────────────────────────────────────────── */}
       {showNew && (
         <Card className="rounded-xl border-blue-100 bg-blue-50/30">
           <CardContent className="pt-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">Employee ID</Label>
-                <Input className="rounded-xl h-8 text-xs mt-1" value={empId} onChange={(e) => setEmpId(e.target.value)} placeholder="emp_xxx" />
+                <Input
+                  className="rounded-xl h-8 text-xs mt-1"
+                  value={empId}
+                  onChange={(e) => setEmpId(e.target.value)}
+                  placeholder="emp_xxx"
+                />
               </div>
               <div>
                 <Label className="text-xs">Effective from</Label>
-                <Input type="date" className="rounded-xl h-8 text-xs mt-1" value={effFrom} onChange={(e) => setEffFrom(e.target.value)} />
+                <Input
+                  type="date"
+                  className="rounded-xl h-8 text-xs mt-1"
+                  value={effFrom}
+                  onChange={(e) => setEffFrom(e.target.value)}
+                />
               </div>
             </div>
             <div>
               <Label className="text-xs mb-2 block">Allocation splits</Label>
-              <div className="space-y-2">
-                {splits.map((row, i) => (
-                  <div key={i} className="flex gap-2 items-center">
-                    <Input className="rounded-xl h-8 text-xs flex-1" placeholder="Cost centre / project" value={row.costCentre}
-                      onChange={(e) => setSplits((p) => p.map((s, j) => j === i ? { ...s, costCentre: e.target.value } : s))} />
-                    <Input type="number" className="rounded-xl h-8 text-xs w-20" placeholder="%" value={row.percentage}
-                      onChange={(e) => setSplits((p) => p.map((s, j) => j === i ? { ...s, percentage: Number(e.target.value) } : s))} />
-                    {splits.length > 1 && (
-                      <button onClick={() => setSplits((p) => p.filter((_, j) => j !== i))}><Trash2 className="h-3.5 w-3.5 text-red-400" /></button>
-                    )}
-                  </div>
-                ))}
-                <button className="text-xs text-[#50B0E0] hover:underline" onClick={() => setSplits((p) => [...p, { costCentre: "", percentage: 0 }])}>
-                  + Add row
-                </button>
-                {totalPct !== 100 && <p className="text-xs text-red-500">Total must equal 100% (currently {totalPct}%)</p>}
-              </div>
+              <SplitEditor splits={newSplits} onChange={setNewSplits} />
             </div>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" className="rounded-xl text-xs" onClick={() => setShowNew(false)}>Cancel</Button>
-              <Button className="rounded-xl text-xs gap-1" style={{ backgroundColor: BRAND }}
-                disabled={totalPct !== 100 || !empId || create.isPending}
-                onClick={() => create.mutate({
-                  organizationId: orgId,
-                  employeeId: empId,
-                  effectiveFrom: new Date(effFrom),
-                  splits: splits.map((s) => ({ costCentre: s.costCentre || undefined, percentage: s.percentage })),
-                })}>
-                <Save className="h-3 w-3" /> Save rule
+              <Button variant="outline" className="rounded-xl text-xs" onClick={() => setShowNew(false)}>
+                Cancel
+              </Button>
+              <Button
+                className="rounded-xl text-xs gap-1"
+                style={{ backgroundColor: BRAND }}
+                disabled={newTotal !== 100 || !empId || create.isLoading}
+                onClick={handleCreate}
+              >
+                <Save className="h-3 w-3" />
+                {create.isLoading ? "Saving…" : "Save rule"}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
+      {/* ── Rules table ──────────────────────────────────────────────────── */}
       <div className="overflow-x-auto rounded-xl border">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-500 text-xs">
@@ -216,13 +354,80 @@ function AllocationsTab({ orgId }: { orgId: string }) {
             </tr>
           </thead>
           <tbody>
-            {isLoading
-              ? <tr><td colSpan={4} className="text-center py-8"><RefreshCw className="h-4 w-4 animate-spin mx-auto text-gray-400" /></td></tr>
-              : (rules ?? []).map((r: any) => <AllocationRow key={r.id} rule={r} />)
-            }
+            {isLoading ? (
+              <tr>
+                <td colSpan={4} className="text-center py-8">
+                  <RefreshCw className="h-4 w-4 animate-spin mx-auto text-gray-400" />
+                </td>
+              </tr>
+            ) : (rules ?? []).length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-center py-10 text-gray-400 text-sm">
+                  No allocation rules yet. Create one above.
+                </td>
+              </tr>
+            ) : (
+              (rules ?? []).map((r: any) => (
+                <AllocationRow key={r.id} rule={r} onEdit={handleEdit} />
+              ))
+            )}
           </tbody>
         </table>
       </div>
+
+      {/* ── Edit modal ───────────────────────────────────────────────────── */}
+      {editingRule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-semibold text-sm">Edit Allocation Rule</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {editingEmpName}
+                  {editingRule.effectiveFrom && (
+                    <> · effective {new Date(editingRule.effectiveFrom).toLocaleDateString("en-GB")}</>
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                onClick={() => setEditingRule(null)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mb-5">
+              <Label className="text-xs mb-2 block">Allocation splits</Label>
+              <SplitEditor splits={editSplits} onChange={setEditSplits} />
+            </div>
+
+            {update.error && (
+              <p className="text-xs text-red-500 mb-3">{update.error.message}</p>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                className="rounded-xl text-xs"
+                onClick={() => setEditingRule(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="rounded-xl text-xs gap-1"
+                style={{ backgroundColor: BRAND }}
+                disabled={editTotal !== 100 || update.isLoading}
+                onClick={handleUpdate}
+              >
+                <Save className="h-3 w-3" />
+                {update.isLoading ? "Saving…" : "Save changes"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
