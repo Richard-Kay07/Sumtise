@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,11 +26,15 @@ import {
 import { Logo } from "@/components/logo"
 
 export default function InvoicesPage() {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
   
   // Debounce search term to reduce API calls
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
+
+  const utils = trpc.useUtils()
 
   // Get user's organizations
   const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
@@ -64,6 +69,22 @@ export default function InvoicesPage() {
         return "outline"
     }
   }, [])
+
+  const handleDownload = useCallback(async (invoiceId: string) => {
+    if (!organizations?.[0]?.id) return
+    setDownloadingId(invoiceId)
+    try {
+      const result = await utils.invoices.exportPDF.fetch({
+        organizationId: organizations[0].id,
+        id: invoiceId,
+      })
+      window.open(result.pdfUrl, "_blank")
+    } catch (err) {
+      console.error("PDF export failed", err)
+    } finally {
+      setDownloadingId(null)
+    }
+  }, [organizations, utils])
 
   // Memoize filtered invoices to avoid recalculating on every render
   const filteredInvoices = useMemo(() => {
@@ -254,14 +275,27 @@ export default function InvoicesPage() {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center space-x-2">
-                            <Button variant="outline" size="sm">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/invoices/${invoice.id}`)}
+                            >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="sm">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/invoices/${invoice.id}/edit`)}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="sm">
-                              <Download className="h-4 w-4" />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={downloadingId === invoice.id}
+                              onClick={() => handleDownload(invoice.id)}
+                            >
+                              <Download className={`h-4 w-4 ${downloadingId === invoice.id ? "animate-pulse" : ""}`} />
                             </Button>
                           </div>
                         </td>

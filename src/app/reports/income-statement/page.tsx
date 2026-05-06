@@ -134,52 +134,51 @@ export default function IncomeStatementPage() {
       .reduce((sum, inv) => sum + Number(inv.total), 0)
 
     // Calculate revenue from transactions (credit entries to revenue accounts)
-    const revenueTransactions = filteredTransactions.filter(t => 
-      t.type === "CREDIT" && t.account?.category === "REVENUE"
+    const revenueTransactions = filteredTransactions.filter(t =>
+      Number(t.credit) > 0 && t.account?.type === "REVENUE"
     )
-    const otherIncome = revenueTransactions.reduce((sum, t) => sum + Number(t.amount), 0)
+    const otherIncome = revenueTransactions.reduce((sum, t) => sum + Number(t.credit), 0)
 
     // Calculate Cost of Goods Sold (from transactions)
-    const cogsTransactions = filteredTransactions.filter(t => 
-      t.account?.category === "COST_OF_GOODS_SOLD" || t.account?.category === "EXPENSE"
+    const cogsTransactions = filteredTransactions.filter(t =>
+      Number(t.debit) > 0 && t.account?.type === "EXPENSE"
     )
     const materials = cogsTransactions
       .filter(t => t.account?.name?.toLowerCase().includes("materials") || 
                    t.account?.name?.toLowerCase().includes("inventory"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.debit), 0)
     const labor = cogsTransactions
       .filter(t => t.account?.name?.toLowerCase().includes("labor") || 
                    t.account?.name?.toLowerCase().includes("wages"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.debit), 0)
     const overhead = cogsTransactions
       .filter(t => !t.account?.name?.toLowerCase().includes("materials") && 
                    !t.account?.name?.toLowerCase().includes("labor") &&
                    !t.account?.name?.toLowerCase().includes("wages"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.debit), 0)
 
     // Calculate Operating Expenses
-    const expenseTransactions = filteredTransactions.filter(t => 
-      t.type === "DEBIT" && 
-      (t.account?.category === "EXPENSE" || t.account?.category === "OPERATING_EXPENSE")
+    const expenseTransactions = filteredTransactions.filter(t =>
+      Number(t.debit) > 0 && t.account?.type === "EXPENSE"
     )
 
     const salaries = expenseTransactions
       .filter(t => t.account?.name?.toLowerCase().includes("salary") || 
                    t.account?.name?.toLowerCase().includes("wages"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.debit), 0)
     const rent = expenseTransactions
       .filter(t => t.account?.name?.toLowerCase().includes("rent"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.debit), 0)
     const utilities = expenseTransactions
       .filter(t => t.account?.name?.toLowerCase().includes("utility"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.debit), 0)
     const marketing = expenseTransactions
       .filter(t => t.account?.name?.toLowerCase().includes("marketing") || 
                    t.account?.name?.toLowerCase().includes("advertising"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.debit), 0)
     const depreciation = expenseTransactions
       .filter(t => t.account?.name?.toLowerCase().includes("depreciation"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.debit), 0)
     const other = expenseTransactions
       .filter(t => !t.account?.name?.toLowerCase().includes("salary") &&
                    !t.account?.name?.toLowerCase().includes("wages") &&
@@ -188,25 +187,25 @@ export default function IncomeStatementPage() {
                    !t.account?.name?.toLowerCase().includes("marketing") &&
                    !t.account?.name?.toLowerCase().includes("advertising") &&
                    !t.account?.name?.toLowerCase().includes("depreciation"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.debit), 0)
 
     // Calculate Other Income/Expense
     const interestIncome = filteredTransactions
-      .filter(t => t.type === "CREDIT" && t.account?.name?.toLowerCase().includes("interest"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .filter(t => Number(t.credit) > 0 && t.account?.name?.toLowerCase().includes("interest"))
+      .reduce((sum, t) => sum + Number(t.credit), 0)
     const interestExpense = filteredTransactions
-      .filter(t => t.type === "DEBIT" && t.account?.name?.toLowerCase().includes("interest"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .filter(t => Number(t.debit) > 0 && t.account?.name?.toLowerCase().includes("interest"))
+      .reduce((sum, t) => sum + Number(t.debit), 0)
     const otherIncomeItems = filteredTransactions
-      .filter(t => t.type === "CREDIT" && 
-                   t.account?.category !== "REVENUE" &&
+      .filter(t => Number(t.credit) > 0 &&
+                   t.account?.type !== "REVENUE" &&
                    !t.account?.name?.toLowerCase().includes("interest"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.credit), 0)
     const otherExpenseItems = filteredTransactions
-      .filter(t => t.type === "DEBIT" && 
-                   t.account?.category !== "EXPENSE" &&
+      .filter(t => Number(t.debit) > 0 &&
+                   t.account?.type !== "EXPENSE" &&
                    !t.account?.name?.toLowerCase().includes("interest"))
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Number(t.debit), 0)
 
     const data: IncomeStatementData = {
       revenue: {

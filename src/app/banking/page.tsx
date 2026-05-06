@@ -1,190 +1,103 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Progress } from "@/components/ui/progress"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { trpc } from "@/lib/trpc-client"
 import { Logo } from "@/components/logo"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { 
-  CreditCard, 
-  Upload, 
-  Download, 
-  RefreshCw, 
-  CheckCircle, 
+import {
+  CreditCard,
+  Upload,
+  CheckCircle,
   AlertTriangle,
   TrendingUp,
   TrendingDown,
-  DollarSign,
-  Calendar,
-  FileText,
-  Link,
-  Shield,
-  Banknote
+  Banknote,
+  Plus,
+  RefreshCw,
+  Clock,
 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
-interface BankTransaction {
-  id: string
-  date: string
-  description: string
-  amount: number
-  type: 'debit' | 'credit'
-  balance: number
-  reference?: string
-  category?: string
-  matched: boolean
-}
-
-interface BankAccount {
-  id: string
-  name: string
-  accountNumber: string
-  sortCode: string
-  currency: string
-  currentBalance: number
-  lastSync: string
-  status: 'connected' | 'disconnected' | 'error'
-  transactions: BankTransaction[]
-}
+const CURRENCIES = ["GBP", "USD", "EUR", "CAD", "AUD", "ZAR"]
 
 export default function BankingPage() {
-  const [selectedAccount, setSelectedAccount] = useState<string>("")
-  const [isImporting, setIsImporting] = useState(false)
-  const [importProgress, setImportProgress] = useState(0)
-  const [reconciliationMode, setReconciliationMode] = useState(false)
+  const router = useRouter()
+  const { toast } = useToast()
 
-  // Get user's organizations
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("")
+  const [addAccountOpen, setAddAccountOpen] = useState(false)
+  const [newAccount, setNewAccount] = useState({
+    name: "",
+    accountNumber: "",
+    sortCode: "",
+    iban: "",
+    currency: "GBP",
+    openingBalance: "0",
+  })
+
   const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
+  const orgId = organizations?.[0]?.id ?? ""
 
-  // Get bank accounts
-  const { data: bankAccounts } = trpc.bankAccounts.getAll.useQuery(
-    { organizationId: organizations?.[0]?.id || "" },
-    { enabled: !!organizations?.[0]?.id }
+  const { data: bankAccounts, refetch: refetchAccounts } = trpc.bankAccounts.getAll.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId }
   )
 
-  // Mock data for demonstration
-  const mockBankAccounts: BankAccount[] = [
+  // Transactions for selected account
+  const { data: txData, isLoading: txLoading } = trpc.bankAccounts.getTransactions.useQuery(
     {
-      id: "1",
-      name: "Business Current Account",
-      accountNumber: "****1234",
-      sortCode: "20-00-00",
-      currency: "GBP",
-      currentBalance: 25430.50,
-      lastSync: "2024-01-15T10:30:00Z",
-      status: "connected",
-      transactions: [
-        {
-          id: "t1",
-          date: "2024-01-15",
-          description: "Payment from ABC Corp",
-          amount: 2500.00,
-          type: "credit",
-          balance: 25430.50,
-          reference: "INV-2024001",
-          category: "Sales",
-          matched: true
-        },
-        {
-          id: "t2",
-          date: "2024-01-14",
-          description: "Office Supplies Ltd",
-          amount: 150.00,
-          type: "debit",
-          balance: 22930.50,
-          reference: "EXP-001",
-          category: "Office Supplies",
-          matched: true
-        },
-        {
-          id: "t3",
-          date: "2024-01-13",
-          description: "Bank Transfer - Unknown",
-          amount: 500.00,
-          type: "credit",
-          balance: 23080.50,
-          matched: false
-        }
-      ]
+      organizationId: orgId,
+      bankAccountId: selectedAccountId,
+      page: 1,
+      limit: 50,
+      sortBy: "date",
+      sortOrder: "desc",
     },
-    {
-      id: "2",
-      name: "Business Savings Account",
-      accountNumber: "****5678",
-      sortCode: "20-00-00",
-      currency: "GBP",
-      currentBalance: 50000.00,
-      lastSync: "2024-01-14T15:45:00Z",
-      status: "connected",
-      transactions: []
+    { enabled: !!selectedAccountId && !!orgId }
+  )
+
+  // Unreconciled count for selected account
+  const { data: unreconciledData } = trpc.bankAccounts.getUnreconciled.useQuery(
+    { organizationId: orgId, bankAccountId: selectedAccountId, page: 1, limit: 1 },
+    { enabled: !!selectedAccountId && !!orgId }
+  )
+
+  const createAccount = trpc.bankAccounts.create.useMutation({
+    onSuccess: () => {
+      refetchAccounts()
+      setAddAccountOpen(false)
+      setNewAccount({ name: "", accountNumber: "", sortCode: "", iban: "", currency: "GBP", openingBalance: "0" })
+      toast({ title: "Bank account added" })
+    },
+    onError: (err) => toast({ title: "Failed to add account", description: err.message, variant: "destructive" }),
+  })
+
+  const handleCreateAccount = () => {
+    if (!newAccount.name.trim()) {
+      toast({ title: "Name is required", variant: "destructive" })
+      return
     }
-  ]
-
-  const accounts = bankAccounts || mockBankAccounts
-  const selectedAccountData = accounts.find(acc => acc.id === selectedAccount)
-
-  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    setIsImporting(true)
-    setImportProgress(0)
-
-    // Simulate file processing
-    const interval = setInterval(() => {
-      setImportProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsImporting(false)
-          return 100
-        }
-        return prev + 10
-      })
-    }, 200)
-
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    createAccount.mutate({
+      organizationId: orgId,
+      name: newAccount.name,
+      accountNumber: newAccount.accountNumber || undefined,
+      sortCode: newAccount.sortCode || undefined,
+      iban: newAccount.iban || undefined,
+      currency: newAccount.currency,
+      openingBalance: parseFloat(newAccount.openingBalance) || 0,
+    })
   }
 
-  const handleOpenBankingConnect = async () => {
-    // This would integrate with Open Banking APIs
-    console.log("Connecting to Open Banking...")
-  }
-
-  const handleReconcile = async () => {
-    setReconciliationMode(true)
-    // Simulate reconciliation process
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setReconciliationMode(false)
-  }
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "connected":
-        return "default"
-      case "disconnected":
-        return "secondary"
-      case "error":
-        return "destructive"
-      default:
-        return "outline"
-    }
-  }
-
-  const getTransactionIcon = (type: string) => {
-    return type === "credit" ? TrendingUp : TrendingDown
-  }
-
-  const getTransactionColor = (type: string) => {
-    return type === "credit" ? "text-green-600" : "text-red-600"
-  }
-
-  const unmatchedTransactions = selectedAccountData?.transactions.filter(t => !t.matched) || []
-  const matchedTransactions = selectedAccountData?.transactions.filter(t => t.matched) || []
+  const selectedAccount = bankAccounts?.find(a => a.id === selectedAccountId)
+  const transactions = txData?.transactions ?? []
+  const unreconciledCount = unreconciledData?.pagination?.total ?? 0
 
   return (
     <div className="min-h-screen bg-background">
@@ -192,309 +105,306 @@ export default function BankingPage() {
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <div className="mr-4 flex">
-            <a className="mr-6" href="/">
-              <Logo size={32} showText={true} />
-            </a>
+            <a className="mr-6" href="/"><Logo size={32} showText={true} /></a>
           </div>
           <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
             <div className="w-full flex-1 md:w-auto md:flex-none">
-              <h1 className="text-2xl font-bold">Banking & Reconciliation</h1>
+              <h1 className="text-2xl font-bold">Banking &amp; Reconciliation</h1>
             </div>
             <nav className="flex items-center space-x-2">
-              <Button variant="outline">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Sync All
+              <Button variant="outline" onClick={() => router.push("/banking/import")}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import Statement
               </Button>
-              <Button>
-                <Link className="mr-2 h-4 w-4" />
-                Connect Bank
+              <Button onClick={() => setAddAccountOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Account
               </Button>
             </nav>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
       <main className="container mx-auto py-6">
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Bank Accounts */}
-          <div className="lg:col-span-1">
+          {/* Sidebar — accounts + import options */}
+          <div className="lg:col-span-1 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <CreditCard className="mr-2 h-5 w-5" />
-                  Bank Accounts
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" /> Bank Accounts
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={() => setAddAccountOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </CardTitle>
-                <CardDescription>
-                  Manage your connected accounts
-                </CardDescription>
+                <CardDescription>Select an account to view transactions</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {accounts.map((account) => (
-                    <div
-                      key={account.id}
-                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                        selectedAccount === account.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
-                      }`}
-                      onClick={() => setSelectedAccount(account.id)}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-medium">{account.name}</h3>
-                        <Badge variant={getStatusBadgeVariant(account.status)}>
-                          {account.status}
-                        </Badge>
+                {!bankAccounts?.length ? (
+                  <div className="text-center py-8">
+                    <Banknote className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+                    <p className="text-sm text-muted-foreground mb-3">No bank accounts yet</p>
+                    <Button size="sm" onClick={() => setAddAccountOpen(true)}>
+                      <Plus className="mr-1 h-3.5 w-3.5" /> Add Account
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {bankAccounts.map((account) => (
+                      <div
+                        key={account.id}
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                          selectedAccountId === account.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                        }`}
+                        onClick={() => setSelectedAccountId(account.id)}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <h3 className="font-medium text-sm">{account.name}</h3>
+                          <Badge variant="outline" className="text-xs">{account.currency}</Badge>
+                        </div>
+                        <div className="text-lg font-bold">
+                          {formatCurrency(Number(account.currentBalance), account.currency)}
+                        </div>
+                        {account.accountNumber && (
+                          <div className="text-xs text-muted-foreground mt-1">••••{account.accountNumber.slice(-4)}</div>
+                        )}
                       </div>
-                      <div className="space-y-1 text-sm text-muted-foreground">
-                        <div className="flex items-center">
-                          <Banknote className="mr-2 h-4 w-4" />
-                          {formatCurrency(account.currentBalance, account.currency)}
-                        </div>
-                        <div className="flex items-center">
-                          <Calendar className="mr-2 h-4 w-4" />
-                          Last sync: {formatDate(account.lastSync)}
-                        </div>
-                        <div className="flex items-center">
-                          <FileText className="mr-2 h-4 w-4" />
-                          {account.transactions.length} transactions
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Import Options */}
-            <Card className="mt-6">
+            {/* Import / Open Banking */}
+            <Card>
               <CardHeader>
                 <CardTitle>Import Transactions</CardTitle>
-                <CardDescription>
-                  Upload bank statements or connect via Open Banking
-                </CardDescription>
+                <CardDescription>Upload a bank statement file</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
-                    <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium mb-2">Upload Statement</p>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      CSV, OFX, QIF formats supported
-                    </p>
-                    <input
-                      type="file"
-                      accept=".csv,.ofx,.qif"
-                      onChange={handleFileImport}
-                      className="hidden"
-                      id="file-upload"
-                    />
-                    <Button variant="outline" size="sm" onClick={() => document.getElementById('file-upload')?.click()}>
-                      Choose File
-                    </Button>
-                  </div>
+              <CardContent className="space-y-3">
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => router.push(selectedAccountId ? `/banking/import?accountId=${selectedAccountId}` : "/banking/import")}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import CSV / OFX
+                </Button>
 
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Shield className="h-4 w-4 text-green-500" />
-                      <span className="text-sm font-medium">Open Banking</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Secure, real-time bank data
-                    </p>
-                    <Button variant="outline" size="sm" onClick={handleOpenBankingConnect}>
-                      <Link className="mr-2 h-4 w-4" />
-                      Connect
-                    </Button>
+                {/* Open Banking — architecture retained, UI honest about status */}
+                <div className="border rounded-lg p-3 bg-muted/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">Open Banking</span>
+                    <Badge variant="outline" className="text-xs">Coming soon</Badge>
                   </div>
-
-                  {isImporting && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Importing transactions...</span>
-                        <span>{importProgress}%</span>
-                      </div>
-                      <Progress value={importProgress} className="h-2" />
-                    </div>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Plaid / TrueLayer integration is planned for a future release. Use CSV/OFX import in the meantime.
+                  </p>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Transactions and Reconciliation */}
+          {/* Main — transactions */}
           <div className="lg:col-span-2">
-            {selectedAccountData ? (
-              <div className="space-y-6">
-                {/* Account Summary */}
+            {!selectedAccount ? (
+              <Card>
+                <CardContent className="py-16 text-center">
+                  <CreditCard className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold">Select a bank account</h3>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    Choose an account from the sidebar to view its transactions.
+                  </p>
+                  {!bankAccounts?.length && (
+                    <Button className="mt-4" onClick={() => setAddAccountOpen(true)}>
+                      <Plus className="mr-2 h-4 w-4" /> Add your first account
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {/* Account summary */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span>{selectedAccountData.name}</span>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline">
-                          {unmatchedTransactions.length} unmatched
-                        </Badge>
-                        <Button 
-                          variant="outline" 
+                      <span>{selectedAccount.name}</span>
+                      <div className="flex items-center gap-2">
+                        {unreconciledCount > 0 && (
+                          <Badge variant="outline" className="text-orange-600 border-orange-300">
+                            {unreconciledCount} unreconciled
+                          </Badge>
+                        )}
+                        <Button
                           size="sm"
-                          onClick={handleReconcile}
-                          disabled={reconciliationMode}
+                          variant="outline"
+                          onClick={() => router.push(`/banking/reconciliation?accountId=${selectedAccountId}`)}
                         >
-                          {reconciliationMode ? (
-                            <>
-                              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                              Reconciling...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="mr-2 h-4 w-4" />
-                              Reconcile
-                            </>
-                          )}
+                          <CheckCircle className="mr-1 h-4 w-4" />
+                          Reconcile
                         </Button>
                       </div>
                     </CardTitle>
-                    <CardDescription>
-                      Account: {selectedAccountData.accountNumber} | Sort Code: {selectedAccountData.sortCode}
-                    </CardDescription>
+                    {selectedAccount.accountNumber && (
+                      <CardDescription>
+                        Account ••••{selectedAccount.accountNumber.slice(-4)}
+                        {selectedAccount.sortCode && ` · Sort code ${selectedAccount.sortCode}`}
+                      </CardDescription>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-4 md:grid-cols-3">
                       <div className="text-center">
                         <div className="text-2xl font-bold text-green-600">
-                          {formatCurrency(selectedAccountData.currentBalance, selectedAccountData.currency)}
+                          {formatCurrency(Number(selectedAccount.currentBalance), selectedAccount.currency)}
                         </div>
                         <div className="text-sm text-muted-foreground">Current Balance</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold">
-                          {selectedAccountData.transactions.length}
-                        </div>
+                        <div className="text-2xl font-bold">{txData?.pagination?.total ?? 0}</div>
                         <div className="text-sm text-muted-foreground">Total Transactions</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {matchedTransactions.length}
+                        <div className={`text-2xl font-bold ${unreconciledCount > 0 ? "text-orange-600" : "text-green-600"}`}>
+                          {unreconciledCount}
                         </div>
-                        <div className="text-sm text-muted-foreground">Matched</div>
+                        <div className="text-sm text-muted-foreground">Unreconciled</div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Unmatched Transactions */}
-                {unmatchedTransactions.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center text-orange-600">
-                        <AlertTriangle className="mr-2 h-5 w-5" />
-                        Unmatched Transactions ({unmatchedTransactions.length})
-                      </CardTitle>
-                      <CardDescription>
-                        These transactions need to be matched with your accounting records
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {unmatchedTransactions.map((transaction) => {
-                          const Icon = getTransactionIcon(transaction.type)
+                {/* Transactions list */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>Transactions</span>
+                      <Button size="sm" variant="outline"
+                        onClick={() => router.push(`/banking/import?accountId=${selectedAccountId}`)}>
+                        <Upload className="mr-1 h-3.5 w-3.5" /> Import
+                      </Button>
+                    </CardTitle>
+                    <CardDescription>Most recent 50 transactions for this account</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {txLoading ? (
+                      <div className="py-12 text-center">
+                        <RefreshCw className="mx-auto h-8 w-8 animate-spin text-muted-foreground mb-3" />
+                        <p className="text-sm text-muted-foreground">Loading transactions…</p>
+                      </div>
+                    ) : transactions.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+                        <h3 className="font-semibold mb-1">No transactions yet</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Import a bank statement to see transactions here.
+                        </p>
+                        <Button onClick={() => router.push(`/banking/import?accountId=${selectedAccountId}`)}>
+                          <Upload className="mr-2 h-4 w-4" /> Import Statement
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {transactions.map((tx) => {
+                          const amount = Number(tx.amount)
+                          const isCredit = amount >= 0
+                          const Icon = isCredit ? TrendingUp : TrendingDown
+                          const isReconciled = !!tx.reconciledAt
                           return (
-                            <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
-                              <div className="flex items-center space-x-3">
-                                <Icon className={`h-5 w-5 ${getTransactionColor(transaction.type)}`} />
+                            <div key={tx.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <Icon className={`h-4 w-4 ${isCredit ? "text-green-600" : "text-red-600"}`} />
                                 <div>
-                                  <div className="font-medium">{transaction.description}</div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {formatDate(transaction.date)} • {transaction.reference || 'No reference'}
+                                  <div className="text-sm font-medium">{tx.description}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {formatDate(tx.date)}
+                                    {tx.reference && ` · ${tx.reference}`}
+                                    {tx.payee && ` · ${tx.payee}`}
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex items-center space-x-3">
-                                <div className={`font-bold ${getTransactionColor(transaction.type)}`}>
-                                  {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                              <div className="flex items-center gap-3">
+                                <div className={`font-bold text-sm ${isCredit ? "text-green-600" : "text-red-600"}`}>
+                                  {isCredit ? "+" : ""}{formatCurrency(Math.abs(amount), selectedAccount.currency)}
                                 </div>
-                                <div className="flex space-x-1">
-                                  <Button variant="outline" size="sm">
-                                    <CheckCircle className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="outline" size="sm">
-                                    <AlertTriangle className="h-4 w-4" />
-                                  </Button>
-                                </div>
+                                {isReconciled ? (
+                                  <Badge variant="outline" className="text-green-600 border-green-200 text-xs">
+                                    <CheckCircle className="mr-1 h-3 w-3" /> Reconciled
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-orange-600 border-orange-200 text-xs">
+                                    <AlertTriangle className="mr-1 h-3 w-3" /> Pending
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           )
                         })}
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* All Transactions */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>All Transactions</CardTitle>
-                    <CardDescription>
-                      Complete transaction history for this account
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {selectedAccountData.transactions.map((transaction) => {
-                        const Icon = getTransactionIcon(transaction.type)
-                        return (
-                          <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <Icon className={`h-5 w-5 ${getTransactionColor(transaction.type)}`} />
-                              <div>
-                                <div className="font-medium">{transaction.description}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  {formatDate(transaction.date)} • {transaction.reference || 'No reference'}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-3">
-                              <div className={`font-bold ${getTransactionColor(transaction.type)}`}>
-                                {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                {transaction.matched ? (
-                                  <Badge variant="default" className="bg-green-100 text-green-800">
-                                    <CheckCircle className="mr-1 h-3 w-3" />
-                                    Matched
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="destructive">
-                                    <AlertTriangle className="mr-1 h-3 w-3" />
-                                    Unmatched
-                                  </Badge>
-                                )}
-                                {transaction.category && (
-                                  <Badge variant="outline">{transaction.category}</Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
-            ) : (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <CreditCard className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold">Select a bank account</h3>
-                  <p className="text-muted-foreground">
-                    Choose an account from the sidebar to view transactions
-                  </p>
-                </CardContent>
-              </Card>
             )}
           </div>
         </div>
       </main>
+
+      {/* Add Account Dialog */}
+      <Dialog open={addAccountOpen} onOpenChange={setAddAccountOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Bank Account</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Account name <span className="text-red-500">*</span></Label>
+              <Input className="mt-1" placeholder="e.g. Business Current Account"
+                value={newAccount.name} onChange={e => setNewAccount(a => ({ ...a, name: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Account number</Label>
+                <Input className="mt-1" placeholder="12345678"
+                  value={newAccount.accountNumber} onChange={e => setNewAccount(a => ({ ...a, accountNumber: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Sort code</Label>
+                <Input className="mt-1" placeholder="20-00-00"
+                  value={newAccount.sortCode} onChange={e => setNewAccount(a => ({ ...a, sortCode: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label>IBAN (optional)</Label>
+              <Input className="mt-1" placeholder="GB29 NWBK 6016 1331 9268 19"
+                value={newAccount.iban} onChange={e => setNewAccount(a => ({ ...a, iban: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Currency</Label>
+                <select className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={newAccount.currency} onChange={e => setNewAccount(a => ({ ...a, currency: e.target.value }))}>
+                  {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>Opening balance</Label>
+                <Input className="mt-1" type="number" step="0.01" placeholder="0.00"
+                  value={newAccount.openingBalance} onChange={e => setNewAccount(a => ({ ...a, openingBalance: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddAccountOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateAccount} disabled={createAccount.isPending}>
+              {createAccount.isPending ? "Adding…" : "Add Account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

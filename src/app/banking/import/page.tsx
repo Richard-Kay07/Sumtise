@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -36,6 +37,7 @@ interface ColumnMapping {
 
 export default function BankImportPage() {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [fileType, setFileType] = useState<FileType>('CSV')
   const [fileContent, setFileContent] = useState<string>("")
@@ -52,6 +54,12 @@ export default function BankImportPage() {
   const [importResult, setImportResult] = useState<any>(null)
   const [selectedAccountId, setSelectedAccountId] = useState<string>("")
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
+
+  // Pre-select account from query param (set by /banking page)
+  useEffect(() => {
+    const id = searchParams.get("accountId")
+    if (id) setSelectedAccountId(id)
+  }, [searchParams])
   const [resultDialogOpen, setResultDialogOpen] = useState(false)
 
   // Get user's organizations
@@ -122,9 +130,14 @@ export default function BankImportPage() {
     // Read file content
     const reader = new FileReader()
     reader.onload = async (e) => {
-      const content = e.target?.result as string
-      const base64 = btoa(content)
+      const arrayBuffer = e.target?.result as ArrayBuffer
+      const bytes = new Uint8Array(arrayBuffer)
+      let binary = ""
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
+      const base64 = btoa(binary)
       setFileContent(base64)
+      // Also read as text for column detection
+      const content = new TextDecoder().decode(bytes)
 
       // For CSV, detect columns
       if (fileType === 'CSV' || extension === 'CSV' || extension === 'TXT') {
@@ -149,7 +162,7 @@ export default function BankImportPage() {
         }
       }
     }
-    reader.readAsText(file)
+    reader.readAsArrayBuffer(file)
   }, [fileType, toast])
 
   const handlePreview = () => {
@@ -436,16 +449,16 @@ export default function BankImportPage() {
             <Button
               variant="outline"
               onClick={handlePreview}
-              disabled={!fileContent || !selectedAccountId || previewMutation.isLoading}
+              disabled={!fileContent || !selectedAccountId || previewMutation.isPending}
             >
               <Eye className="mr-2 h-4 w-4" />
               Preview
             </Button>
             <Button
               onClick={handleImport}
-              disabled={!fileContent || !selectedAccountId || importMutation.isLoading}
+              disabled={!fileContent || !selectedAccountId || importMutation.isPending}
             >
-              {importMutation.isLoading ? (
+              {importMutation.isPending ? (
                 <>
                   <Upload className="mr-2 h-4 w-4 animate-spin" />
                   Importing...

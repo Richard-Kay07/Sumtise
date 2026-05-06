@@ -59,7 +59,7 @@ export default function RecurringInvoicesPage() {
   // Client-side search filter
   const filtered = search
     ? templates.filter((t: any) =>
-        t.title?.toLowerCase().includes(search.toLowerCase()) ||
+        t.templateName?.toLowerCase().includes(search.toLowerCase()) ||
         t.customer?.name?.toLowerCase().includes(search.toLowerCase())
       )
     : templates
@@ -144,7 +144,7 @@ export default function RecurringInvoicesPage() {
                     <tr key={t.id} className="border-b last:border-0 hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium cursor-pointer"
                         onClick={() => (window.location.href = `/invoices/recurring/${t.id}`)}>
-                        {t.title}
+                        {t.templateName}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{t.customer?.name ?? "—"}</td>
                       <td className="px-4 py-3 text-gray-500">{FREQ_LABELS[t.frequency] ?? t.frequency}</td>
@@ -160,7 +160,7 @@ export default function RecurringInvoicesPage() {
                         <div className="flex items-center gap-1">
                           {t.status === "ACTIVE" && (
                             <button
-                              onClick={() => { setRunningId(t.id); runNow.mutate({ organizationId: orgId, templateId: t.id }) }}
+                              onClick={() => { setRunningId(t.id); runNow.mutate({ organizationId: orgId, id: t.id }) }}
                               disabled={runNow.isPending && runningId === t.id}
                               title="Run now"
                               className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#50B0E0] transition-colors"
