@@ -322,6 +322,88 @@ export const taxRouter = createTRPCRouter({
       })
     }),
 
+  // ── Draft saves ───────────────────────────────────────────────────────────
+
+  saveVATDraft: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.SETTINGS_EDIT))
+    .input(z.object({
+      organizationId: z.string(),
+      periodStart:    z.date(),
+      periodEnd:      z.date(),
+      reference:      z.string().optional(),
+      totalAmount:    z.string(),
+      data:           z.record(z.unknown()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return prisma.taxSubmission.create({
+        data: {
+          organizationId: ctx.organizationId,
+          submissionType: "VAT_RETURN",
+          periodStart:    input.periodStart,
+          periodEnd:      input.periodEnd,
+          submissionDate: new Date(),
+          status:         "DRAFT",
+          reference:      input.reference,
+          totalAmount:    new Prisma.Decimal(input.totalAmount),
+          data:           input.data,
+          submittedBy:    ctx.userId ?? undefined,
+        },
+      })
+    }),
+
+  saveCTDraft: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.SETTINGS_EDIT))
+    .input(z.object({
+      organizationId: z.string(),
+      periodStart:    z.date(),
+      periodEnd:      z.date(),
+      reference:      z.string().optional(),
+      totalAmount:    z.string(),
+      data:           z.record(z.unknown()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return prisma.taxSubmission.create({
+        data: {
+          organizationId: ctx.organizationId,
+          submissionType: "CORPORATION_TAX",
+          periodStart:    input.periodStart,
+          periodEnd:      input.periodEnd,
+          submissionDate: new Date(),
+          status:         "DRAFT",
+          reference:      input.reference,
+          totalAmount:    new Prisma.Decimal(input.totalAmount),
+          data:           input.data,
+          submittedBy:    ctx.userId ?? undefined,
+        },
+      })
+    }),
+
+  // ── Submit an existing draft ───────────────────────────────────────────────
+
+  submitDraft: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.SETTINGS_EDIT))
+    .input(z.object({
+      organizationId: z.string(),
+      submissionId:   z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await prisma.taxSubmission.findFirst({
+        where: { id: input.submissionId, organizationId: ctx.organizationId },
+      })
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Submission not found" })
+      if (existing.status !== "DRAFT") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Only DRAFT submissions can be submitted" })
+      }
+      return prisma.taxSubmission.update({
+        where: { id: input.submissionId },
+        data: {
+          status:      "SUBMITTED",
+          submittedAt: new Date(),
+          submittedBy: ctx.userId ?? undefined,
+        },
+      })
+    }),
+
   // ── All submissions list ──────────────────────────────────────────────────
 
   listAllSubmissions: orgScopedProcedure
