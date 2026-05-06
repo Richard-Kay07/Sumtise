@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
-export default function ReconciliationPage() {
+function ReconciliationContent() {
   const { toast } = useToast()
   const searchParams = useSearchParams()
 
@@ -379,5 +379,17 @@ export default function ReconciliationPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function ReconciliationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    }>
+      <ReconciliationContent />
+    </Suspense>
   )
 }

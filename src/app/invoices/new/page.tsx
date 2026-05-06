@@ -1,30 +1,25 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
-import { 
-  Plus, 
-  Minus, 
-  Save, 
+import {
+  Plus,
+  Minus,
+  Save,
   Send,
   ArrowLeft,
   ArrowRight,
-  Calendar,
-  User,
-  FileText,
-  DollarSign,
-  Percent
 } from "lucide-react"
 
 const invoiceItemSchema = z.object({
@@ -46,156 +41,131 @@ const invoiceFormSchema = z.object({
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>
 type InvoiceItem = z.infer<typeof invoiceItemSchema>
 
-export default function CreateInvoicePage() {
+function CreateInvoiceContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { toast } = useToast()
   const [currentStep, setCurrentStep] = useState(1)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitModeRef = useRef<"draft" | "send">("draft")
 
   const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const { data: customersData } = trpc.customers.getAll.useQuery(
-    { 
-      organizationId: organizations?.[0]?.id || "",
-      page: 1,
-      limit: 100, // Get more customers for dropdown
-    },
-    { enabled: !!organizations?.[0]?.id }
-  )
+  const orgId = organizations?.[0]?.id ?? ""
 
-  const customers = customersData?.customers || []
-  
-  // Get customer from URL params
-  const customerIdFromUrl = searchParams?.get("customerId") || ""
+  const { data: customersData } = trpc.customers.getAll.useQuery(
+    { organizationId: orgId, page: 1, limit: 100 },
+    { enabled: !!orgId }
+  )
+  const customers = customersData?.customers ?? []
+
+  const customerIdFromUrl = searchParams.get("customerId") ?? ""
 
   const form = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
       customerId: customerIdFromUrl,
-      date: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      date: new Date().toISOString().split("T")[0],
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       currency: "GBP",
       notes: "",
       items: [{ description: "", quantity: 1, unitPrice: 0, taxRate: 20 }],
     },
   })
 
-  // Update form when customerId from URL changes
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = form
+
   useEffect(() => {
-    if (customerIdFromUrl && customers.length > 0) {
-      setValue("customerId", customerIdFromUrl)
-      // Set currency from customer if available
-      const selectedCustomer = customers.find(c => c.id === customerIdFromUrl)
-      if (selectedCustomer?.currency) {
-        setValue("currency", selectedCustomer.currency)
-      }
-      // Set due date based on customer payment terms
-      if (selectedCustomer?.paymentTerms) {
-        const dueDate = new Date()
-        dueDate.setDate(dueDate.getDate() + selectedCustomer.paymentTerms)
-        setValue("dueDate", dueDate.toISOString().split('T')[0])
-      }
+    if (!customerIdFromUrl || customers.length === 0) return
+    setValue("customerId", customerIdFromUrl)
+    const customer = customers.find(c => c.id === customerIdFromUrl)
+    if (customer?.currency) setValue("currency", customer.currency)
+    if (customer?.paymentTerms) {
+      const due = new Date()
+      due.setDate(due.getDate() + customer.paymentTerms)
+      setValue("dueDate", due.toISOString().split("T")[0])
     }
   }, [customerIdFromUrl, customers, setValue])
 
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = form
+  const createMutation = trpc.invoices.create.useMutation({
+    onSuccess: () => {
+      toast({ title: submitModeRef.current === "send" ? "Invoice created & sent" : "Draft saved" })
+      router.push("/invoices")
+    },
+    onError: (err) => {
+      toast({ title: "Failed to create invoice", description: err.message, variant: "destructive" })
+    },
+  })
+
   const watchedItems = watch("items")
   const watchedCurrency = watch("currency")
 
   const addItem = () => {
-    const currentItems = watch("items")
-    setValue("items", [...currentItems, { description: "", quantity: 1, unitPrice: 0, taxRate: 20 }])
+    setValue("items", [...watch("items"), { description: "", quantity: 1, unitPrice: 0, taxRate: 20 }])
   }
 
   const removeItem = (index: number) => {
-    const currentItems = watch("items")
-    if (currentItems.length > 1) {
-      setValue("items", currentItems.filter((_, i) => i !== index))
-    }
+    const items = watch("items")
+    if (items.length > 1) setValue("items", items.filter((_, i) => i !== index))
   }
 
   const updateItem = (index: number, field: keyof InvoiceItem, value: string | number) => {
-    const currentItems = [...watchedItems]
-    currentItems[index] = { ...currentItems[index], [field]: value }
-    
-    // Recalculate total for this item
-    const quantity = typeof currentItems[index].quantity === 'number' ? currentItems[index].quantity : parseFloat(currentItems[index].quantity.toString())
-    const unitPrice = typeof currentItems[index].unitPrice === 'number' ? currentItems[index].unitPrice : parseFloat(currentItems[index].unitPrice.toString())
-    const taxRate = typeof currentItems[index].taxRate === 'number' ? currentItems[index].taxRate : parseFloat(currentItems[index].taxRate.toString())
-    
-    const subtotal = quantity * unitPrice
-    const tax = subtotal * (taxRate / 100)
-    currentItems[index].total = subtotal + tax
-    
-    setValue("items", currentItems)
+    const items = [...watchedItems]
+    items[index] = { ...items[index], [field]: value }
+    setValue("items", items)
   }
 
   const calculateTotals = () => {
-    const items = watchedItems
-    const subtotal = items.reduce((sum, item) => {
-      const quantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity.toString())
-      const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice.toString())
-      return sum + (quantity * unitPrice)
-    }, 0)
-    
-    const taxAmount = items.reduce((sum, item) => {
-      const quantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity.toString())
-      const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice.toString())
-      const taxRate = typeof item.taxRate === 'number' ? item.taxRate : parseFloat(item.taxRate.toString())
-      return sum + (quantity * unitPrice * (taxRate / 100))
-    }, 0)
-    
+    const subtotal = watchedItems.reduce((s, i) => s + (Number(i.quantity) * Number(i.unitPrice)), 0)
+    const taxAmount = watchedItems.reduce((s, i) => s + (Number(i.quantity) * Number(i.unitPrice) * Number(i.taxRate) / 100), 0)
     return { subtotal, taxAmount, total: subtotal + taxAmount }
   }
 
   const totals = calculateTotals()
 
-  const onSubmit = async (data: InvoiceFormData) => {
-    setIsSubmitting(true)
-    try {
-      // Create invoice via tRPC mutation
-      // const result = await trpc.invoices.create.mutate({
-      //   organizationId: organizations?.[0]?.id || "",
-      //   customerId: data.customerId,
-      //   date: new Date(data.date),
-      //   dueDate: new Date(data.dueDate),
-      //   currency: data.currency,
-      //   notes: data.notes,
-      //   items: data.items,
-      // })
-      
-      // For now, simulate success
-      alert("Invoice created successfully!")
-      router.push("/invoices")
-    } catch (error) {
-      console.error("Error creating invoice:", error)
-      alert("Failed to create invoice. Please try again.")
-    } finally {
-      setIsSubmitting(false)
+  const itemTotal = (item: InvoiceItem) => {
+    const sub = Number(item.quantity) * Number(item.unitPrice)
+    return sub + sub * (Number(item.taxRate) / 100)
+  }
+
+  const onSubmit = (data: InvoiceFormData) => {
+    if (!orgId) {
+      toast({ title: "No organisation found", variant: "destructive" })
+      return
     }
+    createMutation.mutate({
+      organizationId: orgId,
+      customerId: data.customerId,
+      date: new Date(data.date),
+      dueDate: new Date(data.dueDate),
+      notes: data.notes,
+      items: data.items.map(i => ({
+        description: i.description,
+        quantity: Number(i.quantity),
+        unitPrice: Number(i.unitPrice),
+        taxRate: Number(i.taxRate),
+      })),
+    })
   }
 
   return (
     <div className="flex flex-col h-full bg-background">
       <main className="container mx-auto py-6">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Create Invoice</h1>
             <p className="text-muted-foreground mt-1">
-              Step {currentStep} of 3: {currentStep === 1 ? "Customer & Dates" : currentStep === 2 ? "Items" : "Review"}
+              Step {currentStep} of 3:{" "}
+              {currentStep === 1 ? "Customer & Dates" : currentStep === 2 ? "Items" : "Review"}
             </p>
           </div>
           <Button variant="outline" onClick={() => router.push("/invoices")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Cancel
+            <ArrowLeft className="mr-2 h-4 w-4" /> Cancel
           </Button>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-6 lg:grid-cols-4">
-            {/* Main Form */}
             <div className="lg:col-span-3 space-y-6">
-              {/* Step 1: Customer & Dates */}
+              {/* Step 1 */}
               {currentStep === 1 && (
                 <Card>
                   <CardHeader>
@@ -211,24 +181,19 @@ export default function CreateInvoicePage() {
                         className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
                         onChange={(e) => {
                           setValue("customerId", e.target.value)
-                          // Update currency and due date based on selected customer
-                          const selectedCustomer = customers.find(c => c.id === e.target.value)
-                          if (selectedCustomer) {
-                            if (selectedCustomer.currency) {
-                              setValue("currency", selectedCustomer.currency)
-                            }
-                            if (selectedCustomer.paymentTerms) {
-                              const dueDate = new Date()
-                              dueDate.setDate(dueDate.getDate() + selectedCustomer.paymentTerms)
-                              setValue("dueDate", dueDate.toISOString().split('T')[0])
-                            }
+                          const c = customers.find(x => x.id === e.target.value)
+                          if (c?.currency) setValue("currency", c.currency)
+                          if (c?.paymentTerms) {
+                            const due = new Date()
+                            due.setDate(due.getDate() + c.paymentTerms)
+                            setValue("dueDate", due.toISOString().split("T")[0])
                           }
                         }}
                       >
-                        <option value="">Select a customer...</option>
-                        {customers.map((customer) => (
-                          <option key={customer.id} value={customer.id}>
-                            {customer.name} {customer.email ? `(${customer.email})` : ""}
+                        <option value="">Select a customer…</option>
+                        {customers.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}{c.email ? ` (${c.email})` : ""}
                           </option>
                         ))}
                       </select>
@@ -237,7 +202,8 @@ export default function CreateInvoicePage() {
                       )}
                       {customers.length === 0 && (
                         <p className="text-sm text-muted-foreground mt-1">
-                          No customers found. <Link href="/customers/new" className="text-primary hover:underline">Create one</Link>
+                          No customers found.{" "}
+                          <Link href="/customers/new" className="text-primary hover:underline">Create one</Link>
                         </p>
                       )}
                     </div>
@@ -245,25 +211,13 @@ export default function CreateInvoicePage() {
                     <div className="grid gap-4 md:grid-cols-2">
                       <div>
                         <Label htmlFor="date">Invoice Date *</Label>
-                        <Input
-                          id="date"
-                          type="date"
-                          {...register("date")}
-                        />
-                        {errors.date && (
-                          <p className="text-sm text-destructive mt-1">{errors.date.message}</p>
-                        )}
+                        <Input id="date" type="date" {...register("date")} />
+                        {errors.date && <p className="text-sm text-destructive mt-1">{errors.date.message}</p>}
                       </div>
                       <div>
                         <Label htmlFor="dueDate">Due Date *</Label>
-                        <Input
-                          id="dueDate"
-                          type="date"
-                          {...register("dueDate")}
-                        />
-                        {errors.dueDate && (
-                          <p className="text-sm text-destructive mt-1">{errors.dueDate.message}</p>
-                        )}
+                        <Input id="dueDate" type="date" {...register("dueDate")} />
+                        {errors.dueDate && <p className="text-sm text-destructive mt-1">{errors.dueDate.message}</p>}
                       </div>
                     </div>
 
@@ -283,7 +237,7 @@ export default function CreateInvoicePage() {
                 </Card>
               )}
 
-              {/* Step 2: Items */}
+              {/* Step 2 */}
               {currentStep === 2 && (
                 <Card>
                   <CardHeader>
@@ -296,75 +250,56 @@ export default function CreateInvoicePage() {
                         <div className="flex items-center justify-between">
                           <h4 className="font-medium">Item {index + 1}</h4>
                           {watchedItems.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeItem(index)}
-                            >
+                            <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
                               <Minus className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
-
                         <div>
                           <Label>Description *</Label>
                           <Input
                             value={item.description}
-                            onChange={(e) => updateItem(index, "description", e.target.value)}
+                            onChange={e => updateItem(index, "description", e.target.value)}
                             placeholder="Item description"
                           />
                         </div>
-
                         <div className="grid gap-4 md:grid-cols-4">
                           <div>
                             <Label>Quantity *</Label>
                             <Input
-                              type="number"
-                              step="0.01"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(index, "quantity", parseFloat(e.target.value) || 0)}
+                              type="number" step="0.01" value={item.quantity}
+                              onChange={e => updateItem(index, "quantity", parseFloat(e.target.value) || 0)}
                             />
                           </div>
                           <div>
                             <Label>Unit Price *</Label>
                             <Input
-                              type="number"
-                              step="0.01"
-                              value={item.unitPrice}
-                              onChange={(e) => updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)}
+                              type="number" step="0.01" value={item.unitPrice}
+                              onChange={e => updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)}
                             />
                           </div>
                           <div>
                             <Label>Tax Rate (%)</Label>
                             <Input
-                              type="number"
-                              step="0.01"
-                              value={item.taxRate}
-                              onChange={(e) => updateItem(index, "taxRate", parseFloat(e.target.value) || 0)}
+                              type="number" step="0.01" value={item.taxRate}
+                              onChange={e => updateItem(index, "taxRate", parseFloat(e.target.value) || 0)}
                             />
                           </div>
                           <div>
                             <Label>Total</Label>
-                            <Input
-                              value={formatCurrency(item.total || 0, watchedCurrency)}
-                              readOnly
-                              className="bg-muted"
-                            />
+                            <Input value={formatCurrency(itemTotal(item), watchedCurrency)} readOnly className="bg-muted" />
                           </div>
                         </div>
                       </div>
                     ))}
-
                     <Button type="button" variant="outline" onClick={addItem} className="w-full">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Item
+                      <Plus className="mr-2 h-4 w-4" /> Add Item
                     </Button>
                   </CardContent>
                 </Card>
               )}
 
-              {/* Step 3: Review */}
+              {/* Step 3 */}
               {currentStep === 3 && (
                 <Card>
                   <CardHeader>
@@ -376,7 +311,7 @@ export default function CreateInvoicePage() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Customer:</span>
                         <span className="font-medium">
-                          {customers?.find(c => c.id === watch("customerId"))?.name}
+                          {customers.find(c => c.id === watch("customerId"))?.name}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -395,7 +330,7 @@ export default function CreateInvoicePage() {
                         {watchedItems.map((item, index) => (
                           <div key={index} className="flex justify-between text-sm">
                             <span>{item.description} × {item.quantity}</span>
-                            <span>{formatCurrency(item.total || 0, watchedCurrency)}</span>
+                            <span>{formatCurrency(itemTotal(item), watchedCurrency)}</span>
                           </div>
                         ))}
                       </div>
@@ -423,75 +358,72 @@ export default function CreateInvoicePage() {
                         {...register("notes")}
                         rows={3}
                         className="w-full px-3 py-2 border border-input bg-background rounded-md"
-                        placeholder="Additional notes for the invoice..."
+                        placeholder="Additional notes for the invoice…"
                       />
                     </div>
                   </CardContent>
                 </Card>
               )}
 
-              {/* Navigation Buttons */}
+              {/* Navigation */}
               <div className="flex justify-between">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+                  onClick={() => setCurrentStep(s => Math.max(1, s - 1))}
                   disabled={currentStep === 1}
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Previous
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Previous
                 </Button>
+
                 {currentStep < 3 ? (
                   <Button
                     type="button"
                     onClick={() => {
-                      // Validate current step before proceeding
                       if (currentStep === 1) {
                         if (!watch("customerId") || !watch("date") || !watch("dueDate")) {
-                          alert("Please fill in all required fields")
+                          toast({ title: "Please fill in all required fields", variant: "destructive" })
                           return
                         }
                       } else if (currentStep === 2) {
                         const items = watch("items")
-                        if (items.some(item => !item.description || item.quantity <= 0 || item.unitPrice < 0)) {
-                          alert("Please complete all item fields")
+                        if (items.some(i => !i.description || Number(i.quantity) <= 0)) {
+                          toast({ title: "Please complete all item fields", variant: "destructive" })
                           return
                         }
                       }
-                      setCurrentStep(currentStep + 1)
+                      setCurrentStep(s => s + 1)
                     }}
                   >
-                    Next
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    Next <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 ) : (
                   <div className="flex gap-2">
                     <Button
                       type="submit"
                       variant="outline"
-                      disabled={isSubmitting}
+                      disabled={createMutation.isPending}
+                      onClick={() => { submitModeRef.current = "draft" }}
                     >
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Draft
+                      <Save className="mr-2 h-4 w-4" /> Save Draft
                     </Button>
                     <Button
                       type="submit"
-                      disabled={isSubmitting}
+                      disabled={createMutation.isPending}
+                      onClick={() => { submitModeRef.current = "send" }}
                     >
                       <Send className="mr-2 h-4 w-4" />
-                      {isSubmitting ? "Creating..." : "Create & Send"}
+                      {createMutation.isPending ? "Creating…" : "Create & Send"}
                     </Button>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Sidebar Summary */}
+            {/* Sidebar */}
             <div className="space-y-6">
               <Card>
-                <CardHeader>
-                  <CardTitle>Summary</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>Summary</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
@@ -521,3 +453,14 @@ export default function CreateInvoicePage() {
   )
 }
 
+export default function CreateInvoicePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    }>
+      <CreateInvoiceContent />
+    </Suspense>
+  )
+}

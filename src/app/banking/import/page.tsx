@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -35,7 +35,7 @@ interface ColumnMapping {
   balance?: string
 }
 
-export default function BankImportPage() {
+function BankImportContent() {
   const { toast } = useToast()
   const searchParams = useSearchParams()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -619,6 +619,15 @@ export default function BankImportPage() {
   )
 }
 
-
-
+export default function BankImportPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    }>
+      <BankImportContent />
+    </Suspense>
+  )
+}
 
