@@ -221,48 +221,44 @@ export const invoiceItemSchema = z.object({
 })
 
 // Credit Note schemas
-export const createCreditNoteSchema = z.object({
-  fromInvoiceId: z.string().optional(), // Source invoice (optional for manual creation)
+// Base schema is a plain ZodObject so routers can call .extend() on it.
+// createCreditNoteSchema adds the cross-field refinement for use in forms/direct validation.
+export const createCreditNoteBaseSchema = z.object({
+  fromInvoiceId: z.string().optional(),
   date: z.date({ required_error: "Credit note date is required" }),
   reason: z.string().optional(),
   notes: z.string().optional(),
   currency: z.string().default("GBP"),
-  // Manual items (if not from invoice)
   items: z.array(z.object({
     description: z.string().min(1),
     quantity: z.number().min(0),
     unitPrice: z.number().min(0),
     taxRate: z.number().min(0).max(100).default(0),
   })).optional(),
-}).refine(
+})
+export const createCreditNoteSchema = createCreditNoteBaseSchema.refine(
   (data) => data.fromInvoiceId || (data.items && data.items.length > 0),
-  {
-    message: "Either fromInvoiceId or items must be provided",
-    path: ["fromInvoiceId"],
-  }
+  { message: "Either fromInvoiceId or items must be provided", path: ["fromInvoiceId"] }
 )
 
 // Debit Note schemas
-export const createDebitNoteSchema = z.object({
-  fromBillId: z.string().optional(), // Source bill (optional for manual creation)
+export const createDebitNoteBaseSchema = z.object({
+  fromBillId: z.string().optional(),
   vendorId: z.string().min(1, "Vendor ID is required"),
   date: z.date({ required_error: "Debit note date is required" }),
   reason: z.string().optional(),
   notes: z.string().optional(),
   currency: z.string().default("GBP"),
-  // Manual items (if not from bill)
   items: z.array(z.object({
     description: z.string().min(1),
     quantity: z.number().min(0),
     unitPrice: z.number().min(0),
     taxRate: z.number().min(0).max(100).default(0),
   })).optional(),
-}).refine(
+})
+export const createDebitNoteSchema = createDebitNoteBaseSchema.refine(
   (data) => data.fromBillId || (data.items && data.items.length > 0),
-  {
-    message: "Either fromBillId or items must be provided",
-    path: ["fromBillId"],
-  }
+  { message: "Either fromBillId or items must be provided", path: ["fromBillId"] }
 )
 
 // Bill schemas
@@ -427,7 +423,7 @@ export const aiResponseSchema = z.object({
 })
 
 // Payment schemas
-export const createPaymentSchema = z.object({
+export const createPaymentBaseSchema = z.object({
   billId: z.string().optional(),
   vendorId: z.string().optional(),
   bankAccountId: z.string().min(1, "Bank account ID is required"),
@@ -439,30 +435,25 @@ export const createPaymentSchema = z.object({
   method: z.enum(["BANK_TRANSFER", "BACS", "FASTER_PAYMENTS", "CHAPS", "CHEQUE", "CARD", "OTHER"]),
   idempotencyKey: z.string().optional(),
   reference: z.string().optional(),
-}).refine(
+})
+export const createPaymentSchema = createPaymentBaseSchema.refine(
   (data) => data.billId || data.vendorId,
-  {
-    message: "Either billId or vendorId must be provided",
-    path: ["billId"],
-  }
+  { message: "Either billId or vendorId must be provided", path: ["billId"] }
 )
 
 // Payment Run schemas
-export const createPaymentRunSchema = z.object({
+export const createPaymentRunBaseSchema = z.object({
   bankAccountId: z.string().min(1, "Bank account ID is required"),
   paymentDate: z.date({ required_error: "Payment date is required" }),
   paymentMethod: z.enum(["BANK_TRANSFER", "BACS", "FASTER_PAYMENTS", "CHAPS", "CHEQUE", "CARD", "OTHER"]),
   currency: z.string().default("GBP"),
   notes: z.string().optional(),
-  // Selection criteria (either criteria or explicit billIds)
   vendorIds: z.array(z.string()).optional(),
   dueDateTo: z.date().optional(),
   minAmount: z.number().optional(),
-  billIds: z.array(z.string()).optional(), // Explicit bill IDs
-}).refine(
-  (data) => data.billIds && data.billIds.length > 0 || data.vendorIds || data.dueDateTo || data.minAmount !== undefined,
-  {
-    message: "Either billIds or selection criteria (vendorIds, dueDateTo, minAmount) must be provided",
-    path: ["billIds"],
-  }
+  billIds: z.array(z.string()).optional(),
+})
+export const createPaymentRunSchema = createPaymentRunBaseSchema.refine(
+  (data) => (data.billIds && data.billIds.length > 0) || data.vendorIds || data.dueDateTo || data.minAmount !== undefined,
+  { message: "Either billIds or selection criteria (vendorIds, dueDateTo, minAmount) must be provided", path: ["billIds"] }
 )

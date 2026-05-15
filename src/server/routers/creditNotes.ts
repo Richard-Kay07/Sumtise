@@ -15,7 +15,7 @@ import { z } from "zod"
 import { TRPCError } from "@trpc/server"
 import { createTRPCRouter, orgScopedProcedure, requirePermissionProcedure } from "@/lib/trpc"
 import { Permission } from "@/lib/permissions"
-import { paginationSchema, createCreditNoteSchema } from "@/types/schemas"
+import { paginationSchema, createCreditNoteBaseSchema } from "@/types/schemas"
 import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
@@ -343,7 +343,7 @@ export const creditNotesRouter = createTRPCRouter({
    */
   create: orgScopedProcedure
     .use(requirePermissionProcedure(Permission.CREDIT_NOTES_CREATE))
-    .input(createCreditNoteSchema.extend({ organizationId: z.string().min(1) }))
+    .input(createCreditNoteBaseSchema.extend({ organizationId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const {
         organizationId,

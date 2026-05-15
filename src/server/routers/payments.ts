@@ -16,7 +16,7 @@ import { z } from "zod"
 import { TRPCError } from "@trpc/server"
 import { createTRPCRouter, orgScopedProcedure, requirePermissionProcedure } from "@/lib/trpc"
 import { Permission } from "@/lib/permissions"
-import { paginationSchema, createPaymentSchema } from "@/types/schemas"
+import { paginationSchema, createPaymentBaseSchema } from "@/types/schemas"
 import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
@@ -332,7 +332,7 @@ export const paymentsRouter = createTRPCRouter({
    */
   create: orgScopedProcedure
     .use(requirePermissionProcedure(Permission.PAYMENTS_CREATE))
-    .input(createPaymentSchema.extend({ organizationId: z.string().min(1) }))
+    .input(createPaymentBaseSchema.extend({ organizationId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const {
         organizationId,

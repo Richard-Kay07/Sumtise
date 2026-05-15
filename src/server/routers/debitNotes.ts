@@ -15,7 +15,7 @@ import { z } from "zod"
 import { TRPCError } from "@trpc/server"
 import { createTRPCRouter, orgScopedProcedure, requirePermissionProcedure } from "@/lib/trpc"
 import { Permission } from "@/lib/permissions"
-import { paginationSchema, createDebitNoteSchema } from "@/types/schemas"
+import { paginationSchema, createDebitNoteBaseSchema } from "@/types/schemas"
 import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
@@ -426,7 +426,7 @@ export const debitNotesRouter = createTRPCRouter({
    */
   create: orgScopedProcedure
     .use(requirePermissionProcedure(Permission.BILLS_CREATE))
-    .input(createDebitNoteSchema.extend({ organizationId: z.string().min(1) }))
+    .input(createDebitNoteBaseSchema.extend({ organizationId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const { organizationId, fromBillId, vendorId, items, date, reason, notes, currency } = input
 
