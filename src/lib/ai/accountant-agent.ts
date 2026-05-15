@@ -17,7 +17,11 @@ import { buildFinancialContext, formatContextForPrompt } from "./financial-conte
 import { ACCOUNTANT_TOOLS, executeTool } from "./accountant-tools"
 import { resolveModels, getModelId } from "./model-registry"
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+let _openai: OpenAI | null = null
+function getOpenAI(): OpenAI {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return _openai
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -206,7 +210,7 @@ export async function runAccountantAgent(
 
   // Tool-use loop (max 6 turns to prevent runaway)
   for (let turn = 0; turn < 6; turn++) {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model,
       messages,
       tools: ACCOUNTANT_TOOLS,

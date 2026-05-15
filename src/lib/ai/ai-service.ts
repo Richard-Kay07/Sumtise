@@ -6,7 +6,11 @@ import { resolveModels, getModelId, type ModelSnapshot, type ModelTier } from ".
 
 export type { ModelSnapshot, ModelTier }
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+let _openai: OpenAI | null = null
+function getOpenAI(): OpenAI {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return _openai
+}
 
 export type { NLQueryResult, ReceiptData, CategorizedExpense }
 
@@ -18,7 +22,7 @@ export interface AIInsight {
 // ── Model resolution ──────────────────────────────────────────────────────────
 
 export async function getModelSnapshot(): Promise<ModelSnapshot> {
-  return resolveModels(openai)
+  return resolveModels(getOpenAI())
 }
 
 // ── Natural language query ────────────────────────────────────────────────────
@@ -57,7 +61,7 @@ Return JSON array (exactly 5 items):
 ]`
 
   try {
-    const res = await openai.chat.completions.create({
+    const res = await getOpenAI().chat.completions.create({
       model,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },

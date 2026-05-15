@@ -10,7 +10,11 @@
 import OpenAI from "openai"
 import { resolveModels, getModelId } from "./model-registry"
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+let _openai: OpenAI | null = null
+function getOpenAI(): OpenAI {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return _openai
+}
 
 export interface ReceiptLineItem {
   description: string
@@ -69,7 +73,7 @@ Return JSON matching this schema exactly (use null for missing fields):
   "notes": string | null
 }`
 
-  const res = await openai.chat.completions.create({
+  const res = await getOpenAI().chat.completions.create({
     model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
@@ -88,7 +92,7 @@ async function extractWithVision(imageBuffer: Buffer, mimeType = "image/jpeg", m
   const base64 = imageBuffer.toString("base64")
   const dataUrl = `data:${mimeType};base64,${base64}`
 
-  const res = await openai.chat.completions.create({
+  const res = await getOpenAI().chat.completions.create({
     model,
     messages: [
       {
@@ -195,7 +199,7 @@ Return JSON:
 }`
 
   const model = modelOverride ?? getModelId("FAST")
-  const res = await openai.chat.completions.create({
+  const res = await getOpenAI().chat.completions.create({
     model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },

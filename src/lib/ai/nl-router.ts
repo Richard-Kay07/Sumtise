@@ -11,7 +11,11 @@ import OpenAI from "openai"
 import { prisma } from "@/lib/prisma"
 import { resolveModels, getModelId, type ModelTier } from "./model-registry"
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+let _openai: OpenAI | null = null
+function getOpenAI(): OpenAI {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return _openai
+}
 
 export type QueryIntent =
   | "OVERDUE_INVOICES"
@@ -67,7 +71,7 @@ Return JSON only:
 
   try {
     const model = fastModel ?? getModelId("FAST")
-    const res = await openai.chat.completions.create({
+    const res = await getOpenAI().chat.completions.create({
       model,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
@@ -264,7 +268,7 @@ export async function resolveNLQuery(
   modelOverrides?: { fast?: string; smart?: string }
 ): Promise<NLQueryResult> {
   // Warm the model cache (no-op if already warm)
-  await resolveModels(openai)
+  await resolveModels(getOpenAI())
 
   const fastModel  = modelOverrides?.fast  ?? getModelId("FAST")
   const smartModel = modelOverrides?.smart ?? getModelId("SMART")
@@ -320,7 +324,7 @@ Write a clear, helpful answer in 2-4 sentences. If there is no data, say so hone
 
   let answer = "I couldn't retrieve data at this time."
   try {
-    const res = await openai.chat.completions.create({
+    const res = await getOpenAI().chat.completions.create({
       model: smartModel,
       messages: [
         { role: "system", content: systemPrompt },
