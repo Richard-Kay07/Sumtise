@@ -34,6 +34,7 @@ import { budgetsRouter } from "./budgets"
 import { grantsRouter } from "./grants"
 import { inventoryRouter } from "./inventory"
 import { recurringInvoicesRouter } from "./recurringInvoices"
+import { forecastsRouter } from "./forecasts"
 
 /**
  * Generate and store invoice PDF
@@ -1623,6 +1624,7 @@ export const appRouter = createTRPCRouter({
 
   // Recurring Invoices
   recurringInvoices: recurringInvoicesRouter,
+  forecasts: forecastsRouter,
 
   // Dashboard routes
   dashboard: createTRPCRouter({
