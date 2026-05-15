@@ -102,7 +102,7 @@ export default function ForecastingPage() {
 
   const s = data?.summary
 
-  if (isLoading) {
+  if (!orgId || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
@@ -256,7 +256,7 @@ export default function ForecastingPage() {
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `£${(v / 1000).toFixed(0)}k`} />
                 <Tooltip content={<CustomTooltip />} />
                 <ReferenceLine
-                  x={data?.historical[data.historical.length - 1]?.label}
+                  x={data?.historical?.at(-1)?.label}
                   stroke="#cbd5e1"
                   strokeDasharray="4 4"
                   label={{ value: "Today →", position: "insideTopRight", fontSize: 10, fill: "#94a3b8" }}
