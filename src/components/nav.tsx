@@ -181,6 +181,7 @@ export function Nav() {
               <Divider />
               <SectionLabel>Feature Modules</SectionLabel>
               <NavItem href="/settings/modules">Module Settings</NavItem>
+              <NavItem href="/settings/currency">Multi-Currency / FX</NavItem>
               <NavItem href="/settings/payroll-coa">Payroll COA</NavItem>
               <NavItem href="/settings/related-parties">Related Parties</NavItem>
               <NavItem href="/settings/wga-codes">WGA / CPID Codes</NavItem>

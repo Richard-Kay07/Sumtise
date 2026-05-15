@@ -18,6 +18,7 @@ import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { postDoubleEntry, type JournalLine } from "@/lib/posting"
+import { resolveRate } from "@/lib/finance/fxDb"
 import { Prisma, BillStatus } from "@prisma/client"
 
 /**
@@ -909,13 +910,23 @@ export const billsRouter = createTRPCRouter({
         },
       })
 
+      // Resolve FX rate at bill date (falls back to 1.0 for same-currency orgs)
+      const moduleSettings = await prisma.orgModuleSettings.findUnique({
+        where: { orgId: ctx.organizationId },
+      })
+      const functionalCurrency = moduleSettings?.functionalCurrency ?? "GBP"
+      const resolvedFx = bill.currency !== functionalCurrency
+        ? await resolveRate(ctx.organizationId, bill.currency, functionalCurrency, new Date(bill.date))
+        : null
+      const bookingRate = resolvedFx?.rate ?? 1.0
+
       // Post to ledger
       const postingResult = await postDoubleEntry({
         date: bill.date,
         lines: journalLines,
         docRef: `BILL-${bill.billNumber}`,
         currency: bill.currency,
-        rate: 1.0,
+        rate: bookingRate,
         orgId: ctx.organizationId,
         userId: ctx.session.user.id,
         description: `Bill ${bill.billNumber} - ${bill.vendor.name}`,

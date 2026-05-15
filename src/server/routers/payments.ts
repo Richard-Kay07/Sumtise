@@ -21,6 +21,8 @@ import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { postDoubleEntry, type JournalLine } from "@/lib/posting"
+import { resolveRate } from "@/lib/finance/fxDb"
+import { computeRealisedFX } from "@/lib/finance/fx"
 import { Prisma, PaymentStatus, BillStatus, PaymentMethod } from "@prisma/client"
 
 /**
@@ -569,13 +571,16 @@ export const paymentsRouter = createTRPCRouter({
           },
         ]
 
+        const settlementRate = fxRate || 1.0
+        const payCurrency = currency || "GBP"
+
         // Post to ledger
         const postingResult = await postDoubleEntry({
           date,
           lines: journalLines,
           docRef: `PAY-${payment.id}`,
-          currency: currency || "GBP",
-          rate: fxRate || 1.0,
+          currency: payCurrency,
+          rate: settlementRate,
           orgId: ctx.organizationId,
           userId: ctx.session.user.id,
           description: billId
@@ -588,6 +593,92 @@ export const paymentsRouter = createTRPCRouter({
             isOnAccount,
           },
         })
+
+        // ── Realised FX Gain/Loss ──────────────────────────────────────────
+        // When a foreign-currency bill is settled at a different rate than
+        // it was booked at, we post the difference to an FX Gain/Loss account.
+        if (billId) {
+          const moduleSettings = await prisma.orgModuleSettings.findUnique({
+            where: { orgId: ctx.organizationId },
+          })
+          const functionalCurrency = moduleSettings?.functionalCurrency ?? "GBP"
+
+          if (payCurrency !== functionalCurrency) {
+            // Get the booking rate from original AP posting transactions
+            const billRecord = await prisma.bill.findUnique({
+              where: { id: billId },
+              select: { metadata: true, currency: true },
+            })
+            const meta = billRecord?.metadata as any
+            const bookingTxIds: string[] = meta?.postingTransactionIds ?? []
+            let bookingRate = settlementRate // fallback
+
+            if (bookingTxIds.length > 0) {
+              const bookingTx = await prisma.transaction.findFirst({
+                where: { id: { in: bookingTxIds }, credit: { gt: 0 } },
+                select: { exchangeRate: true },
+              })
+              if (bookingTx) {
+                bookingRate = Number(bookingTx.exchangeRate)
+              }
+            }
+
+            if (Math.abs(settlementRate - bookingRate) > 0.000001) {
+              // fxGainLossAccountId from settings, else search by name
+              let fxGlAccountId = moduleSettings?.fxGainLossAccountId ?? null
+
+              if (!fxGlAccountId) {
+                const fxAccount = await prisma.chartOfAccount.findFirst({
+                  where: {
+                    organizationId: ctx.organizationId,
+                    isActive: true,
+                    OR: [
+                      { name: { contains: "FX", mode: "insensitive" } },
+                      { name: { contains: "exchange", mode: "insensitive" } },
+                      { code: { in: ["7800", "7900", "78000", "79000"] } },
+                    ],
+                  },
+                })
+                fxGlAccountId = fxAccount?.id ?? null
+              }
+
+              if (fxGlAccountId) {
+                const fxResult = computeRealisedFX({
+                  foreignAmount: amount,
+                  foreignCurrency: payCurrency,
+                  functionalCurrency,
+                  transactionRate: bookingRate,
+                  settlementRate,
+                  type: "payable",
+                })
+                const gl = Math.abs(fxResult.gainLoss)
+                const isLoss = fxResult.gainLoss < 0
+
+                const fxLines: JournalLine[] = isLoss
+                  ? [
+                      { accountId: fxGlAccountId, debit: gl, credit: 0, description: "Realised FX loss" },
+                      { accountId: debitAccount.id, debit: 0, credit: gl, description: "FX adjustment to AP" },
+                    ]
+                  : [
+                      { accountId: debitAccount.id, debit: gl, credit: 0, description: "FX adjustment to AP" },
+                      { accountId: fxGlAccountId, debit: 0, credit: gl, description: "Realised FX gain" },
+                    ]
+
+                await postDoubleEntry({
+                  date,
+                  lines: fxLines,
+                  docRef: `FXGL-${payment.id}`,
+                  currency: functionalCurrency,
+                  rate: 1.0,
+                  orgId: ctx.organizationId,
+                  userId: ctx.session.user.id,
+                  description: `Realised FX ${isLoss ? "loss" : "gain"} on payment ${payment.id}`,
+                  metadata: { paymentId: payment.id, billId, bookingRate, settlementRate },
+                })
+              }
+            }
+          }
+        }
 
         // Update payment with transaction IDs
         const updatedPayment = await tx.payment.update({
