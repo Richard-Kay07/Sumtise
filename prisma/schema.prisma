@@ -153,6 +153,9 @@ model Organization {
   employeeAllocationRules EmployeeAllocationRule[]
   payrollJournalEntries   PayrollJournalEntry[]
   fxRates                 FxRate[]
+  accountingPeriods       AccountingPeriod[]
+  accrualEntries          AccrualEntry[]
+  closingEntries          ClosingEntry[]
 
   @@map("organizations")
 }
@@ -238,18 +241,21 @@ model Transaction {
   credit         Decimal       @default(0)
   currency       String        @default("GBP")
   exchangeRate   Decimal       @default(1)
+  periodId       String?
   metadata       Json?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   account           ChartOfAccount      @relation(fields: [accountId], references: [id])
+  period            AccountingPeriod?   @relation(fields: [periodId], references: [id], onDelete: SetNull)
   reconciliationLines   ReconciliationLine[]
   projectEntries        ProjectEntry[]
   stockMovements        StockMovement[]
   depreciationSchedules DepreciationSchedule[]
 
   @@index([organizationId, accountId, date])
+  @@index([organizationId, periodId])
   @@map("transactions")
 }
 
@@ -2346,4 +2352,117 @@ model FxRate {
   @@unique([orgId, fromCurrency, toCurrency, date])
   @@index([orgId, fromCurrency, toCurrency, date])
   @@map("fx_rates")
+}
+
+// ─── Period-End / Month-End Close ─────────────────────────────────────────────
+
+enum PeriodStatus {
+  OPEN        // Transactions can be posted freely
+  LOCKED      // Read-only; no new postings (soft close)
+  CLOSED      // Closing entries posted; permanently archived
+}
+
+// Periods 1-12 = regular calendar/fiscal months.
+// Periods 13-16 = SAP-style adjustment periods for year-end work:
+//   13 = Year-End Adjustment I   (pre-audit)
+//   14 = Year-End Adjustment II  (post-audit)
+//   15 = Tax Adjustment
+//   16 = Final Closing
+model AccountingPeriod {
+  id             String       @id @default(cuid())
+  organizationId String
+  fiscalYear     Int          // e.g. 2024
+  periodNumber   Int          // 1-16
+  name           String       // "January 2024", "YE Adj I — 2024"
+  startDate      DateTime     @db.Date
+  endDate        DateTime     @db.Date
+  status         PeriodStatus @default(OPEN)
+  isAdjustment   Boolean      @default(false)  // true for periods 13-16
+  lockedAt       DateTime?
+  lockedBy       String?
+  closedAt       DateTime?
+  closedBy       String?
+  notes          String?      @db.Text
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  transactions   Transaction[]
+  accruals       AccrualEntry[]  @relation("PeriodAccruals")
+  reversals      AccrualEntry[]  @relation("AccrualReversalPeriod")
+  closingEntries ClosingEntry[]
+
+  @@unique([organizationId, fiscalYear, periodNumber])
+  @@index([organizationId, fiscalYear])
+  @@index([organizationId, status])
+  @@map("accounting_periods")
+}
+
+enum AccrualType {
+  ACCRUED_EXPENSE    // Expense incurred, not yet invoiced
+  ACCRUED_INCOME     // Income earned, not yet invoiced
+  PREPAYMENT         // Expense paid in advance (defer to future periods)
+  DEFERRED_INCOME    // Income received, not yet earned
+}
+
+enum AccrualStatus {
+  DRAFT
+  POSTED
+  REVERSED
+  CANCELLED
+}
+
+model AccrualEntry {
+  id                     String       @id @default(cuid())
+  organizationId         String
+  periodId               String
+  description            String
+  amount                 Decimal      @db.Decimal(19, 4)
+  currency               String       @default("GBP")
+  debitAccountId         String
+  creditAccountId        String
+  type                   AccrualType
+  status                 AccrualStatus @default(DRAFT)
+  reference              String?
+  postingTransactionIds  String[]
+  autoReverse            Boolean      @default(true)
+  reversalPeriodId       String?
+  reversalTransactionIds String[]
+  reversalDate           DateTime?
+  notes                  String?      @db.Text
+  metadata               Json?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  period         AccountingPeriod @relation("PeriodAccruals", fields: [periodId], references: [id])
+  reversalPeriod AccountingPeriod? @relation("AccrualReversalPeriod", fields: [reversalPeriodId], references: [id])
+
+  @@index([organizationId, periodId])
+  @@index([organizationId, status])
+  @@map("accrual_entries")
+}
+
+enum ClosingEntryType {
+  REVENUE_CLOSE   // DR Revenue accounts → CR Retained Earnings
+  EXPENSE_CLOSE   // CR Expense accounts → DR Retained Earnings
+}
+
+model ClosingEntry {
+  id                        String           @id @default(cuid())
+  organizationId            String
+  periodId                  String
+  type                      ClosingEntryType
+  transactionIds            String[]
+  grossAmount               Decimal          @db.Decimal(19, 4)
+  retainedEarningsAccountId String
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  period       AccountingPeriod @relation(fields: [periodId], references: [id])
+
+  @@index([organizationId, periodId])
+  @@map("closing_entries")
 }

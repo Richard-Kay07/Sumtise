@@ -295,9 +295,26 @@ export async function postDoubleEntry(
   options: PostDoubleEntryOptions
 ): Promise<PostingResult> {
   // Normalize date
-  const date = typeof options.date === "string" 
-    ? new Date(options.date) 
+  const date = typeof options.date === "string"
+    ? new Date(options.date)
     : options.date
+
+  // Period lock enforcement — reject postings into LOCKED or CLOSED periods
+  const lockedPeriod = await prisma.accountingPeriod.findFirst({
+    where: {
+      organizationId: options.orgId,
+      startDate: { lte: date },
+      endDate: { gte: date },
+      status: { in: ["LOCKED", "CLOSED"] },
+    },
+    select: { name: true, status: true },
+  })
+  if (lockedPeriod) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Cannot post to ${lockedPeriod.name}: period is ${lockedPeriod.status}. Use an adjustment period or re-open this period.`,
+    })
+  }
 
   // Normalize currency and rate
   const currency = options.currency || "GBP"
@@ -317,6 +334,17 @@ export async function postDoubleEntry(
   const transactionIds: string[] = []
 
   try {
+    // Resolve the open period for this posting date (for period stamping)
+    const openPeriod = await prisma.accountingPeriod.findFirst({
+      where: {
+        organizationId: options.orgId,
+        startDate: { lte: date },
+        endDate: { gte: date },
+        status: "OPEN",
+      },
+      select: { id: true },
+    })
+
     // Use transaction to ensure all-or-nothing
     await prisma.$transaction(async (tx) => {
       for (const line of options.lines) {
@@ -331,6 +359,7 @@ export async function postDoubleEntry(
             credit: validation.totalCredit > 0 ? line.credit : 0,
             currency,
             exchangeRate: rate,
+            periodId: openPeriod?.id ?? null,
             metadata: {
               ...line.metadata,
               ...options.metadata,
