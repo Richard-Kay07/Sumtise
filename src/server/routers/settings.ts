@@ -30,6 +30,7 @@ export const settingsRouter = createTRPCRouter({
           "INTEGRATIONS",
           "SECURITY",
           "BILLING",
+          "PAYROLL",
         ]).optional(),
       })
     )
@@ -79,6 +80,7 @@ export const settingsRouter = createTRPCRouter({
           "INTEGRATIONS",
           "SECURITY",
           "BILLING",
+          "PAYROLL",
         ]),
         settings: z.record(z.any()),
       })
@@ -370,6 +372,24 @@ async function validateSettings(category: string, settings: any): Promise<any> {
           paymentMethod: z.string().optional(),
           billingEmail: z.string().email().optional(),
           enableUsageTracking: z.boolean().default(true),
+        })
+        .parse(settings)
+
+    case "PAYROLL":
+      return z
+        .object({
+          payFrequency: z.enum(["WEEKLY", "BI_WEEKLY", "FOUR_WEEKLY", "MONTHLY"]).default("MONTHLY"),
+          taxYear: z.string().default("2025/2026"),
+          payDay: z.string().default("Last working day"),
+          niCategory: z.enum(["A", "B", "C", "H", "J", "M", "Z"]).default("A"),
+          pensionScheme: z.string().default("NEST"),
+          pensionEmployerPct: z.number().min(0).max(100).default(3),
+          pensionEmployeePct: z.number().min(0).max(100).default(5),
+          autoEnrollment: z.boolean().default(true),
+          autoEnrollmentDate: z.string().optional(),
+          apprenticeshipLevy: z.boolean().default(false),
+          hmrcPayeRef: z.string().optional(),
+          hmrcAccountsOfficeRef: z.string().optional(),
         })
         .parse(settings)
 

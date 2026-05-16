@@ -52,7 +52,7 @@ function PeriodRow({
   onSelect: (id: string) => void
   selected: boolean
 }) {
-  const utils = trpc.useContext()
+  const utils = trpc.useUtils()
 
   const lock = trpc.periodEnd.lockPeriod.useMutation({
     onSuccess: () => utils.periodEnd.listPeriods.invalidate(),
@@ -139,7 +139,7 @@ function PeriodRow({
 // ─── Accrual modal ────────────────────────────────────────────────────────────
 
 function AccrualPanel({ periodId, orgId }: { periodId: string; orgId: string }) {
-  const utils = trpc.useContext()
+  const utils = trpc.useUtils()
 
   const { data: accruals } = trpc.periodEnd.listAccruals.useQuery(
     { organizationId: orgId, periodId },
@@ -320,7 +320,7 @@ function AccrualPanel({ periodId, orgId }: { periodId: string; orgId: string }) 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function PeriodEndContent() {
-  const utils = trpc.useContext()
+  const utils = trpc.useUtils()
   const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
   const orgId = orgs?.[0]?.id ?? ""
 

@@ -497,6 +497,288 @@ export const payrollRouter = createTRPCRouter({
         return updated
       }),
   }),
+
+  /**
+   * Leave requests
+   */
+  leave: createTRPCRouter({
+    getAll: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.PAYROLL_VIEW))
+      .input(
+        z.object({
+          organizationId: z.string(),
+          status: z.enum(["PENDING", "APPROVED", "REJECTED", "CANCELLED"]).optional(),
+          employeeId: z.string().optional(),
+          page: z.number().min(1).default(1),
+          limit: z.number().min(1).max(100).default(50),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        const { status, employeeId, page, limit } = input
+        const skip = (page - 1) * limit
+
+        const where: any = { organizationId: ctx.organizationId }
+        if (status) where.status = status
+        if (employeeId) where.employeeId = employeeId
+
+        const [leaves, total] = await Promise.all([
+          prisma.leaveRequest.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: "desc" },
+            include: {
+              employee: {
+                select: { id: true, employeeNumber: true, firstName: true, lastName: true },
+              },
+            },
+          }),
+          prisma.leaveRequest.count({ where }),
+        ])
+
+        return {
+          leaves,
+          pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        }
+      }),
+
+    create: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.PAYROLL_CREATE))
+      .input(
+        z.object({
+          organizationId: z.string(),
+          employeeId: z.string(),
+          leaveType: z.enum(["ANNUAL", "SICK", "MATERNITY", "PATERNITY", "UNPAID", "OTHER"]),
+          startDate: z.date(),
+          endDate: z.date(),
+          daysRequested: z.number().positive(),
+          reason: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { organizationId, ...data } = input
+
+        const employee = await prisma.employee.findFirst({
+          where: { id: data.employeeId, organizationId: ctx.organizationId },
+        })
+        if (!employee) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found" })
+        }
+
+        return prisma.leaveRequest.create({
+          data: {
+            ...data,
+            organizationId: ctx.organizationId,
+            status: "PENDING",
+            daysRequested: new Prisma.Decimal(data.daysRequested),
+          },
+          include: {
+            employee: {
+              select: { id: true, employeeNumber: true, firstName: true, lastName: true },
+            },
+          },
+        })
+      }),
+
+    approve: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.PAYROLL_APPROVE))
+      .input(z.object({ organizationId: z.string(), id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const leave = await prisma.leaveRequest.findFirst({
+          where: { id: input.id, organizationId: ctx.organizationId },
+        })
+        if (!leave) throw new TRPCError({ code: "NOT_FOUND", message: "Leave request not found" })
+        if (leave.status !== "PENDING") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Only pending requests can be approved" })
+        }
+
+        return prisma.leaveRequest.update({
+          where: { id: input.id },
+          data: { status: "APPROVED", approvedAt: new Date(), approvedBy: ctx.userId },
+        })
+      }),
+
+    reject: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.PAYROLL_APPROVE))
+      .input(z.object({ organizationId: z.string(), id: z.string(), reason: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const leave = await prisma.leaveRequest.findFirst({
+          where: { id: input.id, organizationId: ctx.organizationId },
+        })
+        if (!leave) throw new TRPCError({ code: "NOT_FOUND", message: "Leave request not found" })
+        if (leave.status !== "PENDING") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Only pending requests can be rejected" })
+        }
+
+        return prisma.leaveRequest.update({
+          where: { id: input.id },
+          data: { status: "REJECTED", rejectedAt: new Date(), rejectedBy: ctx.userId, rejectionReason: input.reason },
+        })
+      }),
+
+    cancel: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.PAYROLL_EDIT))
+      .input(z.object({ organizationId: z.string(), id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const leave = await prisma.leaveRequest.findFirst({
+          where: { id: input.id, organizationId: ctx.organizationId },
+        })
+        if (!leave) throw new TRPCError({ code: "NOT_FOUND", message: "Leave request not found" })
+        if (!["PENDING", "APPROVED"].includes(leave.status)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot cancel a rejected or already cancelled request" })
+        }
+
+        return prisma.leaveRequest.update({
+          where: { id: input.id },
+          data: { status: "CANCELLED" },
+        })
+      }),
+  }),
+
+  /**
+   * Timesheets
+   */
+  timesheets: createTRPCRouter({
+    getAll: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.PAYROLL_VIEW))
+      .input(
+        z.object({
+          organizationId: z.string(),
+          status: z.enum(["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]).optional(),
+          employeeId: z.string().optional(),
+          weekStartDate: z.date().optional(),
+          page: z.number().min(1).default(1),
+          limit: z.number().min(1).max(100).default(50),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        const { status, employeeId, weekStartDate, page, limit } = input
+        const skip = (page - 1) * limit
+
+        const where: any = { organizationId: ctx.organizationId }
+        if (status) where.status = status
+        if (employeeId) where.employeeId = employeeId
+        if (weekStartDate) where.weekStartDate = weekStartDate
+
+        const [timesheets, total] = await Promise.all([
+          prisma.timesheet.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { weekStartDate: "desc" },
+            include: {
+              employee: {
+                select: { id: true, employeeNumber: true, firstName: true, lastName: true },
+              },
+            },
+          }),
+          prisma.timesheet.count({ where }),
+        ])
+
+        return {
+          timesheets,
+          pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        }
+      }),
+
+    create: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.PAYROLL_CREATE))
+      .input(
+        z.object({
+          organizationId: z.string(),
+          employeeId: z.string(),
+          weekStartDate: z.date(),
+          weekEndDate: z.date(),
+          regularHours: z.number().min(0),
+          overtimeHours: z.number().min(0).default(0),
+          notes: z.string().optional(),
+          entries: z.any().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { organizationId, ...data } = input
+
+        const employee = await prisma.employee.findFirst({
+          where: { id: data.employeeId, organizationId: ctx.organizationId },
+        })
+        if (!employee) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found" })
+        }
+
+        const totalHours = data.regularHours + data.overtimeHours
+
+        return prisma.timesheet.create({
+          data: {
+            ...data,
+            organizationId: ctx.organizationId,
+            status: "DRAFT",
+            totalHours: new Prisma.Decimal(totalHours),
+            regularHours: new Prisma.Decimal(data.regularHours),
+            overtimeHours: new Prisma.Decimal(data.overtimeHours),
+            entries: data.entries ?? undefined,
+          },
+          include: {
+            employee: {
+              select: { id: true, employeeNumber: true, firstName: true, lastName: true },
+            },
+          },
+        })
+      }),
+
+    submit: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.PAYROLL_EDIT))
+      .input(z.object({ organizationId: z.string(), id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const ts = await prisma.timesheet.findFirst({
+          where: { id: input.id, organizationId: ctx.organizationId },
+        })
+        if (!ts) throw new TRPCError({ code: "NOT_FOUND", message: "Timesheet not found" })
+        if (ts.status !== "DRAFT") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Only draft timesheets can be submitted" })
+        }
+
+        return prisma.timesheet.update({
+          where: { id: input.id },
+          data: { status: "SUBMITTED" },
+        })
+      }),
+
+    approve: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.PAYROLL_APPROVE))
+      .input(z.object({ organizationId: z.string(), id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const ts = await prisma.timesheet.findFirst({
+          where: { id: input.id, organizationId: ctx.organizationId },
+        })
+        if (!ts) throw new TRPCError({ code: "NOT_FOUND", message: "Timesheet not found" })
+        if (ts.status !== "SUBMITTED") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Only submitted timesheets can be approved" })
+        }
+
+        return prisma.timesheet.update({
+          where: { id: input.id },
+          data: { status: "APPROVED", approvedAt: new Date(), approvedBy: ctx.userId },
+        })
+      }),
+
+    reject: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.PAYROLL_APPROVE))
+      .input(z.object({ organizationId: z.string(), id: z.string(), notes: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const ts = await prisma.timesheet.findFirst({
+          where: { id: input.id, organizationId: ctx.organizationId },
+        })
+        if (!ts) throw new TRPCError({ code: "NOT_FOUND", message: "Timesheet not found" })
+        if (ts.status !== "SUBMITTED") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Only submitted timesheets can be rejected" })
+        }
+
+        return prisma.timesheet.update({
+          where: { id: input.id },
+          data: { status: "REJECTED", notes: input.notes ?? ts.notes },
+        })
+      }),
+  }),
 })
 
 

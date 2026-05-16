@@ -1069,6 +1069,7 @@ enum SettingsCategory {
   INTEGRATIONS
   SECURITY
   BILLING
+  PAYROLL
 }
 
 // File Uploads
