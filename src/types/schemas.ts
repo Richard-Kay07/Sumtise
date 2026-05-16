@@ -47,7 +47,11 @@ export const chartOfAccountSchema = z.object({
   code: z.string(),
   name: z.string(),
   type: z.enum(["ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE"]),
-  parentId: z.string().optional(),
+  subType: z.string().nullable().optional(),
+  normalBalance: z.enum(["DR", "CR"]).optional(),
+  description: z.string().nullable().optional(),
+  vatTreatment: z.enum(["STANDARD_RATE", "REDUCED_RATE", "ZERO_RATE", "EXEMPT", "OUT_OF_SCOPE", "NOT_APPLICABLE"]).optional(),
+  parentId: z.string().nullable().optional(),
   isActive: z.boolean(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -57,6 +61,10 @@ export const createChartOfAccountSchema = z.object({
   code: z.string().min(1),
   name: z.string().min(1),
   type: z.enum(["ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE"]),
+  subType: z.string().optional(),
+  normalBalance: z.enum(["DR", "CR"]).optional(),
+  description: z.string().optional(),
+  vatTreatment: z.enum(["STANDARD_RATE", "REDUCED_RATE", "ZERO_RATE", "EXEMPT", "OUT_OF_SCOPE", "NOT_APPLICABLE"]).optional(),
   parentId: z.string().optional(),
 })
 

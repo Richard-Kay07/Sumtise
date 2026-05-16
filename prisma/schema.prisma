@@ -190,6 +190,10 @@ model ChartOfAccount {
   code           String
   name           String
   type           AccountType
+  subType        String?
+  normalBalance  NormalBalance    @default(DR)
+  description    String?
+  vatTreatment   VatTreatment     @default(NOT_APPLICABLE)
   parentId       String?
   isActive       Boolean          @default(true)
   createdAt      DateTime         @default(now())
@@ -227,6 +231,20 @@ enum AccountType {
   EQUITY
   REVENUE
   EXPENSE
+}
+
+enum NormalBalance {
+  DR
+  CR
+}
+
+enum VatTreatment {
+  STANDARD_RATE
+  REDUCED_RATE
+  ZERO_RATE
+  EXEMPT
+  OUT_OF_SCOPE
+  NOT_APPLICABLE
 }
 
 // Transactions and Double-Entry Bookkeeping

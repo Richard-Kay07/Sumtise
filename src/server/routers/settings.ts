@@ -9,6 +9,7 @@ import { createTRPCRouter, orgScopedProcedure, requirePermissionProcedure } from
 import { Permission } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { TRPCError } from "@trpc/server"
+import { seedCOA } from "@/lib/coa/templates"
 
 export const settingsRouter = createTRPCRouter({
   /**
@@ -109,6 +110,11 @@ export const settingsRouter = createTRPCRouter({
           settings: JSON.stringify(validatedSettings),
         },
       })
+
+      // When the accounting template changes, seed the new COA (additive upsert — existing accounts are preserved)
+      if (category === "ACCOUNTING" && validatedSettings.chartOfAccountsTemplate) {
+        await seedCOA(ctx.organizationId, validatedSettings.chartOfAccountsTemplate, prisma)
+      }
 
       return {
         ...organizationSettings,

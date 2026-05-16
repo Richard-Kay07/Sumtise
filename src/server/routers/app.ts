@@ -8,6 +8,7 @@ import { generateInvoiceNumber } from "@/lib/utils"
 import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { recordAudit } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
+import { seedCOA } from "@/lib/coa/templates"
 import { helloRouter } from "./hello"
 import { vendorsRouter } from "./vendors"
 import { billsRouter } from "./bills"
@@ -208,6 +209,9 @@ export const appRouter = createTRPCRouter({
             role: "OWNER",
           },
         })
+
+        // Seed default UK COA (FRS 102); template can be changed in Accounting settings
+        await seedCOA(organization.id, "uk", prisma)
 
         return organization
       }),
