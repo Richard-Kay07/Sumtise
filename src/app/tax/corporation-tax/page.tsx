@@ -13,8 +13,7 @@ const fmt   = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDig
 const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`
 
 export default function CorporationTaxPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const now = new Date()
   const [yearStart, setYearStart] = useState(`${now.getFullYear() - 1}-04-01`)

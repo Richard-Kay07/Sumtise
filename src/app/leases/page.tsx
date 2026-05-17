@@ -23,8 +23,7 @@ function statusBadge(status: string) {
 }
 
 export default function LeasesPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const [status,     setStatus]     = useState("")
   const [assetClass, setAssetClass] = useState("")

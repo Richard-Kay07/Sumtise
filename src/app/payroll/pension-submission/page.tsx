@@ -11,8 +11,7 @@ import { Shield, Plus, CheckCircle, Loader2 } from "lucide-react"
 const BRAND = "#50B0E0"
 
 export default function PensionSubmissionPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const [showForm,    setShowForm]    = useState(false)
   const [periodStart, setPeriodStart] = useState("")

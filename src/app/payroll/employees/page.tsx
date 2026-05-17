@@ -45,8 +45,7 @@ export default function EmployeesPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [form, setForm] = useState(DEFAULT_FORM)
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = organizations?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data, isLoading, refetch } = trpc.payroll.employees.getAll.useQuery(
     { organizationId: orgId, page: 1, limit: 100 },

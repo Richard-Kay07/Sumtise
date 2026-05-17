@@ -23,6 +23,7 @@ import {
   CreditCard,
 } from "lucide-react"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 
 export default function CustomerDetailPage() {
   const router = useRouter()
@@ -30,15 +31,14 @@ export default function CustomerDetailPage() {
   const customerId = params.id as string
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Get customer
   const { data: customer, isLoading, refetch } = trpc.customers.getById.useQuery(
     {
       id: customerId,
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
     },
-    { enabled: !!customerId && !!organizations?.[0]?.id }
+    { enabled: !!customerId && !!orgId }
   )
 
   // Delete mutation
@@ -56,7 +56,7 @@ export default function CustomerDetailPage() {
     if (confirm("Are you sure you want to archive this customer?")) {
       deleteMutation.mutate({
         id: customerId,
-        organizationId: organizations?.[0]?.id || "",
+        organizationId: orgId,
       })
     }
   }

@@ -16,8 +16,7 @@ import Link from "next/link"
 const BRAND = "#50B0E0"
 
 export default function AnalysisCodeBreakdownPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const today = new Date()
   const y = today.getFullYear(), m = today.getMonth()

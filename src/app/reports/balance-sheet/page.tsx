@@ -20,6 +20,7 @@ import {
   TrendingDown
 } from "lucide-react"
 import { useDebounce } from "@/lib/hooks/useDebounce"
+import { useOrganization } from "@/contexts/organization-context"
 
 interface BalanceSheetData {
   assets: {
@@ -88,15 +89,14 @@ export default function BalanceSheetPage() {
   const debouncedAsOfDate = useDebounce(asOfDate, 500)
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Fetch chart of accounts
   const { data: accountsData } = trpc.chartOfAccounts.getAll.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
     },
     { 
-      enabled: !!organizations?.[0]?.id,
+      enabled: !!orgId,
       refetchOnWindowFocus: false
     }
   )
@@ -104,7 +104,7 @@ export default function BalanceSheetPage() {
   // Fetch all transactions up to the as-of date
   const { data: transactionsData, isLoading: transactionsLoading } = trpc.transactions.getAll.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page: 1,
       limit: 10000,
       sortBy: "date",
@@ -112,7 +112,7 @@ export default function BalanceSheetPage() {
       endDate: debouncedAsOfDate ? new Date(debouncedAsOfDate) : undefined,
     },
     { 
-      enabled: !!organizations?.[0]?.id && !!debouncedAsOfDate,
+      enabled: !!orgId && !!debouncedAsOfDate,
       refetchOnWindowFocus: false
     }
   )
@@ -120,14 +120,14 @@ export default function BalanceSheetPage() {
   // Fetch invoices for accounts receivable calculation
   const { data: invoicesData } = trpc.invoices.getAll.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page: 1,
       limit: 1000,
       sortBy: "date",
       sortOrder: "asc",
     },
     { 
-      enabled: !!organizations?.[0]?.id,
+      enabled: !!orgId,
       refetchOnWindowFocus: false
     }
   )
@@ -139,10 +139,10 @@ export default function BalanceSheetPage() {
   // Fetch bank accounts for cash calculation
   const { data: bankAccountsData } = trpc.bankAccounts.getAll.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
     },
     { 
-      enabled: !!organizations?.[0]?.id,
+      enabled: !!orgId,
       refetchOnWindowFocus: false
     }
   )

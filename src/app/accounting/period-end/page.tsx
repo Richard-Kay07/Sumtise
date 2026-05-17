@@ -321,8 +321,7 @@ function AccrualPanel({ periodId, orgId }: { periodId: string; orgId: string }) 
 
 function PeriodEndContent() {
   const utils = trpc.useUtils()
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const currentYear = new Date().getFullYear()
   const [selectedYear, setSelectedYear] = useState(currentYear)

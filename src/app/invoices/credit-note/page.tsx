@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { useOrganization } from "@/contexts/organization-context"
 import { 
   Plus, 
   Minus, 
@@ -50,16 +51,15 @@ export default function CreditNotePage() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
   const { data: invoices } = trpc.invoices.getAll.useQuery(
     { 
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page: 1,
       limit: 100,
       sortBy: "createdAt",
       sortOrder: "desc",
     },
-    { enabled: !!organizations?.[0]?.id }
+    { enabled: !!orgId }
   )
 
   const form = useForm<CreditNoteFormData>({
@@ -150,7 +150,7 @@ export default function CreditNotePage() {
     try {
       // Create credit note via tRPC mutation
       // const result = await trpc.creditNotes.create.mutate({
-      //   organizationId: organizations?.[0]?.id || "",
+      //   organizationId: orgId,
       //   invoiceId: data.invoiceId,
       //   date: new Date(data.date),
       //   reason: data.reason,

@@ -42,8 +42,7 @@ export default function BankingPage() {
     openingBalance: "0",
   })
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = organizations?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: bankAccounts, refetch: refetchAccounts } = trpc.bankAccounts.getAll.useQuery(
     { organizationId: orgId },

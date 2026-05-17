@@ -13,8 +13,7 @@ const fmt   = (n: number) => `£${n.toLocaleString(undefined, { minimumFractionD
 const fmtD  = (d: string | Date) => new Date(d).toLocaleDateString("en-GB")
 
 export default function LeaseDetailPage({ params }: { params: { id: string } }) {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data, isLoading, refetch } = trpc.leases.getById.useQuery(
     { organizationId: orgId, id: params.id },

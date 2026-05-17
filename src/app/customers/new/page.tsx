@@ -12,6 +12,7 @@ import { trpc } from "@/lib/trpc-client"
 // Toast notifications - using simple alert for now
 import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 
 export default function NewCustomerPage() {
   const router = useRouter()
@@ -39,7 +40,6 @@ export default function NewCustomerPage() {
   const [tagInput, setTagInput] = useState("")
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Create mutation
   const createMutation = trpc.customers.create.useMutation({
@@ -56,7 +56,7 @@ export default function NewCustomerPage() {
     e.preventDefault()
 
     createMutation.mutate({
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       name: formData.name,
       email: formData.email || undefined,
       phone: formData.phone || undefined,

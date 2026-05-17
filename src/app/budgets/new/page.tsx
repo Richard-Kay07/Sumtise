@@ -22,8 +22,7 @@ const BUDGET_TYPES = [
 
 export default function NewBudgetPage() {
   const router = useRouter()
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: projects } = trpc.projects?.list?.useQuery(
     { organizationId: orgId },

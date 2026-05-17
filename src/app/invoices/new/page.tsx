@@ -48,8 +48,7 @@ function CreateInvoiceContent() {
   const [currentStep, setCurrentStep] = useState(1)
   const submitModeRef = useRef<"draft" | "send">("draft")
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = organizations?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: customersData } = trpc.customers.getAll.useQuery(
     { organizationId: orgId, page: 1, limit: 100 },

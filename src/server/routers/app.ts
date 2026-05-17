@@ -197,22 +197,19 @@ export const appRouter = createTRPCRouter({
         const organization = await prisma.organization.create({
           data: {
             ...input,
-            creatorId: ctx.session.user.id,
+            creatorId: ctx.userId,
           },
         })
 
-        // Add creator as owner
         await prisma.organizationMember.create({
           data: {
-            userId: ctx.session.user.id,
+            userId: ctx.userId,
             organizationId: organization.id,
             role: "OWNER",
           },
         })
 
-        // Seed default UK COA (FRS 102); template can be changed in Accounting settings
         await seedCOA(organization.id, "uk", prisma)
-
         return organization
       }),
 
@@ -221,40 +218,26 @@ export const appRouter = createTRPCRouter({
       .query(async ({ ctx, input }) => {
         const organization = await prisma.organization.findUnique({
           where: { slug: input.slug },
-          include: {
-            members: {
-              include: {
-                user: true,
-              },
-            },
-          },
+          include: { members: { include: { user: true } } },
         })
-
-        if (!organization) {
-          throw new Error("Organization not found")
-        }
-
-        // Check if user is member
-        const isMember = organization.members.some(
-          (member) => member.userId === ctx.session.user.id
-        )
-
-        if (!isMember) {
-          throw new Error("Unauthorized")
-        }
-
+        if (!organization) throw new TRPCError({ code: "NOT_FOUND" })
+        const isMember = organization.members.some((m) => m.userId === ctx.userId)
+        if (!isMember) throw new TRPCError({ code: "FORBIDDEN" })
         return organization
       }),
 
     getUserOrganizations: protectedProcedure.query(async ({ ctx }) => {
       const memberships = await prisma.organizationMember.findMany({
-        where: { userId: ctx.session.user.id },
-        include: {
-          organization: true,
-        },
+        where: { userId: ctx.userId },
+        include: { organization: true },
+        orderBy: { joinedAt: "asc" },
       })
-
-      return memberships.map((membership) => membership.organization)
+      // Return org fields + role so the switcher can display the user's role per ledger
+      return memberships.map((m) => ({
+        ...m.organization,
+        role:        m.role,
+        memberSince: m.joinedAt,
+      }))
     }),
   }),
 

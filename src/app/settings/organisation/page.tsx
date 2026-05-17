@@ -13,8 +13,7 @@ import { Save, RefreshCw } from "lucide-react"
 export default function OrganisationSettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const organizationId = organizations?.[0]?.id
+  const { orgId: organizationId } = useOrganization()
 
   const { data: organization, isLoading: orgLoading } = trpc.settings.getOrganization.useQuery(
     { organizationId: organizationId || "" },

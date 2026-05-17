@@ -19,6 +19,7 @@ import {
   Printer
 } from "lucide-react"
 import { useDebounce } from "@/lib/hooks/useDebounce"
+import { useOrganization } from "@/contexts/organization-context"
 
 interface IncomeStatementData {
   revenue: {
@@ -69,12 +70,11 @@ export default function IncomeStatementPage() {
   const debouncedEndDate = useDebounce(endDate, 500)
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Fetch transactions for the date range
   const { data: transactionsData, isLoading: transactionsLoading } = trpc.transactions.getAll.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page: 1,
       limit: 1000,
       sortBy: "date",
@@ -83,7 +83,7 @@ export default function IncomeStatementPage() {
       endDate: debouncedEndDate ? new Date(debouncedEndDate) : undefined,
     },
     { 
-      enabled: !!organizations?.[0]?.id && !!debouncedStartDate && !!debouncedEndDate,
+      enabled: !!orgId && !!debouncedStartDate && !!debouncedEndDate,
       refetchOnWindowFocus: false
     }
   )
@@ -91,14 +91,14 @@ export default function IncomeStatementPage() {
   // Fetch invoices for revenue calculation
   const { data: invoicesData } = trpc.invoices.getAll.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page: 1,
       limit: 1000,
       sortBy: "date",
       sortOrder: "asc",
     },
     { 
-      enabled: !!organizations?.[0]?.id,
+      enabled: !!orgId,
       refetchOnWindowFocus: false
     }
   )

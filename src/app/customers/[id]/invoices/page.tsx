@@ -12,6 +12,7 @@ import { trpc } from "@/lib/trpc-client"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { useDebounce } from "@/lib/hooks/useDebounce"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 import { 
   ArrowLeft, 
   Search, 
@@ -36,28 +37,27 @@ export default function CustomerInvoicesPage() {
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Get customer
   const { data: customer } = trpc.customers.getById.useQuery(
     {
       id: customerId,
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
     },
-    { enabled: !!customerId && !!organizations?.[0]?.id }
+    { enabled: !!customerId && !!orgId }
   )
 
   // Get customer invoices
   const { data: invoicesData, isLoading } = trpc.customers.getInvoices.useQuery(
     {
       customerId,
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page,
       limit,
       sortBy: "createdAt",
       sortOrder: "desc",
     },
-    { enabled: !!customerId && !!organizations?.[0]?.id }
+    { enabled: !!customerId && !!orgId }
   )
 
   const invoices = invoicesData?.invoices || []

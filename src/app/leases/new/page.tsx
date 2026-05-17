@@ -51,8 +51,7 @@ export default function NewLeasePage() {
   const router   = useRouter()
   const [step,   setStep] = useState(1)
 
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: coa } = trpc.chartOfAccounts.getAll.useQuery({ organizationId: orgId }, { enabled: !!orgId })
   const accounts = coa ?? []

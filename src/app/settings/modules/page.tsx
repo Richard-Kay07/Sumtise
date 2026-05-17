@@ -109,8 +109,7 @@ function Section({ title, description, children }: { title: string; description?
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ModulesSettingsPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: settings, isLoading, refetch } = trpc.modules.getSettings.useQuery(
     { organizationId: orgId },

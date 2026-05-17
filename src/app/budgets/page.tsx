@@ -23,8 +23,7 @@ const fmt = (n: number) =>
   `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
 export default function BudgetsPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const [search,     setSearch]     = useState("")
   const [status,     setStatus]     = useState("")

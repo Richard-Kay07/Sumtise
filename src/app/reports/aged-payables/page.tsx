@@ -17,6 +17,7 @@ import {
   AlertTriangle
 } from "lucide-react"
 import { useDebounce } from "@/lib/hooks/useDebounce"
+import { useOrganization } from "@/contexts/organization-context"
 
 export default function AgedPayablesPage() {
   const [asOfDate, setAsOfDate] = useState(() => {
@@ -28,18 +29,17 @@ export default function AgedPayablesPage() {
 
   const debouncedAsOfDate = useDebounce(asOfDate, 500)
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   const { data: agedData, isLoading } = trpc.reports.getAgedPayables.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       asOfDate: debouncedAsOfDate,
       currency: currency || undefined,
       page,
       limit,
     },
     { 
-      enabled: !!organizations?.[0]?.id && !!debouncedAsOfDate,
+      enabled: !!orgId && !!debouncedAsOfDate,
       refetchOnWindowFocus: false
     }
   )

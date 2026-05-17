@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { useOrganization } from "@/contexts/organization-context"
 import { 
   Save,
   ArrowLeft,
@@ -33,16 +34,15 @@ export default function AmendExpensePage() {
   const [amendmentReason, setAmendmentReason] = useState("")
   const [amendmentType, setAmendmentType] = useState("OTHER")
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
   const { data: billsData } = trpc.bills.getAll.useQuery(
     { 
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page: 1,
       limit: 100,
       sortBy: "createdAt",
       sortOrder: "desc",
     },
-    { enabled: !!organizations?.[0]?.id }
+    { enabled: !!orgId }
   )
 
   const bills = billsData?.bills || []
@@ -82,7 +82,7 @@ export default function AmendExpensePage() {
       // }
 
       // await trpc.billAmendments.create.mutate({
-      //   organizationId: organizations?.[0]?.id || "",
+      //   organizationId: orgId,
       //   billId: selectedBill.id,
       //   userId: currentUser.id,
       //   amendmentType: amendmentType,

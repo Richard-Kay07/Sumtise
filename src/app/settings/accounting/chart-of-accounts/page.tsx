@@ -390,8 +390,7 @@ export default function ChartOfAccountsPage() {
   const [editAccount, setEditAccount] = useState<any | null>(null)
   const [createForm, setCreateForm] = useState<FormState>(EMPTY_FORM)
 
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: accounts = [], isLoading, refetch } = trpc.chartOfAccounts.getAll.useQuery(
     { organizationId: orgId },

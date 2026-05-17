@@ -19,8 +19,7 @@ function quarterEnd(q: number, year: number) {
 }
 
 export default function VatMtdPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const now       = new Date()
   const yearStr   = now.getFullYear().toString()

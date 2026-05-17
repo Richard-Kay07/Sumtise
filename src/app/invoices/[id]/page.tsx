@@ -8,13 +8,13 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Edit } from "lucide-react"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { useOrganization } from "@/contexts/organization-context"
 
 function InvoiceDetailContent() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
 
-  const { data: orgsData } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgsData?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data, isLoading } = trpc.invoices.getAll.useQuery(
     { organizationId: orgId, page: 1, limit: 200 },

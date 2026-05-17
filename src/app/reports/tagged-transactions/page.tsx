@@ -20,8 +20,7 @@ const CATEGORY_COLOURS: Record<string, string> = {
 }
 
 export default function TaggedTransactionsPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const today  = new Date()
   const y = today.getFullYear(), m = today.getMonth()

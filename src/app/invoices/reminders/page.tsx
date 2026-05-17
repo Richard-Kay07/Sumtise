@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { useOrganization } from "@/contexts/organization-context"
 import { 
   Mail, 
   Send,
@@ -25,6 +26,7 @@ import {
 
 export default function SendRemindersPage() {
   const router = useRouter()
+  const { orgId, activeOrg } = useOrganization()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set())
   const [emailTemplate, setEmailTemplate] = useState("default")
@@ -33,17 +35,16 @@ export default function SendRemindersPage() {
   const [isSending, setIsSending] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
   const { data: invoicesData } = trpc.invoices.getAll.useQuery(
     { 
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page: 1,
       limit: 100,
       sortBy: "dueDate",
       sortOrder: "asc",
       status: "SENT", // Only show sent but unpaid invoices
     },
-    { enabled: !!organizations?.[0]?.id }
+    { enabled: !!orgId }
   )
 
   const invoices = invoicesData?.invoices || []
@@ -165,7 +166,7 @@ If you have any queries, please contact us immediately.
       .replace(/\{\{dueDate\}\}/g, formatDate(invoice.dueDate))
       .replace(/\{\{amount\}\}/g, formatCurrency(invoice.total, invoice.currency))
       .replace(/\{\{daysOverdue\}\}/g, daysOverdue.toString())
-      .replace(/\{\{organizationName\}\}/g, organizations?.[0]?.name || "Sumtise")
+      .replace(/\{\{organizationName\}\}/g, activeOrg?.name || "Sumtise")
   }
 
   const handleSendReminders = async () => {
@@ -181,7 +182,7 @@ If you have any queries, please contact us immediately.
       for (const invoice of selectedInvoiceList) {
         // Create reminder record and send email
         // await trpc.invoiceReminders.create.mutate({
-        //   organizationId: organizations?.[0]?.id || "",
+        //   organizationId: orgId,
         //   invoiceId: invoice.id,
         //   reminderType: emailTemplate.toUpperCase(),
         //   scheduledFor: new Date(),

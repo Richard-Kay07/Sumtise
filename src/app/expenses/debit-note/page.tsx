@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { useOrganization } from "@/contexts/organization-context"
 import { 
   Plus, 
   Minus, 
@@ -53,20 +54,19 @@ export default function DebitNotePage() {
   const [selectedBill, setSelectedBill] = useState<any>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
   const { data: billsData } = trpc.bills.getAll.useQuery(
     { 
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page: 1,
       limit: 100,
       sortBy: "createdAt",
       sortOrder: "desc",
     },
-    { enabled: !!organizations?.[0]?.id }
+    { enabled: !!orgId }
   )
   const { data: vendors } = trpc.vendors.getAll.useQuery(
-    { organizationId: organizations?.[0]?.id || "" },
-    { enabled: !!organizations?.[0]?.id }
+    { organizationId: orgId },
+    { enabled: !!orgId }
   )
 
   const bills = billsData?.bills || []
@@ -167,7 +167,7 @@ export default function DebitNotePage() {
     try {
       // Create debit note via tRPC mutation
       // const result = await trpc.debitNotes.create.mutate({
-      //   organizationId: organizations?.[0]?.id || "",
+      //   organizationId: orgId,
       //   billId: data.billId || undefined,
       //   vendorId: data.vendorId,
       //   date: new Date(data.date),

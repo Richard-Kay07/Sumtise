@@ -36,8 +36,7 @@ function ReconciliationContent() {
   const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set())
   const [ledgerMatches, setLedgerMatches] = useState<Map<string, string>>(new Map())
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = organizations?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   // Pre-select account from query param (set by /banking page)
   useEffect(() => {

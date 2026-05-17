@@ -23,8 +23,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
 }
 
 export default function PaySalariesPage() {
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = organizations?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data, isLoading, refetch } = trpc.payroll.runs.getAll.useQuery(
     { organizationId: orgId, page: 1, limit: 20 },

@@ -13,8 +13,7 @@ const BRAND = "#50B0E0"
 const fmt   = (n: number) => `£${Number(n).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export default function InventoryPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const [search,   setSearch]   = useState("")
   const [lowStock, setLowStock] = useState(false)

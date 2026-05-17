@@ -12,6 +12,7 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { useDebounce } from "@/lib/hooks/useDebounce"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 import { 
   Plus, 
   Search, 
@@ -40,12 +41,11 @@ export default function CustomersPage() {
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Get customers
   const { data: customersData, isLoading, refetch } = trpc.customers.getAll.useQuery(
     { 
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page,
       limit,
       sortBy: "createdAt",
@@ -54,7 +54,7 @@ export default function CustomersPage() {
       isActive: statusFilter === "all" ? undefined : statusFilter === "active",
       tags: selectedTags.length > 0 ? selectedTags : undefined,
     },
-    { enabled: !!organizations?.[0]?.id }
+    { enabled: !!orgId }
   )
 
   const customers = customersData?.customers || []
@@ -75,7 +75,7 @@ export default function CustomersPage() {
     if (confirm("Are you sure you want to archive this customer?")) {
       deleteMutation.mutate({
         id: customerId,
-        organizationId: organizations?.[0]?.id || "",
+        organizationId: orgId,
       })
     }
   }, [deleteMutation, organizations])

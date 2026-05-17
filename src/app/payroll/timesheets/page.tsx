@@ -29,8 +29,7 @@ export default function TimesheetsPage() {
     notes: "",
   })
 
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: empData } = trpc.payroll.employees.getAll.useQuery(
     { organizationId: orgId, status: "ACTIVE", page: 1, limit: 100 },

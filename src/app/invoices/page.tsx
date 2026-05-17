@@ -24,6 +24,7 @@ import {
   User
 } from "lucide-react"
 import { Logo } from "@/components/logo"
+import { useOrganization } from "@/contexts/organization-context"
 
 export default function InvoicesPage() {
   const router = useRouter()
@@ -37,19 +38,18 @@ export default function InvoicesPage() {
   const utils = trpc.useUtils()
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Get invoices for the first organization
   const { data: invoicesData, isLoading } = trpc.invoices.getAll.useQuery(
     { 
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page: 1,
       limit: 50,
       sortBy: "createdAt",
       sortOrder: "desc",
       ...(statusFilter !== "all" && { status: statusFilter as any })
     },
-    { enabled: !!organizations?.[0]?.id }
+    { enabled: !!orgId }
   )
 
   const invoices = invoicesData?.invoices || []
@@ -71,7 +71,7 @@ export default function InvoicesPage() {
   }, [])
 
   const handleDownload = useCallback(async (invoiceId: string) => {
-    if (!organizations?.[0]?.id) return
+    if (!orgId) return
     setDownloadingId(invoiceId)
     try {
       const result = await utils.invoices.exportPDF.fetch({

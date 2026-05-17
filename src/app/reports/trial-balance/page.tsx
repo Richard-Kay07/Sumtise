@@ -19,6 +19,7 @@ import {
   XCircle
 } from "lucide-react"
 import { useDebounce } from "@/lib/hooks/useDebounce"
+import { useOrganization } from "@/contexts/organization-context"
 
 export default function TrialBalancePage() {
   const [asOfDate, setAsOfDate] = useState(() => {
@@ -31,18 +32,17 @@ export default function TrialBalancePage() {
   const debouncedAsOfDate = useDebounce(asOfDate, 500)
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Fetch trial balance data
   const { data: trialBalanceData, isLoading } = trpc.reports.getTrialBalance.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       asOfDate: debouncedAsOfDate,
       currency: currency || undefined,
       includeInactive,
     },
     { 
-      enabled: !!organizations?.[0]?.id && !!debouncedAsOfDate,
+      enabled: !!orgId && !!debouncedAsOfDate,
       refetchOnWindowFocus: false
     }
   )

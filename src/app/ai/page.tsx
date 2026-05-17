@@ -14,6 +14,7 @@ import {
   BookOpen, ChevronRight, Database, RotateCcw, PlusCircle,
 } from "lucide-react"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND = "#50B0E0"
 
@@ -965,7 +966,7 @@ export default function AIPage() {
   const [tab, setTab]   = useState<Tab>("chat")
   const [tier, setTier] = useState<ModelTier>("SMART")
   const { data: orgs }  = trpc.organization.getUserOrganizations.useQuery()
-  const orgId           = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: modelData } = trpc.ai.getModels.useQuery(
     { organizationId: orgId },

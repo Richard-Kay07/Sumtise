@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { ArrowLeft, Eye, CheckCircle, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useMemo } from "react"
+import { useOrganization } from "@/contexts/organization-context"
 
 export default function TransactionDetailPage() {
   const router = useRouter()
@@ -16,15 +17,14 @@ export default function TransactionDetailPage() {
   const transactionId = params.id as string
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Get transaction
   const { data: transactionData, isLoading } = trpc.transactions.getById.useQuery(
     {
       id: transactionId,
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
     },
-    { enabled: !!transactionId && !!organizations?.[0]?.id }
+    { enabled: !!transactionId && !!orgId }
   )
 
   const transaction = transactionData?.transaction

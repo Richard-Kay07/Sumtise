@@ -11,6 +11,7 @@ import { trpc } from "@/lib/trpc-client"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { useDebounce } from "@/lib/hooks/useDebounce"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 import { 
   Plus, 
   Search, 
@@ -36,18 +37,17 @@ export default function JournalEntriesPage() {
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Get chart of accounts for filter
   const { data: accountsData } = trpc.chartOfAccounts.getAll.useQuery(
-    { organizationId: organizations?.[0]?.id || "" },
-    { enabled: !!organizations?.[0]?.id }
+    { organizationId: orgId },
+    { enabled: !!orgId }
   )
 
   // Get journal entries
   const { data: journalsData, isLoading } = trpc.transactions.getJournalEntries.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page,
       limit,
       sortBy: "date",
@@ -56,7 +56,7 @@ export default function JournalEntriesPage() {
       startDate: startDate || undefined,
       endDate: endDate || undefined,
     },
-    { enabled: !!organizations?.[0]?.id }
+    { enabled: !!orgId }
   )
 
   const journals = journalsData?.journals || []

@@ -14,8 +14,7 @@ import Link from "next/link"
 export default function AccountingSettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const organizationId = organizations?.[0]?.id
+  const { orgId: organizationId } = useOrganization()
 
   const { data: settingsData, isLoading } = trpc.settings.getOrganizationSettings.useQuery(
     { organizationId: organizationId || "", category: "ACCOUNTING" },

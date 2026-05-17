@@ -30,6 +30,7 @@ import {
 } from "recharts"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency } from "@/lib/utils"
+import { useOrganization } from "@/contexts/organization-context"
 
 function fmt(n: number, currency = "GBP") {
   return formatCurrency(n, currency)
@@ -65,8 +66,7 @@ export default function ForecastingPage() {
   const [historicalMonths, setHistoricalMonths] = useState(6)
   const [forecastMonths, setForecastMonths] = useState(6)
 
-  const { data: orgsData } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgsData?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data, isLoading, isError, refetch } = trpc.forecasts.getCashFlowForecast.useQuery(
     { organizationId: orgId, historicalMonths, forecastMonths },

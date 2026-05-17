@@ -95,8 +95,7 @@ function WGAScheduleModal({ orgId, onClose }: { orgId: string; onClose: () => vo
 const CSV_TEMPLATE = "cpid,entityName,entityType,departmentGroup\nDWP001,Department for Work and Pensions,CENTRAL_GOVERNMENT,DWP\n"
 
 export default function WGACodesPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const [search,      setSearch]      = useState("")
   const [showForm,    setShowForm]    = useState(false)

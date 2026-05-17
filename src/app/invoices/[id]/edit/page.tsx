@@ -10,14 +10,14 @@ import { ArrowLeft, Save } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { trpc } from "@/lib/trpc-client"
 import { useToast } from "@/hooks/use-toast"
+import { useOrganization } from "@/contexts/organization-context"
 
 function EditInvoiceContent() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { toast } = useToast()
 
-  const { data: orgsData } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgsData?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data, isLoading } = trpc.invoices.getAll.useQuery(
     { organizationId: orgId, page: 1, limit: 200 },

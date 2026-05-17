@@ -45,8 +45,7 @@ export default function ReportsPage() {
     end: new Date().toISOString().split("T")[0],
   })
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = organizations?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: cashFlow, isLoading: cashFlowLoading } = trpc.reports.getCashFlow.useQuery(
     { organizationId: orgId, startDate: dateRange.start, endDate: dateRange.end },

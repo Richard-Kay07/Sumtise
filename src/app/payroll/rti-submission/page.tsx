@@ -11,8 +11,7 @@ import { FileText, Plus, CheckCircle, Loader2 } from "lucide-react"
 const BRAND = "#50B0E0"
 
 export default function RTISubmissionPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const [showForm,   setShowForm]   = useState(false)
   const [type,       setType]       = useState<"RTI_PAYE" | "RTI_NI">("RTI_PAYE")

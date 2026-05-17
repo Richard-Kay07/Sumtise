@@ -18,8 +18,7 @@ const COMMON_CURRENCIES = [
 function CurrencySettingsContent() {
   const utils = trpc.useContext()
 
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: settings, isLoading: settingsLoading } = trpc.fxRates.getSettings.useQuery(
     { organizationId: orgId },

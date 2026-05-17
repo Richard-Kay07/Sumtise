@@ -608,8 +608,7 @@ function PayCostAnalysisTab({ orgId }: { orgId: string }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function PayrollCOAPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   return (
     <div className="min-h-screen bg-gray-50">

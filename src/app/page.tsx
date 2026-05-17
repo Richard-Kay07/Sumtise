@@ -11,6 +11,7 @@ import {
   Plus, Users, BarChart3, FilePlus, Receipt
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Pie, PieChart as RechartsPieChart, Cell } from "recharts"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND_BLUE = "#50B0E0"
 const BRAND_DARK = "#1A1D24"
@@ -52,10 +53,9 @@ export default function Dashboard() {
   const { user, isLoaded } = useUser()
   const router = useRouter()
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
   const { data: stats } = trpc.dashboard.getStats.useQuery(
-    { organizationId: organizations?.[0]?.id || "" },
-    { enabled: !!organizations?.[0]?.id }
+    { organizationId: orgId },
+    { enabled: !!orgId }
   )
 
   useEffect(() => {

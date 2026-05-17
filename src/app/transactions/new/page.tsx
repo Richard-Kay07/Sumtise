@@ -12,6 +12,7 @@ import { trpc } from "@/lib/trpc-client"
 import { formatCurrency } from "@/lib/utils"
 import { ArrowLeft, Plus, Minus, Save, AlertCircle, CheckCircle } from "lucide-react"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 
 interface JournalLine {
   accountId: string
@@ -36,12 +37,11 @@ export default function NewJournalPage() {
   ])
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Get chart of accounts
   const { data: accountsData } = trpc.chartOfAccounts.getAll.useQuery(
-    { organizationId: organizations?.[0]?.id || "" },
-    { enabled: !!organizations?.[0]?.id }
+    { organizationId: orgId },
+    { enabled: !!orgId }
   )
 
   const accounts = accountsData?.accounts || []
@@ -115,7 +115,7 @@ export default function NewJournalPage() {
     }
 
     createMutation.mutate({
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       date: formData.date,
       description: formData.description,
       reference: formData.reference || undefined,

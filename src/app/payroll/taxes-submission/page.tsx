@@ -35,8 +35,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function TaxesSubmissionPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const [typeFilter, setTypeFilter] = useState("")
 

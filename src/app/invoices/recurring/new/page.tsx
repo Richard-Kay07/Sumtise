@@ -335,8 +335,7 @@ export default function NewRecurringInvoicePage() {
 
   const [items, setItems] = useState<Item[]>([emptyItem()])
 
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: customersData } = trpc.customers.getAll.useQuery(
     { organizationId: orgId, limit: 200, page: 1, sortBy: "name", sortOrder: "asc" },

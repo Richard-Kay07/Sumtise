@@ -249,8 +249,7 @@ export default function BudgetDetailPage() {
   const router   = useRouter()
   const budgetId = params?.id as string
 
-  const { data: orgs }  = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: budget, isLoading, refetch } = trpc.budgets.getById.useQuery(
     { organizationId: orgId, id: budgetId },

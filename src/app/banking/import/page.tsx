@@ -63,8 +63,7 @@ function BankImportContent() {
   const [resultDialogOpen, setResultDialogOpen] = useState(false)
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = organizations?.[0]?.id || ""
+  const { orgId } = useOrganization()
 
   // Get bank accounts
   const { data: bankAccounts } = trpc.bankAccounts.getAll.useQuery(

@@ -13,6 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { useOrganization } from "@/contexts/organization-context"
 import { 
   Plus, 
   Save,
@@ -57,14 +58,13 @@ export default function CreateExpensePage() {
   const [scannedData, setScannedData] = useState<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
   const { data: vendors } = trpc.vendors.getAll.useQuery(
-    { organizationId: organizations?.[0]?.id || "" },
-    { enabled: !!organizations?.[0]?.id }
+    { organizationId: orgId },
+    { enabled: !!orgId }
   )
   const { data: accounts } = trpc.chartOfAccounts.getAll.useQuery(
-    { organizationId: organizations?.[0]?.id || "" },
-    { enabled: !!organizations?.[0]?.id }
+    { organizationId: orgId },
+    { enabled: !!orgId }
   )
 
   const form = useForm<ExpenseFormData>({
@@ -174,7 +174,7 @@ export default function CreateExpensePage() {
     try {
       // Create bill/expense via tRPC mutation
       // const result = await trpc.bills.create.mutate({
-      //   organizationId: organizations?.[0]?.id || "",
+      //   organizationId: orgId,
       //   vendorId: data.vendorId,
       //   billNumber: data.billNumber || undefined,
       //   date: new Date(data.date),

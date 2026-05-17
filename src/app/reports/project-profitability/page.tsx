@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { BarChart3, RefreshCw, AlertCircle } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { trpc } from "@/lib/trpc-client"
+import { useOrganization } from "@/contexts/organization-context"
 
 interface ProjectRow {
   id: string
@@ -22,8 +23,7 @@ function fmt(n: number) {
 }
 
 export default function ProjectProfitabilityPage() {
-  const { data: orgsData } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgsData?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: projectsData, isLoading } = trpc.projects.list.useQuery(
     { organizationId: orgId, limit: 50, page: 1 },

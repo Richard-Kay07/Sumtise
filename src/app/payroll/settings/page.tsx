@@ -27,8 +27,7 @@ export default function PayrollSettingsPage() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [saved, setSaved] = useState(false)
 
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data: settingsData, isLoading } = trpc.settings.getOrganizationSettings.useQuery(
     { organizationId: orgId, category: "PAYROLL" },

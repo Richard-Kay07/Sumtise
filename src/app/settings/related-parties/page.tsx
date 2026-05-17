@@ -64,8 +64,7 @@ function DisclosureModal({ orgId, onClose }: { orgId: string; onClose: () => voi
 }
 
 export default function RelatedPartiesPage() {
-  const { data: orgs } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = orgs?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   const { data, isLoading, refetch } = trpc.tags.listRelatedParties.useQuery(
     { organizationId: orgId },

@@ -17,6 +17,7 @@ import {
   TrendingDown
 } from "lucide-react"
 import { useDebounce } from "@/lib/hooks/useDebounce"
+import { useOrganization } from "@/contexts/organization-context"
 
 export default function CashFlowPage() {
   const [startDate, setStartDate] = useState(() => {
@@ -32,17 +33,16 @@ export default function CashFlowPage() {
   const debouncedStartDate = useDebounce(startDate, 500)
   const debouncedEndDate = useDebounce(endDate, 500)
 
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   const { data: cashFlowData, isLoading } = trpc.reports.getCashFlow.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       startDate: debouncedStartDate,
       endDate: debouncedEndDate,
       currency: currency || undefined,
     },
     { 
-      enabled: !!organizations?.[0]?.id && !!debouncedStartDate && !!debouncedEndDate,
+      enabled: !!orgId && !!debouncedStartDate && !!debouncedEndDate,
       refetchOnWindowFocus: false
     }
   )

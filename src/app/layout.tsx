@@ -6,6 +6,7 @@ import "./globals.css"
 import { ClerkProvider } from "@clerk/nextjs"
 import { Providers } from "@/components/providers"
 import { Nav } from "@/components/nav"
+import { OrganizationProvider } from "@/contexts/organization-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -67,10 +68,12 @@ export default function RootLayout({
       <html lang="en" suppressHydrationWarning>
         <body className={inter.className}>
           <Providers>
-            <Nav />
-            <div className="pt-14">
-              {children}
-            </div>
+            <OrganizationProvider>
+              <Nav />
+              <div className="pt-14">
+                {children}
+              </div>
+            </OrganizationProvider>
           </Providers>
         </body>
       </html>

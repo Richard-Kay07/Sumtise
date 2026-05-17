@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress"
 import { trpc } from "@/lib/trpc-client"
 import { Logo } from "@/components/logo"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { useOrganization } from "@/contexts/organization-context"
 import { 
   Plus, 
   Upload, 
@@ -44,18 +45,17 @@ export default function ExpensesPage() {
   const cameraRef = useRef<HTMLVideoElement>(null)
 
   // Get user's organizations
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
 
   // Get bills for the first organization
   const { data: billsData, isLoading: billsLoading, refetch: refetchBills } = trpc.bills.getAll.useQuery(
     {
-      organizationId: organizations?.[0]?.id || "",
+      organizationId: orgId,
       page: 1,
       limit: 50,
       sortBy: "date",
       sortOrder: "desc",
     },
-    { enabled: !!organizations?.[0]?.id }
+    { enabled: !!orgId }
   )
 
   const bills = billsData?.bills || []

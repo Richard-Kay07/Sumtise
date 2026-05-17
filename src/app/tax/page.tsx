@@ -99,8 +99,7 @@ export default function TaxPage() {
   const [manualReference, setManualReference] = useState("")
 
   // ── Org ──────────────────────────────────────────────────────────────────
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const orgId = organizations?.[0]?.id ?? ""
+  const { orgId } = useOrganization()
 
   // ── Auto-populate VAT quarter dates ──────────────────────────────────────
   const { data: quarterDates } = trpc.tax.getVATQuarterDates.useQuery(
