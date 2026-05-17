@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { trpc } from "@/lib/trpc-client"
-import { Loader2, ArrowLeft, PiggyBank } from "lucide-react"
-import Link from "next/link"
+import { Loader2, PiggyBank } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -50,22 +50,11 @@ export default function NewBudgetPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="border-b bg-white shadow-sm">
-        <div className="max-w-3xl mx-auto px-4 flex h-14 items-center gap-3">
-          <Link href="/budgets">
-            <Button variant="ghost" size="sm" className="gap-1.5 text-gray-500">
-              <ArrowLeft className="h-4 w-4" />
-              Budgets
-            </Button>
-          </Link>
-          <span className="text-gray-300">/</span>
-          <div className="flex items-center gap-2">
-            <PiggyBank className="h-4 w-4" style={{ color: BRAND }} />
-            <h1 className="text-base font-semibold" style={{ color: "#1A1D24" }}>New Budget</h1>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        crumbs={[{ label: "Budgets", href: "/budgets" }]}
+        title="New Budget"
+        icon={<PiggyBank className="h-4 w-4" />}
+      />
 
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
 

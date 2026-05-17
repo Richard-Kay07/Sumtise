@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,10 +10,11 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { trpc } from "@/lib/trpc-client"
 import {
-  ArrowLeft, Plus, Trash2, Pencil, Loader2, CheckCircle,
+  Plus, Trash2, Pencil, Loader2, CheckCircle,
   AlertTriangle, TrendingUp, TrendingDown, Lock, Info,
   PiggyBank, Copy,
 } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 const fmt = (n: number | string, currency = "GBP") =>
@@ -321,20 +321,13 @@ export default function BudgetDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* Header */}
-      <div className="border-b bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 flex h-14 items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/budgets">
-              <Button variant="ghost" size="sm" className="gap-1.5 text-gray-500">
-                <ArrowLeft className="h-4 w-4" /> Budgets
-              </Button>
-            </Link>
-            <span className="text-gray-300">/</span>
-            <PiggyBank className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
-            <h1 className="text-base font-semibold truncate max-w-xs" style={{ color: "#1A1D24" }}>
-              {b.name}
-            </h1>
+      <PageHeader
+        crumbs={[{ label: "Budgets", href: "/budgets" }]}
+        title={b.name}
+        icon={<PiggyBank className="h-4 w-4" />}
+        actions={
+          <div className="flex items-center gap-2">
+            {/* Status badge */}
             <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.color}`}>
               {cfg.label}
             </span>
@@ -343,9 +336,6 @@ export default function BudgetDetailPage() {
                 {b.budgetType}
               </span>
             )}
-          </div>
-
-          <div className="flex items-center gap-2">
             {/* Status transitions */}
             {transitions.map(next => (
               <Button
@@ -396,8 +386,8 @@ export default function BudgetDetailPage() {
               </Button>
             )}
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-5">
 
