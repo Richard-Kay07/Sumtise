@@ -12,6 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
 } from "recharts"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND = "#50B0E0"
 

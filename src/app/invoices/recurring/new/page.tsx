@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RefreshCw, ChevronLeft, ChevronRight, Plus, Trash2, Check } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND = "#50B0E0"
 

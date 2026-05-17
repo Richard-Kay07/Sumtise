@@ -12,6 +12,7 @@ import {
   ChevronRight, AlertTriangle, BarChart3, BookOpen, X,
 } from "lucide-react"
 import { format } from "date-fns"
+import { useOrganization } from "@/contexts/organization-context"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

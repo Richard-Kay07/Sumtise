@@ -15,6 +15,7 @@ import {
   PiggyBank, Copy,
 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND = "#50B0E0"
 const fmt = (n: number | string, currency = "GBP") =>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { trpc } from "@/lib/trpc-client"
+import { useOrganization } from "@/contexts/organization-context"
 import {
   FolderKanban, Landmark, Users, Building2, BookOpen, Tags, Scale,
   Briefcase, ChevronRight, RefreshCw, AlertTriangle, CheckCircle,

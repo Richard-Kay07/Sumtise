@@ -24,6 +24,7 @@ import {
   Save,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
+import { useOrganization } from "@/contexts/organization-context"
 
 type TaxType = "VAT" | "CORPORATION_TAX" | "RTI_PAYE"
 type VATScheme = "standard" | "cash" | "flat_rate"

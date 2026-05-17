@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { trpc } from "@/lib/trpc-client"
 import { DollarSign, Users, Play, CheckCircle, Loader2, ChevronDown, Plus, UserPlus } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 
 function fmt(n: number) {
   return `£${n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { trpc } from "@/lib/trpc-client"
 import { format } from "date-fns"
 import { RefreshCw, Plus, Trash2, Save, DollarSign } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 
 const COMMON_CURRENCIES = [
   "GBP", "USD", "EUR", "JPY", "CHF", "CAD", "AUD", "NZD",

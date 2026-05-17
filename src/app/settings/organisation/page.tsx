@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { trpc } from "@/lib/trpc-client"
 import { Logo } from "@/components/logo"
 import { Save, RefreshCw } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 // Toast notifications - using simple alert for now
 
 export default function OrganisationSettingsPage() {

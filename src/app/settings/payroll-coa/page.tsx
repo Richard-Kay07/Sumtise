@@ -12,6 +12,7 @@ import {
   Plus, RefreshCw, Save, ChevronRight, Trash2, Eye, RotateCcw,
   CheckCircle, XCircle, Clock,
 } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from "recharts"

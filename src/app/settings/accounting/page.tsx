@@ -10,6 +10,7 @@ import { Logo } from "@/components/logo"
 import { Save, RefreshCw, Lock, Calendar } from "lucide-react"
 // Toast notifications - using simple alert for now
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 
 export default function AccountingSettingsPage() {
   const [isSaving, setIsSaving] = useState(false)

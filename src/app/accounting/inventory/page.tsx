@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { trpc } from "@/lib/trpc-client"
 import { Plus, Search, Package, AlertTriangle } from "lucide-react"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND = "#50B0E0"
 const fmt   = (n: number) => `£${Number(n).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

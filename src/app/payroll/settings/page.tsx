@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { trpc } from "@/lib/trpc-client"
 import { Settings, Save, CheckCircle, Building2, Shield, Calendar, Loader2 } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 
 const DEFAULT_SETTINGS = {
   payFrequency: "MONTHLY",

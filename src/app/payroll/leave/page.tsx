@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { trpc } from "@/lib/trpc-client"
 import { Calendar, Plus, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
   ANNUAL: "Annual Leave",

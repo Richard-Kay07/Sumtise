@@ -13,6 +13,7 @@ import { trpc } from "@/lib/trpc-client"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 import {
   Plus,
   Minus,

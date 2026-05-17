@@ -24,6 +24,7 @@ import {
   Clock,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useOrganization } from "@/contexts/organization-context"
 
 const CURRENCIES = ["GBP", "USD", "EUR", "CAD", "AUD", "ZAR"]
 

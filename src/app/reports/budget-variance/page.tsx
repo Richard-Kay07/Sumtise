@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { trpc } from "@/lib/trpc-client"
 import { BarChart3, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND = "#50B0E0"
 const fmt = (n: number | string) =>

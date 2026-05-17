@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { trpc } from "@/lib/trpc-client"
 import { Plus, Search, ChevronDown, ChevronRight, Edit, Loader2, X, Lock, ShieldAlert } from "lucide-react"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

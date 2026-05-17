@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { trpc } from "@/lib/trpc-client"
 import { FileText, Plus, CheckCircle, Loader2 } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND = "#50B0E0"
 

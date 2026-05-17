@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { trpc } from "@/lib/trpc-client"
 import { Logo } from "@/components/logo"
 import { Save, RefreshCw, Link as LinkIcon, CheckCircle2, XCircle } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 // Toast notifications - using simple alert for now
 
 export default function IntegrationsPage() {

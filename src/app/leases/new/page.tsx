@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { trpc } from "@/lib/trpc-client"
 import { ChevronLeft, ChevronRight, RefreshCw, Info } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND = "#50B0E0"
 

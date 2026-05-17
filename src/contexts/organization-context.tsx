@@ -4,6 +4,7 @@ import {
   createContext, useContext, useState, useEffect,
   useCallback, useRef, type ReactNode,
 } from "react"
+import { useAuth } from "@clerk/nextjs"
 import { trpc } from "@/lib/trpc-client"
 
 const STORAGE_KEY = "sumtise_active_org"
@@ -43,10 +44,14 @@ const OrgContext = createContext<OrgContextValue>({
 // ─── Provider ──────────────────────────────────────────────────────────────────
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
+  const { isSignedIn } = useAuth()
   const [activeOrgId, setActiveOrgId] = useState<string>("")
   const initialised = useRef(false)
 
-  const { data: memberships, isLoading } = trpc.organization.getUserOrganizations.useQuery()
+  const { data: memberships, isLoading } = trpc.organization.getUserOrganizations.useQuery(
+    undefined,
+    { enabled: !!isSignedIn }
+  )
 
   // Restore from localStorage on first mount
   useEffect(() => {

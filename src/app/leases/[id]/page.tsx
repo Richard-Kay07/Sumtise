@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { trpc } from "@/lib/trpc-client"
 import { RefreshCw, ChevronLeft, Copy, CheckCircle } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND = "#50B0E0"
 const fmt   = (n: number) => `£${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

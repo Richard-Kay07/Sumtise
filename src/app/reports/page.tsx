@@ -35,6 +35,7 @@ import {
 } from "recharts"
 import { Logo } from "@/components/logo"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 
 const COLORS = ["#50B0E0", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#82CA9D"]
 

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { trpc } from "@/lib/trpc-client"
 import { Clock, CheckCircle, AlertCircle, Send, Plus, Loader2 } from "lucide-react"
+import { useOrganization } from "@/contexts/organization-context"
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   APPROVED: "default",

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { trpc } from "@/lib/trpc-client"
 import { Plus, Search, Building2, RefreshCw } from "lucide-react"
 import Link from "next/link"
+import { useOrganization } from "@/contexts/organization-context"
 
 const BRAND = "#50B0E0"
 
