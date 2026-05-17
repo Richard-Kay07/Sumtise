@@ -112,39 +112,52 @@ export default function BudgetVariancePage() {
                         <th className="px-4 py-3">Description</th>
                         <th className="px-4 py-3 text-right">Budgeted</th>
                         <th className="px-4 py-3 text-right">Actual</th>
-                        <th className="px-4 py-3 text-right">Variance</th>
+                        <th className="px-4 py-3 text-right">Variance (Fav)</th>
                         <th className="px-4 py-3 text-right">Var %</th>
                         <th className="px-4 py-3"></th>
                       </tr>
                     </thead>
                     <tbody>
                       {lines.map((line: any) => {
-                        const variance    = Number(line.variance)
-                        const varPct      = line.variancePercent != null ? Number(line.variancePercent) : null
-                        const isOverBudget = line.isOverBudget
+                        const variance     = Number(line.variance)
+                        const varPct       = line.variancePercent != null ? Number(line.variancePercent) : null
+                        const isFavourable = line.isFavourable
+                        const isRevenue    = line.isRevenueType
+                        const nb           = line.account?.normalBalance
                         return (
-                          <tr key={line.id} className={`border-b last:border-0 ${isOverBudget ? "bg-red-50/40" : ""}`}>
-                            <td className="px-4 py-3 text-xs font-mono text-gray-500">
-                              [{line.account?.code ?? "—"}] {line.account?.name}
+                          <tr key={line.id} className={`border-b last:border-0 ${!isFavourable ? "bg-red-50/40" : ""}`}>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-mono text-gray-400">{line.account?.code ?? "—"}</span>
+                                <span className="text-sm text-gray-800">{line.account?.name}</span>
+                                {nb && (
+                                  <span className={`text-[10px] px-1 rounded font-bold ${nb === "CR" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
+                                    {nb}
+                                  </span>
+                                )}
+                              </div>
+                              {line.account?.subType && (
+                                <p className="text-[10px] text-gray-400 mt-0.5 ml-0">{line.account.subType.replace(/_/g, " ")}</p>
+                              )}
                             </td>
-                            <td className="px-4 py-3 text-gray-600">{line.description ?? "—"}</td>
-                            <td className="px-4 py-3 text-right font-mono">{fmt(Number(line.budgetedAmount))}</td>
-                            <td className="px-4 py-3 text-right font-mono">{fmt(Number(line.actualAmount))}</td>
-                            <td className={`px-4 py-3 text-right font-mono font-semibold ${isOverBudget ? "text-red-600" : "text-green-600"}`}>
-                              {isOverBudget ? "(" : ""}{fmt(Math.abs(variance))}{isOverBudget ? ")" : ""}
+                            <td className="px-4 py-3 text-gray-600 text-sm">{line.description ?? "—"}</td>
+                            <td className="px-4 py-3 text-right font-mono text-sm">{fmt(Number(line.budgetedAmount))}</td>
+                            <td className="px-4 py-3 text-right font-mono text-sm">{fmt(Number(line.actualAmount))}</td>
+                            <td className={`px-4 py-3 text-right font-mono font-semibold text-sm ${!isFavourable ? "text-red-600" : "text-green-600"}`}>
+                              {!isFavourable ? "(" : ""}{fmt(Math.abs(variance))}{!isFavourable ? ")" : ""}
                             </td>
                             <td className="px-4 py-3 text-right text-xs">
                               {varPct != null ? (
-                                <span className={isOverBudget ? "text-red-600" : "text-green-600"}>
+                                <span className={!isFavourable ? "text-red-600" : "text-green-600"}>
                                   {Math.abs(varPct).toFixed(1)}%
                                 </span>
                               ) : "—"}
                             </td>
                             <td className="px-4 py-3">
-                              {isOverBudget
+                              {!isFavourable
                                 ? <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
-                                : variance > 0
-                                  ? <TrendingDown className="h-3.5 w-3.5 text-green-500" />
+                                : Math.abs(variance) > 0
+                                  ? <TrendingUp className="h-3.5 w-3.5 text-green-500" />
                                   : null}
                             </td>
                           </tr>

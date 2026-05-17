@@ -62,7 +62,7 @@ export default function CreateExpensePage() {
     { organizationId: organizations?.[0]?.id || "" },
     { enabled: !!organizations?.[0]?.id }
   )
-  const { data: accounts } = trpc.accounts.getAll.useQuery(
+  const { data: accounts } = trpc.chartOfAccounts.getAll.useQuery(
     { organizationId: organizations?.[0]?.id || "" },
     { enabled: !!organizations?.[0]?.id }
   )
