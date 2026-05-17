@@ -385,6 +385,17 @@ export const appRouter = createTRPCRouter({
       .use(requirePermissionProcedure(Permission.TRANSACTIONS_CREATE))
       .input(createTransactionSchema.extend({ organizationId: z.string() }))
       .mutation(async ({ ctx, input }) => {
+        // Control account guard — direct journal posting to control accounts is forbidden
+        const account = await prisma.chartOfAccount.findUnique({
+          where: { id: input.accountId },
+          select: { isControlAccount: true, name: true, code: true },
+        })
+        if (account?.isControlAccount) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Account ${account.code} — ${account.name} is a control account and cannot be posted to directly. Use the relevant sub-ledger (invoices, bills, payroll, VAT return) instead.`,
+          })
+        }
         return await prisma.transaction.create({
           data: {
             ...input,

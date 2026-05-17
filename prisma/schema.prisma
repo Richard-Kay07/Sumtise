@@ -195,7 +195,16 @@ model ChartOfAccount {
   description    String?
   vatTreatment   VatTreatment     @default(NOT_APPLICABLE)
   parentId       String?
-  isActive       Boolean          @default(true)
+  projectCode    String?
+  grantCode      String?
+  costCentreCode String?
+  departmentCode String?
+  fundCode       String?
+  analysisCode1   String?
+  analysisCode2   String?
+  analysisCode3   String?
+  isControlAccount Boolean        @default(false)
+  isActive        Boolean         @default(true)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 

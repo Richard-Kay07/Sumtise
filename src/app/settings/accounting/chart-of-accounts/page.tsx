@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { trpc } from "@/lib/trpc-client"
-import { Plus, Search, ChevronDown, ChevronRight, Edit, Loader2, X } from "lucide-react"
+import { Plus, Search, ChevronDown, ChevronRight, Edit, Loader2, X, Lock, ShieldAlert } from "lucide-react"
 import Link from "next/link"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -70,11 +70,23 @@ type FormState = {
   description: string
   vatTreatment: VatTreatment
   parentId: string
+  projectCode: string
+  grantCode: string
+  costCentreCode: string
+  departmentCode: string
+  fundCode: string
+  analysisCode1: string
+  analysisCode2: string
+  analysisCode3: string
+  isControlAccount: boolean
 }
 
 const EMPTY_FORM: FormState = {
   code: "", name: "", type: "EXPENSE", subType: "",
   normalBalance: "DR", description: "", vatTreatment: "NOT_APPLICABLE", parentId: "",
+  projectCode: "", grantCode: "", costCentreCode: "", departmentCode: "",
+  fundCode: "", analysisCode1: "", analysisCode2: "", analysisCode3: "",
+  isControlAccount: false,
 }
 
 function AccountForm({
@@ -104,6 +116,12 @@ function AccountForm({
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>
       <div className="space-y-4 mt-2">
+        {form.isControlAccount && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+            <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>This is a <strong>control account</strong>. Its balance is maintained by the sub-ledger (invoices, bills, payroll or VAT). Do not post to it directly.</span>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Code <span className="text-red-500">*</span></Label>
@@ -176,6 +194,57 @@ function AccountForm({
                 ))}
             </select>
           </div>
+        </div>
+
+        <div className="border-t pt-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Analysis Codes</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Project Code</Label>
+              <Input className="mt-1" placeholder="e.g. PRJ-001" value={form.projectCode} onChange={e => set({ projectCode: e.target.value })} />
+            </div>
+            <div>
+              <Label>Grant Code</Label>
+              <Input className="mt-1" placeholder="e.g. GNT-2024" value={form.grantCode} onChange={e => set({ grantCode: e.target.value })} />
+            </div>
+            <div>
+              <Label>Cost Centre</Label>
+              <Input className="mt-1" placeholder="e.g. CC-ADMIN" value={form.costCentreCode} onChange={e => set({ costCentreCode: e.target.value })} />
+            </div>
+            <div>
+              <Label>Department</Label>
+              <Input className="mt-1" placeholder="e.g. FINANCE" value={form.departmentCode} onChange={e => set({ departmentCode: e.target.value })} />
+            </div>
+            <div>
+              <Label>Fund</Label>
+              <Input className="mt-1" placeholder="e.g. RESTRICTED" value={form.fundCode} onChange={e => set({ fundCode: e.target.value })} />
+            </div>
+            <div>
+              <Label>Analysis Code 1</Label>
+              <Input className="mt-1" placeholder="Free-form" value={form.analysisCode1} onChange={e => set({ analysisCode1: e.target.value })} />
+            </div>
+            <div>
+              <Label>Analysis Code 2</Label>
+              <Input className="mt-1" placeholder="Free-form" value={form.analysisCode2} onChange={e => set({ analysisCode2: e.target.value })} />
+            </div>
+            <div>
+              <Label>Analysis Code 3</Label>
+              <Input className="mt-1" placeholder="Free-form" value={form.analysisCode3} onChange={e => set({ analysisCode3: e.target.value })} />
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t pt-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Controls</p>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.isControlAccount}
+              onChange={e => set({ isControlAccount: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <span className="text-sm">Control account — populated by sub-ledger only, no direct posting</span>
+          </label>
         </div>
 
         {error && <p className="text-sm text-red-500 bg-red-50 p-3 rounded-lg">{error}</p>}
@@ -260,12 +329,17 @@ function AccountSection({
               </thead>
               <tbody>
                 {rows.map(({ account, depth }) => (
-                  <tr key={account.id} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
+                  <tr key={account.id} className={`border-b last:border-0 hover:bg-gray-50 transition-colors ${account.isControlAccount ? "bg-amber-50/30" : ""}`}>
                     <td className="px-3 py-2.5 font-mono text-xs text-gray-500">{account.code}</td>
                     <td className="px-3 py-2.5">
-                      <span style={{ paddingLeft: `${depth * 16}px` }} className="font-medium text-gray-800">
-                        {depth > 0 && <span className="text-gray-300 mr-1">└</span>}
+                      <span style={{ paddingLeft: `${depth * 16}px` }} className="inline-flex items-center gap-1.5 font-medium text-gray-800">
+                        {depth > 0 && <span className="text-gray-300">└</span>}
                         {account.name}
+                        {account.isControlAccount && (
+                          <span title="Control account — no direct posting">
+                            <Lock className="h-3 w-3 text-amber-500 inline" />
+                          </span>
+                        )}
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-gray-400 text-xs hidden lg:table-cell max-w-xs truncate">
@@ -364,6 +438,15 @@ export default function ChartOfAccountsPage() {
         description: account.description ?? "",
         vatTreatment: account.vatTreatment ?? "NOT_APPLICABLE",
         parentId: account.parentId ?? "",
+        projectCode: account.projectCode ?? "",
+        grantCode: account.grantCode ?? "",
+        costCentreCode: account.costCentreCode ?? "",
+        departmentCode: account.departmentCode ?? "",
+        fundCode: account.fundCode ?? "",
+        analysisCode1: account.analysisCode1 ?? "",
+        analysisCode2: account.analysisCode2 ?? "",
+        analysisCode3: account.analysisCode3 ?? "",
+        isControlAccount: account.isControlAccount ?? false,
       } as FormState,
     })
   }
@@ -495,6 +578,15 @@ export default function ChartOfAccountsPage() {
               description: createForm.description || undefined,
               vatTreatment: createForm.vatTreatment,
               parentId: createForm.parentId || undefined,
+              projectCode: createForm.projectCode || undefined,
+              grantCode: createForm.grantCode || undefined,
+              costCentreCode: createForm.costCentreCode || undefined,
+              departmentCode: createForm.departmentCode || undefined,
+              fundCode: createForm.fundCode || undefined,
+              analysisCode1: createForm.analysisCode1 || undefined,
+              analysisCode2: createForm.analysisCode2 || undefined,
+              analysisCode3: createForm.analysisCode3 || undefined,
+              isControlAccount: createForm.isControlAccount,
             })
           }
         />
@@ -516,14 +608,23 @@ export default function ChartOfAccountsPage() {
                 id: editAccount.id,
                 organizationId: orgId,
                 data: {
-                  code:          editAccount.form.code,
-                  name:          editAccount.form.name,
-                  type:          editAccount.form.type,
-                  subType:       editAccount.form.subType || undefined,
-                  normalBalance: editAccount.form.normalBalance,
-                  description:   editAccount.form.description || undefined,
-                  vatTreatment:  editAccount.form.vatTreatment,
-                  parentId:      editAccount.form.parentId || undefined,
+                  code:           editAccount.form.code,
+                  name:           editAccount.form.name,
+                  type:           editAccount.form.type,
+                  subType:        editAccount.form.subType || undefined,
+                  normalBalance:  editAccount.form.normalBalance,
+                  description:    editAccount.form.description || undefined,
+                  vatTreatment:   editAccount.form.vatTreatment,
+                  parentId:       editAccount.form.parentId || undefined,
+                  projectCode:    editAccount.form.projectCode || undefined,
+                  grantCode:      editAccount.form.grantCode || undefined,
+                  costCentreCode: editAccount.form.costCentreCode || undefined,
+                  departmentCode: editAccount.form.departmentCode || undefined,
+                  fundCode:       editAccount.form.fundCode || undefined,
+                  analysisCode1:    editAccount.form.analysisCode1 || undefined,
+                  analysisCode2:    editAccount.form.analysisCode2 || undefined,
+                  analysisCode3:    editAccount.form.analysisCode3 || undefined,
+                  isControlAccount: editAccount.form.isControlAccount,
                 },
               })
             }
