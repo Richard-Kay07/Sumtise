@@ -37,7 +37,7 @@ export default function InvoicesPage() {
 
   const utils = trpc.useUtils()
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Get invoices for the first organization
   const { data: invoicesData, isLoading } = trpc.invoices.getAll.useQuery(

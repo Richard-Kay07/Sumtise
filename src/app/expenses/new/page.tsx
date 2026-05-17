@@ -51,6 +51,7 @@ const expenseFormSchema = z.object({
 type ExpenseFormData = z.infer<typeof expenseFormSchema>
 
 export default function CreateExpensePage() {
+  const { orgId } = useOrganization()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isScanning, setIsScanning] = useState(false)

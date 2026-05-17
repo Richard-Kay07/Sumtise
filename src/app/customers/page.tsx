@@ -40,7 +40,7 @@ export default function CustomersPage() {
   // Debounce search term to reduce API calls
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Get customers
   const { data: customersData, isLoading, refetch } = trpc.customers.getAll.useQuery(

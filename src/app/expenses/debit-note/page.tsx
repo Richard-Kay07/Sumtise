@@ -49,6 +49,7 @@ type DebitNoteFormData = z.infer<typeof debitNoteFormSchema>
 type DebitNoteItem = z.infer<typeof debitNoteItemSchema>
 
 export default function DebitNotePage() {
+  const { orgId } = useOrganization()
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedBill, setSelectedBill] = useState<any>(null)

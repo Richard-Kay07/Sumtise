@@ -44,7 +44,7 @@ export default function ExpensesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLVideoElement>(null)
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Get bills for the first organization
   const { data: billsData, isLoading: billsLoading, refetch: refetchBills } = trpc.bills.getAll.useQuery(

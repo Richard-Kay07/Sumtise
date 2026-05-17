@@ -69,7 +69,7 @@ export default function IncomeStatementPage() {
   const debouncedStartDate = useDebounce(startDate, 500)
   const debouncedEndDate = useDebounce(endDate, 500)
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Fetch transactions for the date range
   const { data: transactionsData, isLoading: transactionsLoading } = trpc.transactions.getAll.useQuery(

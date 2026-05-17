@@ -20,6 +20,7 @@ import { useDebounce } from "@/lib/hooks/useDebounce"
 import { useOrganization } from "@/contexts/organization-context"
 
 export default function AgedReceivablesPage() {
+  const { orgId } = useOrganization()
   const [asOfDate, setAsOfDate] = useState(() => {
     return new Date().toISOString().split('T')[0]
   })

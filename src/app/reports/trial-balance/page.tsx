@@ -31,7 +31,7 @@ export default function TrialBalancePage() {
   // Debounce date changes
   const debouncedAsOfDate = useDebounce(asOfDate, 500)
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Fetch trial balance data
   const { data: trialBalanceData, isLoading } = trpc.reports.getTrialBalance.useQuery(

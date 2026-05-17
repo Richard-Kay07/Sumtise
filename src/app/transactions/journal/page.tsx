@@ -36,7 +36,7 @@ export default function JournalEntriesPage() {
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Get chart of accounts for filter
   const { data: accountsData } = trpc.chartOfAccounts.getAll.useQuery(

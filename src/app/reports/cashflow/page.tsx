@@ -20,6 +20,7 @@ import { useDebounce } from "@/lib/hooks/useDebounce"
 import { useOrganization } from "@/contexts/organization-context"
 
 export default function CashFlowPage() {
+  const { orgId } = useOrganization()
   const [startDate, setStartDate] = useState(() => {
     const date = new Date()
     date.setMonth(date.getMonth() - 1)

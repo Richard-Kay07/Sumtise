@@ -88,7 +88,7 @@ export default function BalanceSheetPage() {
   // Debounce date changes
   const debouncedAsOfDate = useDebounce(asOfDate, 500)
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Fetch chart of accounts
   const { data: accountsData } = trpc.chartOfAccounts.getAll.useQuery(

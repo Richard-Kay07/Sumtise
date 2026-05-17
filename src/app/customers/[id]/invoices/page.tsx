@@ -36,7 +36,7 @@ export default function CustomerInvoicesPage() {
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Get customer
   const { data: customer } = trpc.customers.getById.useQuery(

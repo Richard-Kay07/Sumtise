@@ -39,7 +39,7 @@ export default function NewCustomerPage() {
   })
   const [tagInput, setTagInput] = useState("")
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Create mutation
   const createMutation = trpc.customers.create.useMutation({

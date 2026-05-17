@@ -16,7 +16,7 @@ export default function TransactionDetailPage() {
   const params = useParams()
   const transactionId = params.id as string
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Get transaction
   const { data: transactionData, isLoading } = trpc.transactions.getById.useQuery(

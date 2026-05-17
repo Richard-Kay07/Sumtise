@@ -52,6 +52,7 @@ const recentActivity = [
 export default function Dashboard() {
   const { user, isLoaded } = useUser()
   const router = useRouter()
+  const { orgId } = useOrganization()
 
   const { data: stats } = trpc.dashboard.getStats.useQuery(
     { organizationId: orgId },

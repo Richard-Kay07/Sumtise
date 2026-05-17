@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 
 export default function AmendExpensePage() {
+  const { orgId } = useOrganization()
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedBill, setSelectedBill] = useState<any>(null)

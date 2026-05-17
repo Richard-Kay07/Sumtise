@@ -36,7 +36,7 @@ export default function NewJournalPage() {
     { accountId: "", debit: 0, credit: 0, description: "" },
   ])
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Get chart of accounts
   const { data: accountsData } = trpc.chartOfAccounts.getAll.useQuery(

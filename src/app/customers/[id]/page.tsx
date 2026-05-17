@@ -30,7 +30,7 @@ export default function CustomerDetailPage() {
   const params = useParams()
   const customerId = params.id as string
 
-  // Get user's organizations
+  const { orgId } = useOrganization()
 
   // Get customer
   const { data: customer, isLoading, refetch } = trpc.customers.getById.useQuery(

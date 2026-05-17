@@ -4,10 +4,10 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs"
-import { trpc } from "@/lib/trpc-client"
+import { OrgSwitcher } from "@/components/org-switcher"
 import {
-  ChevronDown, ChevronRight, Building2,
-  FileText, Receipt, RefreshCw, CreditCard, Wallet,
+  ChevronDown, ChevronRight, Building2, CreditCard, Wallet,
+  FileText, Receipt, RefreshCw,
   BarChart3, Scale, BookOpen, PiggyBank,
   Landmark, Package, CalendarClock,
   Settings2, GitBranch, LineChart,
@@ -160,31 +160,6 @@ function NavDropdownRight({
   )
 }
 
-// ─── Organisation pill ────────────────────────────────────────────────────────
-
-function OrgButton({ name }: { name: string }) {
-  return (
-    <Link
-      href="/settings/organisation"
-      className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all hover:bg-white/15 group"
-      style={{ backgroundColor: "rgba(255,255,255,0.10)", borderColor: "rgba(255,255,255,0.18)" }}
-      title="Organisation settings"
-    >
-      <span
-        className="flex items-center justify-center w-5 h-5 rounded-md shrink-0"
-        style={{ backgroundColor: BRAND + "30" }}
-      >
-        <Building2
-          className="w-3 h-3 group-hover:scale-110 transition-transform"
-          style={{ color: BRAND }}
-        />
-      </span>
-      <span className="text-xs font-semibold max-w-[140px] truncate text-white/90">
-        {name}
-      </span>
-    </Link>
-  )
-}
 
 // ─── Active top-level link (Dashboard, AI) ────────────────────────────────────
 
@@ -211,9 +186,6 @@ function NavTopLink({ href, children, icon }: { href: string; children: React.Re
 // ─── Main Nav ─────────────────────────────────────────────────────────────────
 
 export function Nav() {
-  const { data: organizations } = trpc.organization.getUserOrganizations.useQuery()
-  const org = organizations?.[0]
-
   return (
     <nav
       className="fixed top-0 left-0 right-0 z-50 border-b shadow-lg"
@@ -222,27 +194,38 @@ export function Nav() {
       <div className="max-w-screen-2xl mx-auto px-4">
         <div className="flex items-center justify-between h-14">
 
-          {/* ── Logo ── */}
-          <Link href="/" className="flex items-center gap-2.5 shrink-0">
-            <Image
-              src="/logo.png"
-              alt="Sumtise"
-              width={28}
-              height={28}
-              className="shrink-0 object-contain"
-              unoptimized
-              priority
-            />
-            <span
-              className="text-base font-bold tracking-[0.18em] uppercase text-white"
-              style={{ letterSpacing: "0.18em" }}
-            >
-              SUMTISE
-            </span>
-          </Link>
+          {/* ── Left: Logo + Org Switcher ── */}
+          <div className="flex items-center gap-0 shrink-0">
+            <Link href="/" className="flex items-center gap-2 shrink-0 mr-3">
+              <Image
+                src="/logo.png"
+                alt="Sumtise"
+                width={26}
+                height={26}
+                className="shrink-0 object-contain"
+                unoptimized
+                priority
+              />
+              <span
+                className="text-sm font-bold tracking-[0.18em] uppercase text-white hidden xl:block"
+                style={{ letterSpacing: "0.18em" }}
+              >
+                SUMTISE
+              </span>
+            </Link>
 
-          {/* ── Navigation ── */}
-          <div className="hidden lg:flex items-center gap-0.5">
+            {/* vertical divider */}
+            <div className="w-px h-6 mx-3 bg-white/15" />
+
+            {/* Org switcher — prominently left, always visible */}
+            <OrgSwitcher />
+
+            {/* vertical divider before nav items */}
+            <div className="w-px h-6 mx-3 bg-white/15 hidden lg:block" />
+          </div>
+
+          {/* ── Centre: Navigation ── */}
+          <div className="hidden lg:flex items-center gap-0.5 flex-1 justify-center">
 
             {/* Dashboard */}
             <NavTopLink href="/">Dashboard</NavTopLink>
@@ -377,10 +360,8 @@ export function Nav() {
             </NavDropdownRight>
           </div>
 
-          {/* ── Right side ── */}
-          <div className="flex items-center gap-2.5">
-            {org && <OrgButton name={org.name} />}
-
+          {/* ── Right side: user avatar only ── */}
+          <div className="flex items-center gap-2.5 shrink-0">
             <SignedIn>
               <UserButton afterSignOutUrl="/auth/signin" />
             </SignedIn>

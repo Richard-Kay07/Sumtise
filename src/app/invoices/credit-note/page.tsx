@@ -46,6 +46,7 @@ type CreditNoteFormData = z.infer<typeof creditNoteFormSchema>
 type CreditNoteItem = z.infer<typeof creditNoteItemSchema>
 
 export default function CreditNotePage() {
+  const { orgId } = useOrganization()
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
