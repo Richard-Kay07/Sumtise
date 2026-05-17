@@ -20,7 +20,7 @@ import {
   Upload,
   Camera,
   FileText,
-  DollarSign,
+  PoundSterling,
   Calendar,
   Tag,
   MapPin,

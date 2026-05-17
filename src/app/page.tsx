@@ -7,7 +7,7 @@ import Link from "next/link"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency } from "@/lib/utils"
 import {
-  DollarSign, TrendingUp, TrendingDown, CreditCard, FileText,
+  PoundSterling, TrendingUp, TrendingDown, CreditCard, FileText,
   Plus, Users, BarChart3, FilePlus, Receipt
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Pie, PieChart as RechartsPieChart, Cell } from "recharts"
@@ -83,21 +83,24 @@ export default function Dashboard() {
         {/* Stats Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
           {[
-            { label: "Total Revenue", value: formatCurrency(stats?.totalRevenue ?? 103000), icon: <DollarSign className="h-5 w-5 text-gray-400" />, trend: "+20.1% from last month", up: true },
-            { label: "Total Expenses", value: formatCurrency(stats?.totalExpenses ?? 67500), icon: <TrendingDown className="h-5 w-5 text-gray-400" />, trend: "+5.2% from last month", up: false },
-            { label: "Net Profit", value: formatCurrency(stats?.netProfit ?? 35500), icon: <TrendingUp className="h-5 w-5 text-gray-400" />, trend: "+12.5% from last month", up: true },
-            { label: "Cash Position", value: formatCurrency(stats?.cashPosition ?? 42300), icon: <CreditCard className="h-5 w-5 text-gray-400" />, trend: `Across ${stats?.bankBalances?.length ?? 3} bank accounts`, up: null },
+            { label: "Total Revenue",   value: formatCurrency(stats?.totalRevenue  ?? 103000), icon: <PoundSterling className="h-4 w-4" />, color: "#50B0E0", trend: "+20.1% from last month", up: true },
+            { label: "Total Expenses",  value: formatCurrency(stats?.totalExpenses ?? 67500),  icon: <TrendingDown  className="h-4 w-4" />, color: "#EF4444", trend: "+5.2% from last month",  up: false },
+            { label: "Net Profit",      value: formatCurrency(stats?.netProfit     ?? 35500),  icon: <TrendingUp    className="h-4 w-4" />, color: "#10B981", trend: "+12.5% from last month", up: true },
+            { label: "Cash Position",   value: formatCurrency(stats?.cashPosition  ?? 42300),  icon: <CreditCard    className="h-4 w-4" />, color: "#8B5CF6", trend: `Across ${stats?.bankBalances?.length ?? 3} bank accounts`, up: null },
           ].map((card) => (
             <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <div className="flex items-center gap-4">
-                <div className="flex-shrink-0">{card.icon}</div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">{card.label}</p>
-                  <p className="text-xl font-bold" style={{ color: BRAND_DARK }}>{card.value}</p>
-                </div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{card.label}</p>
+                <span
+                  className="flex items-center justify-center w-7 h-7 rounded-lg"
+                  style={{ backgroundColor: card.color + "18", color: card.color }}
+                >
+                  {card.icon}
+                </span>
               </div>
-              <p className={`mt-2 text-xs ${card.up === true ? "text-green-600" : card.up === false ? "text-red-500" : "text-gray-400"}`}>
-                {card.up === true && <TrendingUp className="inline h-3 w-3 mr-1" />}
+              <p className="text-2xl font-bold tracking-tight" style={{ color: BRAND_DARK }}>{card.value}</p>
+              <p className={`mt-1.5 text-xs flex items-center gap-1 ${card.up === true ? "text-green-600" : card.up === false ? "text-red-500" : "text-gray-400"}`}>
+                {card.up === true && <TrendingUp className="h-3 w-3" />}
                 {card.trend}
               </p>
             </div>

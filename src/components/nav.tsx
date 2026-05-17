@@ -37,13 +37,17 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2.5 px-3.5 py-2 text-sm rounded-lg mx-1 transition-colors ${
+      className={`flex items-center gap-2 px-3.5 py-1.5 text-[13px] rounded-lg mx-1 transition-colors whitespace-nowrap ${
         active
           ? "bg-[#50B0E0]/10 text-[#50B0E0] font-medium"
           : "text-gray-600 hover:bg-[#50B0E0]/10 hover:text-[#50B0E0]"
       }`}
     >
-      {icon && <span className="w-3.5 h-3.5 shrink-0 text-current opacity-70">{icon}</span>}
+      {icon && (
+        <span className="inline-flex items-center justify-center w-3.5 h-3.5 shrink-0 text-current opacity-70">
+          {icon}
+        </span>
+      )}
       {children}
     </Link>
   )
@@ -51,14 +55,14 @@ function NavItem({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-3.5 pt-2.5 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+    <div className="px-3.5 pt-2.5 pb-0.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
       {children}
     </div>
   )
 }
 
 function Divider() {
-  return <div className="border-t border-gray-100 my-1.5 mx-3" />
+  return <div className="border-t border-gray-100 my-1 mx-3" />
 }
 
 // ─── Sub-menu (right-opening flyout) ─────────────────────────────────────────
@@ -74,15 +78,19 @@ function NavSubMenu({
 }) {
   return (
     <div className="relative group/sub">
-      <button className="flex items-center justify-between w-full px-3.5 py-2 text-sm text-gray-600 hover:bg-[#50B0E0]/10 hover:text-[#50B0E0] rounded-lg mx-1 transition-colors">
-        <span className="flex items-center gap-2.5">
-          {icon && <span className="w-3.5 h-3.5 shrink-0 opacity-70">{icon}</span>}
+      <button className="flex items-center justify-between w-full px-3.5 py-1.5 text-[13px] text-gray-600 hover:bg-[#50B0E0]/10 hover:text-[#50B0E0] rounded-lg mx-1 transition-colors whitespace-nowrap">
+        <span className="flex items-center gap-2">
+          {icon && (
+            <span className="inline-flex items-center justify-center w-3.5 h-3.5 shrink-0 opacity-70">
+              {icon}
+            </span>
+          )}
           {label}
         </span>
-        <ChevronRight className="h-3 w-3 text-gray-400 ml-5 shrink-0" />
+        <ChevronRight className="h-3 w-3 text-gray-400 ml-4 shrink-0" />
       </button>
       {/* -ml-1 creates a 4 px overlap so moving diagonally doesn't lose hover */}
-      <div className="absolute left-full top-0 -ml-1 pt-0 min-w-[13rem] opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible transition-all duration-150 z-[60]">
+      <div className="absolute left-full top-0 -ml-1 opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible transition-all duration-150 z-[60]">
         <div className="ml-1 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5">
           {children}
         </div>
@@ -109,7 +117,7 @@ function NavDropdown({
         <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
       </button>
       <div
-        className={`absolute top-full left-0 mt-1 ${wide ? "min-w-[15rem]" : "min-w-[13rem]"} bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 py-1.5`}
+        className={`absolute top-full left-0 mt-1 ${wide ? "min-w-[14rem]" : "min-w-[12rem]"} bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 py-1.5`}
       >
         {children}
       </div>

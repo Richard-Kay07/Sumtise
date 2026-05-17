@@ -15,7 +15,7 @@ import {
   Upload, 
   Camera, 
   FileText, 
-  DollarSign,
+  PoundSterling,
   Calendar,
   Tag,
   MapPin,
@@ -333,7 +333,7 @@ export default function ExpensesPage() {
                             
                             <div className="grid gap-2 md:grid-cols-2 text-sm text-muted-foreground">
                               <div className="flex items-center">
-                                <DollarSign className="mr-2 h-4 w-4" />
+                                <PoundSterling className="mr-2 h-4 w-4" />
                                 {formatCurrency(expense.amount)}
                               </div>
                               <div className="flex items-center">
