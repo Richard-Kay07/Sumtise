@@ -42,7 +42,7 @@ export default function PensionSubmissionPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll/employees" }]} title="Pension Submission" />
+      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll" }]} title="Pension Submission" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-5xl mx-auto px-4 flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">

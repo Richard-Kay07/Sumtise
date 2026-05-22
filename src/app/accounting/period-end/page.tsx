@@ -586,7 +586,7 @@ function PeriodEndContent() {
 export default function PeriodEndPage() {
   return (
     <>
-      <PageHeader crumbs={[{ label: "Accounting", href: "/accounting/fixed-assets" }]} title="Period End" />
+      <PageHeader crumbs={[{ label: "Accounting", href: "/accounting" }]} title="Period End" />
       <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
         <PeriodEndContent />
       </Suspense>

@@ -90,7 +90,7 @@ export default function EmployeesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Employees" />
+      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll" }]} title="Employees" />
       <div className="max-w-7xl mx-auto py-6 px-4">
         <div className="flex items-center justify-between mb-6">
           <div>

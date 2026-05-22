@@ -403,7 +403,7 @@ function NewRunForm({
 }) {
   return (
     <div className="space-y-4 mt-2">
-      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll/employees" }]} title="Pay Salaries" />
+      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll" }]} title="Pay Salaries" />
       <div>
         <Label>Run Number</Label>
         <Input className="mt-1" placeholder="e.g. PAY-2026-05" value={form.runNumber} onChange={(e) => setForm({ ...form, runNumber: e.target.value })} />

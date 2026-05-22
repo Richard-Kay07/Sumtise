@@ -40,7 +40,7 @@ export default function InventoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Accounting", href: "/accounting/fixed-assets" }]} title="Inventory" />
+      <PageHeader crumbs={[{ label: "Accounting", href: "/accounting" }]} title="Inventory" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">

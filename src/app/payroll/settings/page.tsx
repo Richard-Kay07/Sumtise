@@ -74,7 +74,7 @@ export default function PayrollSettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll/employees" }]} title="Payroll Settings" />
+      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll" }]} title="Payroll Settings" />
       <div className="max-w-4xl mx-auto py-6 px-4">
         <div className="flex items-center justify-between mb-6">
           <div>

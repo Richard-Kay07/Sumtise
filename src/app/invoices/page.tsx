@@ -76,7 +76,7 @@ export default function InvoicesPage() {
     setDownloadingId(invoiceId)
     try {
       const result = await utils.invoices.exportPDF.fetch({
-        organizationId: organizations[0].id,
+        organizationId: orgId,
         id: invoiceId,
       })
       window.open(result.pdfUrl, "_blank")
@@ -85,7 +85,7 @@ export default function InvoicesPage() {
     } finally {
       setDownloadingId(null)
     }
-  }, [organizations, utils])
+  }, [orgId, utils])
 
   // Memoize filtered invoices to avoid recalculating on every render
   const filteredInvoices = useMemo(() => {
