@@ -9,6 +9,7 @@ import { trpc } from "@/lib/trpc-client"
 import { RefreshCw, Plus, Search, ChevronRight, PlayCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -68,6 +69,7 @@ export default function RecurringInvoicesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Invoices", href: "/invoices" }]} title="Recurring Invoices" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">

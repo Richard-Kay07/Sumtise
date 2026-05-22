@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { trpc } from "@/lib/trpc-client"
 import { Plus, RefreshCw, Upload, Download, Table2 } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -131,6 +132,7 @@ export default function WGACodesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }]} title="WGA Codes" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-5xl mx-auto px-4 flex h-14 items-center justify-between">
           <div>

@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form"
 import { trpc } from "@/lib/trpc-client"
 import { useToast } from "@/hooks/use-toast"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 function EditInvoiceContent() {
   const { id } = useParams<{ id: string }>()
@@ -109,6 +110,7 @@ export default function EditInvoicePage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-background flex items-center justify-center">
+        <PageHeader crumbs={[{ label: "Invoices", href: "/invoices" }]} title="Edit Invoice" />
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     }>

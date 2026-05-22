@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -584,8 +585,11 @@ function PeriodEndContent() {
 
 export default function PeriodEndPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
-      <PeriodEndContent />
-    </Suspense>
+    <>
+      <PageHeader crumbs={[{ label: "Accounting", href: "/accounting/fixed-assets" }]} title="Period End" />
+      <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+        <PeriodEndContent />
+      </Suspense>
+    </>
   )
 }

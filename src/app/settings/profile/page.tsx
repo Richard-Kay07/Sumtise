@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { trpc } from "@/lib/trpc-client"
 import { Logo } from "@/components/logo"
 import { Save, RefreshCw, User } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 // Toast notifications - using simple alert for now
 
 export default function ProfileSettingsPage() {
@@ -61,6 +62,7 @@ export default function ProfileSettingsPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }]} title="Profile" />
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <div className="flex items-center space-x-4">

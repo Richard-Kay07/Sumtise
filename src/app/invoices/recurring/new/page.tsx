@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RefreshCw, ChevronLeft, ChevronRight, Plus, Trash2, Check } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -398,6 +399,7 @@ export default function NewRecurringInvoicePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Invoices", href: "/invoices" }, { label: "Recurring", href: "/invoices/recurring" }]} title="New Recurring Invoice" />
       {/* Header */}
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-3xl mx-auto px-4 flex h-14 items-center gap-3">

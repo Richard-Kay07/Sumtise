@@ -3,10 +3,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Logo } from "@/components/logo"
 import { Construction, CreditCard } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 
 export default function BillingPage() {
   return (
     <div className="min-h-screen bg-background">
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }]} title="Billing & Plan" />
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <div className="flex items-center space-x-4">

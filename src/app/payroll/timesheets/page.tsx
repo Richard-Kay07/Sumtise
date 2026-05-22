@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { trpc } from "@/lib/trpc-client"
 import { Clock, CheckCircle, AlertCircle, Send, Plus, Loader2 } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   APPROVED: "default",
@@ -76,6 +77,7 @@ export default function TimesheetsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll/employees" }]} title="Timesheets" />
       <div className="max-w-7xl mx-auto py-6 px-4">
         <div className="flex items-center justify-between mb-6">
           <div>

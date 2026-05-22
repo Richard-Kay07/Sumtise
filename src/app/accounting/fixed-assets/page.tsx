@@ -9,6 +9,7 @@ import { trpc } from "@/lib/trpc-client"
 import { Plus, Search, Building2, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -71,6 +72,7 @@ export default function FixedAssetsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Accounting", href: "/accounting/fixed-assets" }]} title="Fixed Assets" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">

@@ -10,6 +10,7 @@ import { trpc } from "@/lib/trpc-client"
 import { format } from "date-fns"
 import { RefreshCw, Plus, Trash2, Save, DollarSign } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const COMMON_CURRENCIES = [
   "GBP", "USD", "EUR", "JPY", "CHF", "CAD", "AUD", "NZD",
@@ -306,8 +307,11 @@ function CurrencySettingsContent() {
 
 export default function CurrencySettingsPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-muted-foreground text-sm">Loading…</div>}>
-      <CurrencySettingsContent />
-    </Suspense>
+    <>
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }]} title="Currency Settings" />
+      <Suspense fallback={<div className="p-6 text-muted-foreground text-sm">Loading…</div>}>
+        <CurrencySettingsContent />
+      </Suspense>
+    </>
   )
 }

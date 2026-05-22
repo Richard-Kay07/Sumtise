@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { trpc } from "@/lib/trpc-client"
 import { BarChart3, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 const fmt = (n: number | string) =>
@@ -34,6 +35,7 @@ export default function BudgetVariancePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Reports", href: "/reports" }]} title="Budget Variance" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 flex h-14 items-center">
           <BarChart3 className="h-5 w-5 mr-2" style={{ color: BRAND }} />

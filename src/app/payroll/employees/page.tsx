@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { trpc } from "@/lib/trpc-client"
 import { Users, Plus, Search, Download, Mail, Loader2 } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
   FULL_TIME: "Full Time",
@@ -89,6 +90,7 @@ export default function EmployeesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Employees" />
       <div className="max-w-7xl mx-auto py-6 px-4">
         <div className="flex items-center justify-between mb-6">
           <div>

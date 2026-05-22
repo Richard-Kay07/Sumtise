@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { trpc } from "@/lib/trpc-client"
 import { Calendar, Plus, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
   ANNUAL: "Annual Leave",
@@ -103,6 +104,7 @@ export default function LeavePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll/employees" }]} title="Leave" />
       <div className="max-w-7xl mx-auto py-6 px-4">
         <div className="flex items-center justify-between mb-6">
           <div>

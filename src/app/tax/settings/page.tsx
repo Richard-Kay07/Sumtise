@@ -2,10 +2,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Settings } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 
 export default function TaxSettingsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Tax", href: "/tax" }]} title="Tax Settings" />
       <div className="max-w-7xl mx-auto py-6 px-4">
         <div className="flex items-center justify-between mb-6">
           <div>

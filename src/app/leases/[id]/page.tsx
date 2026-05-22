@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { trpc } from "@/lib/trpc-client"
 import { RefreshCw, ChevronLeft, Copy, CheckCircle } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 const fmt   = (n: number) => `£${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -45,6 +46,7 @@ export default function LeaseDetailPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Leases", href: "/leases" }]} title="Lease" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 flex h-14 items-center gap-3">
           <a href="/leases" className="text-gray-400 hover:text-gray-600"><ChevronLeft className="h-5 w-5" /></a>

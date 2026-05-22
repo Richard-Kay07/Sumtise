@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { trpc } from "@/lib/trpc-client"
 import { FileText, CheckCircle, Loader2 } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 const fmt = (n: number | string) =>
@@ -62,6 +63,7 @@ export default function VatMtdPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Tax", href: "/tax" }]} title="VAT MTD" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-5xl mx-auto px-4 flex h-14 items-center">
           <FileText className="h-5 w-5 mr-2" style={{ color: BRAND }} />

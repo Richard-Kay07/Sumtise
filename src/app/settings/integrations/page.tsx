@@ -10,6 +10,7 @@ import { trpc } from "@/lib/trpc-client"
 import { Logo } from "@/components/logo"
 import { Save, RefreshCw, Link as LinkIcon, CheckCircle2, XCircle } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 // Toast notifications - using simple alert for now
 
 export default function IntegrationsPage() {
@@ -84,6 +85,7 @@ export default function IntegrationsPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }]} title="Integrations" />
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <div className="flex items-center space-x-4">

@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc-client"
 import { CreditCard, Plus, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -46,6 +47,7 @@ export default function PaymentRunsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Expenses", href: "/expenses" }]} title="Payment Runs" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">

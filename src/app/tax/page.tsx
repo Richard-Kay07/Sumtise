@@ -25,6 +25,7 @@ import {
 } from "lucide-react"
 import { Logo } from "@/components/logo"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 type TaxType = "VAT" | "CORPORATION_TAX" | "RTI_PAYE"
 type VATScheme = "standard" | "cash" | "flat_rate"
@@ -325,6 +326,7 @@ export default function TaxPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Tax" />
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">

@@ -13,7 +13,8 @@ import { z } from "zod"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { useOrganization } from "@/contexts/organization-context"
-import { 
+import { PageHeader } from "@/components/page-header"
+import {
   Plus, 
   Minus, 
   Save, 
@@ -189,6 +190,7 @@ export default function DebitNotePage() {
 
   return (
     <div className="flex flex-col h-full bg-background">
+      <PageHeader crumbs={[{ label: "Expenses", href: "/expenses" }]} title="Debit Note" />
       <main className="container mx-auto py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

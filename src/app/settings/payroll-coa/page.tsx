@@ -13,6 +13,7 @@ import {
   CheckCircle, XCircle, Clock,
 } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from "recharts"
@@ -613,6 +614,7 @@ export default function PayrollCOAPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }]} title="Payroll COA" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 flex h-14 items-center gap-3">
           <h1 className="text-xl font-bold" style={{ color: "#1A1D24" }}>Payroll COA Integration</h1>

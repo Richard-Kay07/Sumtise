@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import { useDebounce } from "@/lib/hooks/useDebounce"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 export default function TrialBalancePage() {
   const [asOfDate, setAsOfDate] = useState(() => {
@@ -97,6 +98,7 @@ export default function TrialBalancePage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageHeader crumbs={[{ label: "Reports", href: "/reports" }]} title="Trial Balance" />
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center justify-between">

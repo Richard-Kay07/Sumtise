@@ -12,7 +12,8 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { useDebounce } from "@/lib/hooks/useDebounce"
 import Link from "next/link"
 import { useOrganization } from "@/contexts/organization-context"
-import { 
+import { PageHeader } from "@/components/page-header"
+import {
   Plus, 
   Search, 
   Filter,
@@ -81,6 +82,7 @@ export default function TransactionsPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Transactions" />
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">

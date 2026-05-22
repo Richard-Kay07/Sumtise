@@ -350,7 +350,7 @@ export function Nav() {
               <NavItem href="/settings/integrations"  icon={<Globe />}>Integrations</NavItem>
               <NavItem href="/settings/billing"       icon={<CreditCard />}>Billing &amp; Plan</NavItem>
               <Divider />
-              <NavSubMenu label="System &amp; Modules" icon={<LayoutGrid />} flip>
+              <NavSubMenu label="System &amp; Modules" icon={<LayoutGrid />}>
                 <NavItem href="/settings/modules"         icon={<LayoutGrid />}>Module Settings</NavItem>
                 <NavItem href="/settings/currency"        icon={<Globe />}>Multi-Currency / FX</NavItem>
                 <NavItem href="/settings/payroll-coa"     icon={<GitBranch />}>Payroll COA</NavItem>

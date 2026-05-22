@@ -13,6 +13,7 @@ import { trpc } from "@/lib/trpc-client"
 import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 export default function NewCustomerPage() {
   const router = useRouter()
@@ -90,6 +91,7 @@ export default function NewCustomerPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageHeader crumbs={[{ label: "Customers", href: "/customers" }]} title="New Customer" />
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { trpc } from "@/lib/trpc-client"
 import { Settings, Save, CheckCircle, Building2, Shield, Calendar, Loader2 } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const DEFAULT_SETTINGS = {
   payFrequency: "MONTHLY",
@@ -73,6 +74,7 @@ export default function PayrollSettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll/employees" }]} title="Payroll Settings" />
       <div className="max-w-4xl mx-auto py-6 px-4">
         <div className="flex items-center justify-between mb-6">
           <div>

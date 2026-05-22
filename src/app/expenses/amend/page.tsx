@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge"
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { useOrganization } from "@/contexts/organization-context"
-import { 
+import { PageHeader } from "@/components/page-header"
+import {
   Save,
   ArrowLeft,
   Search,
@@ -136,6 +137,7 @@ export default function AmendExpensePage() {
 
   return (
     <div className="flex flex-col h-full bg-background">
+      <PageHeader crumbs={[{ label: "Expenses", href: "/expenses" }]} title="Amend Expense" />
       <main className="container mx-auto py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

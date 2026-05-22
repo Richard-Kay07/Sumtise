@@ -36,6 +36,7 @@ import {
 import { Logo } from "@/components/logo"
 import Link from "next/link"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const COLORS = ["#50B0E0", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#82CA9D"]
 
@@ -208,6 +209,7 @@ export default function ReportsPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Reports" />
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <div className="mr-4 flex">

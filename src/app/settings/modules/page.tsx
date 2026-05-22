@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { trpc } from "@/lib/trpc-client"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 import {
   FolderKanban, Landmark, Users, Building2, BookOpen, Tags, Scale,
   Briefcase, ChevronRight, RefreshCw, AlertTriangle, CheckCircle,
@@ -158,6 +159,7 @@ export default function ModulesSettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }]} title="Module Settings" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 flex h-14 items-center gap-3">
           <h1 className="text-xl font-bold" style={{ color: "#1A1D24" }}>Feature Modules</h1>

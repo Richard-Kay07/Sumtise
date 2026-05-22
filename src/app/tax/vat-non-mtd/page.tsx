@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FileText, Download } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 
 const returns = [
   { period: "Jan–Mar 2024", output: 6200, input: 2400, net: 3800, due: "30/04/2024", status: "Pending" },
@@ -13,6 +14,7 @@ const returns = [
 export default function VatNonMtdPage() {
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Tax", href: "/tax" }]} title="VAT (Non-MTD)" />
       <div className="max-w-7xl mx-auto py-6 px-4">
         <div className="flex items-center justify-between mb-6">
           <div>

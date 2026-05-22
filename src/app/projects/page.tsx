@@ -9,6 +9,7 @@ import { trpc } from "@/lib/trpc-client"
 import { FolderOpen, Plus, Search, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -48,6 +49,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Projects" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">

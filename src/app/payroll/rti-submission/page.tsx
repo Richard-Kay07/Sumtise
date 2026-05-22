@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { trpc } from "@/lib/trpc-client"
 import { FileText, Plus, CheckCircle, Loader2 } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -41,6 +42,7 @@ export default function RTISubmissionPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll/employees" }]} title="RTI Submission" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-5xl mx-auto px-4 flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">

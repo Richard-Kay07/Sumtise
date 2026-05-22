@@ -6,6 +6,7 @@ import { BarChart3, RefreshCw, AlertCircle } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { trpc } from "@/lib/trpc-client"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 interface ProjectRow {
   id: string
@@ -99,6 +100,7 @@ export default function ProjectProfitabilityPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Reports", href: "/reports" }]} title="Project Profitability" />
       <div className="max-w-7xl mx-auto py-6 px-4">
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#1A1D24" }}>Project Profitability</h1>

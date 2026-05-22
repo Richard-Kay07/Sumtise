@@ -31,6 +31,7 @@ import {
 import { trpc } from "@/lib/trpc-client"
 import { formatCurrency } from "@/lib/utils"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 function fmt(n: number, currency = "GBP") {
   return formatCurrency(n, currency)
@@ -447,6 +448,7 @@ function KpiCard({
       <CardContent className="pt-5">
         <p className="text-xs text-gray-500 mb-1">{label}</p>
         <div className="flex items-center gap-2">
+          <PageHeader crumbs={[{ label: "Reports", href: "/reports" }]} title="Forecasting" />
           <p className="text-2xl font-bold">{value}</p>
           {trend && trend !== "flat" && (
             <span className={`flex items-center text-xs font-medium ${isPositive ? "text-green-600" : isNegative ? "text-red-500" : "text-gray-400"}`}>

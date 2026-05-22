@@ -13,6 +13,7 @@ import {
 } from "recharts"
 import Link from "next/link"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -67,6 +68,7 @@ export default function AnalysisCodeBreakdownPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Reports", href: "/reports" }]} title="Analysis Code Breakdown" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 flex h-14 items-center">
           <h1 className="text-xl font-bold" style={{ color: "#1A1D24" }}>Analysis Code Breakdown</h1>

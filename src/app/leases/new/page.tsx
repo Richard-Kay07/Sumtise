@@ -9,6 +9,7 @@ import { trpc } from "@/lib/trpc-client"
 import { ChevronLeft, ChevronRight, RefreshCw, Info } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -120,6 +121,7 @@ export default function NewLeasePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Leases", href: "/leases" }]} title="New Lease" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-3xl mx-auto px-4 flex h-14 items-center gap-3">
           <a href="/leases" className="text-gray-400 hover:text-gray-600"><ChevronLeft className="h-5 w-5" /></a>

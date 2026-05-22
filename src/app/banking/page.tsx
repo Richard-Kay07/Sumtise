@@ -25,6 +25,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const CURRENCIES = ["GBP", "USD", "EUR", "CAD", "AUD", "ZAR"]
 
@@ -101,6 +102,7 @@ export default function BankingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Banking" />
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">

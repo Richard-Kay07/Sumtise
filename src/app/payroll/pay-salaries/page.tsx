@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { trpc } from "@/lib/trpc-client"
 import { DollarSign, Users, Play, CheckCircle, Loader2, ChevronDown, Plus, UserPlus } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 function fmt(n: number) {
   return `£${n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -402,6 +403,7 @@ function NewRunForm({
 }) {
   return (
     <div className="space-y-4 mt-2">
+      <PageHeader crumbs={[{ label: "Payroll", href: "/payroll/employees" }]} title="Pay Salaries" />
       <div>
         <Label>Run Number</Label>
         <Input className="mt-1" placeholder="e.g. PAY-2026-05" value={form.runNumber} onChange={(e) => setForm({ ...form, runNumber: e.target.value })} />

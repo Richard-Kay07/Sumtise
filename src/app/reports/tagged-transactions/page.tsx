@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { trpc } from "@/lib/trpc-client"
 import { RefreshCw, Download, Tag, Filter, ChevronLeft, ChevronRight } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
+import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 
@@ -79,6 +80,7 @@ export default function TaggedTransactionsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader crumbs={[{ label: "Reports", href: "/reports" }]} title="Tagged Transactions" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-screen-xl mx-auto px-4 flex h-14 items-center justify-between">
           <h1 className="text-xl font-bold" style={{ color: "#1A1D24" }}>Tagged Transactions</h1>
