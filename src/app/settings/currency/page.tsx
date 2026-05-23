@@ -308,7 +308,7 @@ function CurrencySettingsContent() {
 export default function CurrencySettingsPage() {
   return (
     <>
-      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }]} title="Currency Settings" />
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings" }]} title="Currency Settings" />
       <Suspense fallback={<div className="p-6 text-muted-foreground text-sm">Loading…</div>}>
         <CurrencySettingsContent />
       </Suspense>

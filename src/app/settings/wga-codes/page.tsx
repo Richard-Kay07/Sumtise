@@ -132,7 +132,7 @@ export default function WGACodesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }]} title="WGA Codes" />
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings" }]} title="WGA Codes" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-5xl mx-auto px-4 flex h-14 items-center justify-between">
           <div>

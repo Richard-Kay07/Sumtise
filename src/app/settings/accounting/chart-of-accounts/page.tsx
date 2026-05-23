@@ -454,7 +454,7 @@ export default function ChartOfAccountsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }, { label: "Accounting", href: "/settings/accounting" }]} title="Chart of Accounts" />
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings" }, { label: "Accounting", href: "/settings/accounting" }]} title="Chart of Accounts" />
       <div className="max-w-7xl mx-auto py-6 px-4 space-y-6">
 
         {/* Header */}

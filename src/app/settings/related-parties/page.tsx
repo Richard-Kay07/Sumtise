@@ -84,7 +84,7 @@ export default function RelatedPartiesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Settings", href: "/settings/organisation" }]} title="Related Parties" />
+      <PageHeader crumbs={[{ label: "Settings", href: "/settings" }]} title="Related Parties" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-5xl mx-auto px-4 flex h-14 items-center justify-between">
           <h1 className="text-xl font-bold" style={{ color: "#1A1D24" }}>Related Parties</h1>

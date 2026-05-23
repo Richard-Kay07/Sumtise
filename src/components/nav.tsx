@@ -345,6 +345,8 @@ export function Nav() {
 
             {/* ── Settings (right-anchored, flyouts open left) ──────── */}
             <NavDropdownRight label="Settings">
+              <NavItem href="/settings"               icon={<LayoutGrid />}>All Settings</NavItem>
+              <Divider />
               <NavItem href="/settings/profile"       icon={<UserCog />}>Profile</NavItem>
               <NavItem href="/settings/organisation"  icon={<Building2 />}>Organisation</NavItem>
               <NavItem href="/settings/integrations"  icon={<Globe />}>Integrations</NavItem>
