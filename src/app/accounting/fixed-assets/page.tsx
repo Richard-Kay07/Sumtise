@@ -72,7 +72,7 @@ export default function FixedAssetsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Accounting", href: "/accounting" }]} title="Fixed Assets" />
+      <PageHeader crumbs={[{ label: "Assets & Inventory", href: "/accounting/assets-inventory" }]} title="Fixed Assets" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">

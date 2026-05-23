@@ -20,7 +20,7 @@ const TILES = [
 export default function ExpensesHubPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Expenses" />
+      <PageHeader crumbs={[{ label: "Accounting", href: "/accounting" }]} title="Expenses" />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-6">

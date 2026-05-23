@@ -17,7 +17,7 @@ const TILES = [
 export default function CustomersHubPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Customers" />
+      <PageHeader crumbs={[{ label: "Invoices", href: "/invoices" }]} title="Customers" />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-6">
