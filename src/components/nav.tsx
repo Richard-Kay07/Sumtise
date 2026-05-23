@@ -232,6 +232,8 @@ export function Nav() {
 
             {/* ── Accounting ───────────────────────────────────────── */}
             <NavDropdown label="Accounting">
+              <NavItem href="/accounting"          icon={<LayoutGrid />}>All Accounting</NavItem>
+              <Divider />
               <NavItem href="/invoices"            icon={<FileText />}>Invoices</NavItem>
               <NavItem href="/expenses"            icon={<Receipt />}>Expenses</NavItem>
               <NavItem href="/budgets"             icon={<PiggyBank />}>Budgets</NavItem>
@@ -267,6 +269,8 @@ export function Nav() {
 
             {/* ── Projects ─────────────────────────────────────────── */}
             <NavDropdown label="Projects">
+              <NavItem href="/projects" icon={<LayoutGrid />}>All Projects</NavItem>
+              <Divider />
               <NavItem href="/projects" icon={<BarChart3 />}>Project Accounting</NavItem>
               <NavItem href="/grants"   icon={<BadgePercent />}>Grants Management</NavItem>
               <NavItem href="/leases"   icon={<Building />}>Lease Register (IFRS 16)</NavItem>

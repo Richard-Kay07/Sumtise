@@ -1,27 +1,27 @@
 "use client"
 
 import Link from "next/link"
-import {
-  BadgePercent,
-} from "lucide-react"
+import { BadgePercent, List, BarChart3, FileText } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 const DARK  = "#1A1D24"
 
 const TILES = [
-  { href: "/grants/all", icon: BadgePercent, label: "All Grants", desc: "View and manage all grants and funding" },
+  { href: "/grants/all",                    icon: List,      label: "All Grants",          desc: "View and manage all grants and funding" },
+  { href: "/reports/project-profitability", icon: BarChart3, label: "Grant Reports",       desc: "Profitability and spend reporting" },
+  { href: "/reports/tagged-transactions",   icon: FileText,  label: "Tagged Transactions", desc: "Transactions tagged to grant codes" },
 ]
 
 export default function GrantsHubPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Grants" />
+      <PageHeader crumbs={[{ label: "Projects", href: "/projects" }]} title="Grants" />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <h2 className="text-xl font-bold tracking-tight" style={{ color: DARK }}>Grants</h2>
-          <p className="text-sm text-gray-500 mt-1">Grants and funding management</p>
+          <h2 className="text-xl font-bold tracking-tight" style={{ color: DARK }}>Grants Management</h2>
+          <p className="text-sm text-gray-500 mt-1">Manage grants, funding sources and compliance reporting</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

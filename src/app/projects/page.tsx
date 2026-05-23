@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import {
-  Briefcase,
+  Briefcase, BarChart3, BadgePercent, FileText,
+  Building, PlusCircle, ScrollText,
 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 
@@ -10,7 +11,11 @@ const BRAND = "#50B0E0"
 const DARK  = "#1A1D24"
 
 const TILES = [
-  { href: "/projects/all", icon: Briefcase, label: "All Projects", desc: "View and manage all projects" },
+  { href: "/projects/all",  icon: Briefcase,   label: "All Projects",           desc: "View and manage all project accounts" },
+  { href: "/grants",        icon: BadgePercent, label: "Grants Management",      desc: "Manage grants, funding and reporting" },
+  { href: "/leases",        icon: Building,    label: "Lease Register",         desc: "IFRS 16 lease contracts and schedules" },
+  { href: "/reports/project-profitability", icon: BarChart3, label: "Project Profitability", desc: "Revenue and costs per project" },
+  { href: "/reports/cost-analysis",         icon: FileText,  label: "Cost Analysis",         desc: "Breakdown of costs by category" },
 ]
 
 export default function ProjectsHubPage() {
@@ -21,7 +26,7 @@ export default function ProjectsHubPage() {
       <main className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-6">
           <h2 className="text-xl font-bold tracking-tight" style={{ color: DARK }}>Projects</h2>
-          <p className="text-sm text-gray-500 mt-1">Project accounting and cost tracking</p>
+          <p className="text-sm text-gray-500 mt-1">Project accounting, grants management and IFRS 16 leases</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

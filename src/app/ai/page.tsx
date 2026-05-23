@@ -987,8 +987,7 @@ export default function AIPage() {
       <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="AI Assistant" />
       <div className="border-b bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 flex h-14 items-center gap-4">
-          <h1 className="text-xl font-bold" style={{ color: "#1A1D24" }}>AI Assistant</h1>
-          <div className="flex items-center gap-1 ml-2">
+          <div className="flex items-center gap-1">
             {tabs.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
