@@ -1,31 +1,26 @@
 "use client"
 
 import Link from "next/link"
-import {
-  Building2, UserCog, Globe, CreditCard, LayoutGrid,
-} from "lucide-react"
+import { Layers, Package } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 const DARK  = "#1A1D24"
 
 const TILES = [
-  { href: "/settings/organisation",    icon: Building2,  label: "Organisation",       desc: "Company details, branding and preferences" },
-  { href: "/settings/profile",         icon: UserCog,    label: "Profile",            desc: "Your personal account settings" },
-  { href: "/settings/integrations",    icon: Globe,      label: "Integrations",       desc: "Connect third-party apps and services" },
-  { href: "/settings/billing",         icon: CreditCard, label: "Billing & Plan",     desc: "Subscription, invoices and usage" },
-  { href: "/settings/system-modules",  icon: LayoutGrid, label: "System & Modules",   desc: "Modules, currency, payroll COA and reference codes" },
+  { href: "/accounting/fixed-assets", icon: Layers,  label: "Fixed Assets",         desc: "Track and depreciate fixed assets" },
+  { href: "/accounting/inventory",    icon: Package, label: "Inventory Management",  desc: "Manage stock levels and valuations" },
 ]
 
-export default function SettingsHubPage() {
+export default function AssetsInventoryPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader crumbs={[{ label: "Dashboard", href: "/" }]} title="Settings" />
+      <PageHeader crumbs={[{ label: "Accounting", href: "/accounting" }]} title="Assets & Inventory" />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <h2 className="text-xl font-bold tracking-tight" style={{ color: DARK }}>Settings</h2>
-          <p className="text-sm text-gray-500 mt-1">Configure your organisation, modules and preferences</p>
+          <h2 className="text-xl font-bold tracking-tight" style={{ color: DARK }}>Assets &amp; Inventory</h2>
+          <p className="text-sm text-gray-500 mt-1">Fixed assets and inventory management</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

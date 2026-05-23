@@ -2,9 +2,8 @@
 
 import Link from "next/link"
 import {
-  FileText, Receipt, PiggyBank, RefreshCw, Wallet,
-  BookOpen, ArrowLeftRight, Scale, Layers, Package,
-  CalendarClock, Settings2, GitBranch, Tags,
+  FileText, Receipt, PiggyBank, CreditCard,
+  Landmark, Package, CalendarClock, Settings2,
 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 
@@ -12,20 +11,14 @@ const BRAND = "#50B0E0"
 const DARK  = "#1A1D24"
 
 const TILES = [
-  { href: "/invoices",                               icon: FileText,     label: "Invoices",             desc: "Create and manage customer invoices" },
-  { href: "/expenses",                               icon: Receipt,      label: "Expenses",              desc: "Record and track business expenses" },
-  { href: "/budgets",                                icon: PiggyBank,    label: "Budgets",               desc: "Plan and monitor budgets" },
-  { href: "/invoices/recurring",                     icon: RefreshCw,    label: "Recurring Invoices",    desc: "Set up automated recurring billing" },
-  { href: "/expenses/payment-run",                   icon: Wallet,       label: "Payment Runs",          desc: "Batch pay multiple supplier invoices" },
-  { href: "/transactions/journal",                   icon: BookOpen,     label: "Journals",              desc: "View and post manual journal entries" },
-  { href: "/banking/reconciliation",                 icon: ArrowLeftRight, label: "Bank Reconciliation", desc: "Reconcile transactions with bank feeds" },
-  { href: "/reports/trial-balance",                  icon: Scale,        label: "Trial Balance",         desc: "Verify debit/credit balance" },
-  { href: "/accounting/fixed-assets",                icon: Layers,       label: "Fixed Assets",          desc: "Track and depreciate fixed assets" },
-  { href: "/accounting/inventory",                   icon: Package,      label: "Inventory Management",  desc: "Manage stock levels and valuations" },
-  { href: "/accounting/period-end",                  icon: CalendarClock, label: "Period End & Close",   desc: "Run period-end close and reconciliations" },
-  { href: "/settings/accounting",                    icon: Settings2,    label: "Accounting Settings",   desc: "Accounting periods, methods and defaults" },
-  { href: "/settings/accounting/chart-of-accounts",  icon: GitBranch,    label: "Chart of Accounts",    desc: "Manage your COA structure" },
-  { href: "/settings/accounting/analysis-codes",     icon: Tags,         label: "Analysis Codes",        desc: "Tag and classify transactions" },
+  { href: "/invoices",                          icon: FileText,     label: "Invoices",             desc: "Create and manage customer invoices" },
+  { href: "/expenses",                          icon: Receipt,      label: "Expenses",              desc: "Record and track business expenses" },
+  { href: "/budgets",                           icon: PiggyBank,    label: "Budgets",               desc: "Plan and monitor budgets" },
+  { href: "/accounting/billing-payments",       icon: CreditCard,   label: "Billing & Payments",    desc: "Recurring invoices and payment runs" },
+  { href: "/accounting/ledger-banking",         icon: Landmark,     label: "Ledger & Banking",      desc: "Journals, bank reconciliation and trial balance" },
+  { href: "/accounting/assets-inventory",       icon: Package,      label: "Assets & Inventory",    desc: "Fixed assets and inventory management" },
+  { href: "/accounting/period-end",             icon: CalendarClock, label: "Period End & Close",   desc: "Run period-end close and reconciliations" },
+  { href: "/accounting/accounting-settings",    icon: Settings2,    label: "Accounting Settings",   desc: "COA, analysis codes and accounting config" },
 ]
 
 export default function AccountingHubPage() {
