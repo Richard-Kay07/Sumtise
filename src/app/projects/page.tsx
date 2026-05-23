@@ -2,8 +2,7 @@
 
 import Link from "next/link"
 import {
-  Briefcase, BarChart3, BadgePercent, FileText,
-  Building, PlusCircle, ScrollText,
+  BarChart3, BadgePercent, Building,
 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 
@@ -11,11 +10,9 @@ const BRAND = "#50B0E0"
 const DARK  = "#1A1D24"
 
 const TILES = [
-  { href: "/projects/all",  icon: Briefcase,   label: "All Projects",           desc: "View and manage all project accounts" },
-  { href: "/grants",        icon: BadgePercent, label: "Grants Management",      desc: "Manage grants, funding and reporting" },
-  { href: "/leases",        icon: Building,    label: "Lease Register",         desc: "IFRS 16 lease contracts and schedules" },
-  { href: "/reports/project-profitability", icon: BarChart3, label: "Project Profitability", desc: "Revenue and costs per project" },
-  { href: "/reports/cost-analysis",         icon: FileText,  label: "Cost Analysis",         desc: "Breakdown of costs by category" },
+  { href: "/projects/all", icon: BarChart3,    label: "Project Accounting",    desc: "View and manage all project accounts" },
+  { href: "/grants",       icon: BadgePercent, label: "Grants Management",     desc: "Manage grants, funding and reporting" },
+  { href: "/leases",       icon: Building,     label: "Lease Register (IFRS 16)", desc: "IFRS 16 lease contracts and schedules" },
 ]
 
 export default function ProjectsHubPage() {

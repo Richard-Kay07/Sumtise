@@ -4,6 +4,7 @@ import Link from "next/link"
 import {
   TrendingUp, Scale, BookOpen, ArrowLeftRight, Clock3, Clock,
   BarChart3, PieChart, Briefcase, Waves, FileSearch, Tags,
+  FileText, Banknote,
 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 
@@ -23,6 +24,8 @@ const TILES = [
   { href: "/reports/forecasting",             icon: Waves,         label: "Smart Forecasting",       desc: "AI-assisted financial forecasting" },
   { href: "/reports/tagged-transactions",     icon: FileSearch,    label: "Tagged Transactions",     desc: "Transactions filtered by tags" },
   { href: "/reports/analysis-code-breakdown", icon: Tags,          label: "Analysis Code Breakdown", desc: "Transactions grouped by analysis codes" },
+  { href: "/tax/vat-mtd",                     icon: FileText,      label: "VAT Report",              desc: "VAT return and Making Tax Digital" },
+  { href: "/tax/corporation-tax",             icon: Banknote,      label: "Corporation Tax Report",  desc: "CT600 preparation and submission" },
 ]
 
 export default function ReportsHubPage() {

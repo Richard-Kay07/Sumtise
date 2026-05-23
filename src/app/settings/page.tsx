@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import {
-  Building2, UserCog, Globe, CreditCard, Settings2,
-  GitBranch, LayoutGrid, DollarSign, BookOpen, Users, Tags,
+  Building2, UserCog, Globe, CreditCard,
+  LayoutGrid, DollarSign, BookOpen, Users, Tags,
 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 
@@ -11,17 +11,15 @@ const BRAND = "#50B0E0"
 const DARK  = "#1A1D24"
 
 const TILES = [
-  { href: "/settings/organisation",                 icon: Building2,  label: "Organisation",        desc: "Company details, branding and preferences" },
-  { href: "/settings/profile",                      icon: UserCog,    label: "Profile",             desc: "Your personal account settings" },
-  { href: "/settings/integrations",                 icon: Globe,      label: "Integrations",        desc: "Connect third-party apps and services" },
-  { href: "/settings/billing",                      icon: CreditCard, label: "Billing & Plan",      desc: "Subscription, invoices and usage" },
-  { href: "/settings/accounting",                   icon: Settings2,  label: "Accounting",          desc: "Accounting periods, methods and defaults" },
-  { href: "/settings/accounting/chart-of-accounts", icon: GitBranch,  label: "Chart of Accounts",   desc: "Manage your COA structure" },
-  { href: "/settings/modules",                      icon: LayoutGrid, label: "Module Settings",     desc: "Enable or disable app modules" },
-  { href: "/settings/currency",                     icon: DollarSign, label: "Multi-Currency / FX", desc: "Exchange rates and currency settings" },
-  { href: "/settings/payroll-coa",                  icon: BookOpen,   label: "Payroll COA",         desc: "Payroll chart of accounts mapping" },
-  { href: "/settings/related-parties",              icon: Users,      label: "Related Parties",     desc: "Manage related party relationships" },
-  { href: "/settings/wga-codes",                    icon: Tags,       label: "WGA / CPID Codes",    desc: "Whole of Government Accounts codes" },
+  { href: "/settings/organisation",  icon: Building2,  label: "Organisation",        desc: "Company details, branding and preferences" },
+  { href: "/settings/profile",       icon: UserCog,    label: "Profile",             desc: "Your personal account settings" },
+  { href: "/settings/integrations",  icon: Globe,      label: "Integrations",        desc: "Connect third-party apps and services" },
+  { href: "/settings/billing",       icon: CreditCard, label: "Billing & Plan",      desc: "Subscription, invoices and usage" },
+  { href: "/settings/modules",       icon: LayoutGrid, label: "Module Settings",     desc: "Enable or disable app modules" },
+  { href: "/settings/currency",      icon: DollarSign, label: "Multi-Currency / FX", desc: "Exchange rates and currency settings" },
+  { href: "/settings/payroll-coa",   icon: BookOpen,   label: "Payroll COA",         desc: "Payroll chart of accounts mapping" },
+  { href: "/settings/related-parties", icon: Users,    label: "Related Parties",     desc: "Manage related party relationships" },
+  { href: "/settings/wga-codes",     icon: Tags,       label: "WGA / CPID Codes",    desc: "Whole of Government Accounts codes" },
 ]
 
 export default function SettingsHubPage() {
