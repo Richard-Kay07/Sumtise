@@ -17,7 +17,8 @@ export abstract class BaseAgent {
   async run(
     userMessage: string,
     ctx: AgentContext,
-    maxTurns = 8
+    maxTurns = 8,
+    priorMessages: Anthropic.MessageParam[] = []
   ): Promise<AgentRunResult> {
     const startedAt = new Date()
     const client = getAnthropicClient()
@@ -35,6 +36,7 @@ export abstract class BaseAgent {
     })
 
     const messages: Anthropic.MessageParam[] = [
+      ...priorMessages,
       { role: 'user', content: userMessage },
     ]
 

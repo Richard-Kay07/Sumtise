@@ -11,7 +11,8 @@ import {
   detectAnomalies,
   getModelSnapshot,
 } from "@/lib/ai/ai-service"
-import { runAccountantAgent, resolveAccountCode } from "@/lib/ai/accountant-agent"
+import { resolveAccountCode } from "@/lib/ai/accountant-agent"
+import { LedgerAgent } from "@/lib/agents/ledger-agent"
 import { postDoubleEntry, reversePosting } from "@/lib/posting"
 
 // Reusable optional model override schema
@@ -218,11 +219,11 @@ export const aiRouter = createTRPCRouter({
       modelOverrides: modelOverrideSchema,
     }))
     .mutation(async ({ ctx, input }) => {
-      return runAccountantAgent(
-        input.conversation,
-        ctx.organizationId,
-        input.modelOverrides?.smart,
-      )
+      const agent = new LedgerAgent()
+      return agent.runChat(input.conversation, {
+        organizationId: ctx.organizationId,
+        triggeredBy: ctx.userId,
+      })
     }),
 
   // ── Post a proposed journal entry ───────────────────────────────────────────
