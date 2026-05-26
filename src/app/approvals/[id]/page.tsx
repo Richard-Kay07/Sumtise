@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/page-header"
 import { trpc } from "@/lib/trpc-client"
 import { useOrganization } from "@/contexts/organization-context"
-import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, ArrowLeft } from "lucide-react"
+import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, ArrowLeft, Bot } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
 
@@ -110,6 +110,7 @@ export default function ApprovalDetailPage() {
   }
 
   const journal = (approval as any).manualJournal
+  const agentAction = (approval as any).agentAction
   const actions = (approval as any).actions ?? []
   const deadline = (approval as any).deadline ? new Date((approval as any).deadline) : null
   const isOverdue = deadline && deadline < new Date()
@@ -204,6 +205,40 @@ export default function ApprovalDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Agent metadata (shown when this approval was raised by an AI agent) */}
+        {agentAction && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Bot className="h-4 w-4 text-blue-500" /> Agent Proposal
+              </CardTitle>
+              <CardDescription>
+                This entry was proposed by the <strong>{agentAction.agentType}</strong> agent
+                and requires human approval before posting.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {agentAction.inputSummary && (
+                <div>
+                  <span className="font-medium text-muted-foreground">Task: </span>
+                  {agentAction.inputSummary}
+                </div>
+              )}
+              {agentAction.outputSummary && (
+                <div>
+                  <span className="font-medium text-muted-foreground">Reasoning: </span>
+                  {agentAction.outputSummary}
+                </div>
+              )}
+              <div className="flex gap-6 pt-1 text-muted-foreground text-xs">
+                <span>Tools called: {agentAction.toolCallCount}</span>
+                <span>Tokens used: {agentAction.tokensUsed?.toLocaleString()}</span>
+                {agentAction.durationMs && <span>Duration: {(agentAction.durationMs / 1000).toFixed(1)}s</span>}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Action history */}
         {actions.length > 0 && (

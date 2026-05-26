@@ -2518,6 +2518,10 @@ enum WorkflowEntityType {
   MANUAL_JOURNAL
   PAYMENT_RUN
   EXPENSE_REPORT
+  AGENT_JOURNAL
+  VAT_RETURN
+  PAYROLL_RUN_AGENT
+  BANK_FEED_SYNC
 }
 
 enum ApprovalStatus {
@@ -2593,6 +2597,7 @@ model WorkflowPolicy {
   reminderHours   Int                @default(24)
   maxReminders    Int                @default(3)
   delegateUserId  String?
+  amountThreshold Decimal?           @db.Decimal(15, 2)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
@@ -2620,8 +2625,11 @@ model ApprovalRequest {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
+  agentActionId   String?        @unique
+
   organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   manualJournal ManualJournal? @relation(fields: [manualJournalId], references: [id])
+  agentAction   AgentAction?   @relation(fields: [agentActionId], references: [id])
   actions       ApprovalAction[]
 
   @@index([organizationId, status])
@@ -2677,7 +2685,8 @@ model AgentAction {
   startedAt       DateTime          @default(now())
   completedAt     DateTime?
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  approvalRequest ApprovalRequest?
 
   @@index([organizationId, agentType, status])
   @@index([organizationId, startedAt])

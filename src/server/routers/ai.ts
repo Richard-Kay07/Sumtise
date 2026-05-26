@@ -13,6 +13,7 @@ import {
 } from "@/lib/ai/ai-service"
 import { resolveAccountCode } from "@/lib/ai/accountant-agent"
 import { LedgerAgent } from "@/lib/agents/ledger-agent"
+import { submitAgentActionForApproval, requiresApprovalForAmount } from "@/lib/agents/approval-gateway"
 import { postDoubleEntry, reversePosting } from "@/lib/posting"
 
 // Reusable optional model override schema
@@ -245,6 +246,7 @@ export const aiRouter = createTRPCRouter({
       type: z.enum(["journal", "accrual", "prepayment", "deferred_revenue", "reversal", "correction"]),
       reversalDate: z.string().optional(),
       notes: z.string(),
+      agentActionId: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // Resolve account codes to IDs
@@ -261,6 +263,22 @@ export const aiRouter = createTRPCRouter({
         })
       )
 
+      // If this came from an agent, check if the total amount exceeds the approval threshold.
+      if (input.agentActionId) {
+        const totalAmount = input.lines.reduce((s, l) => s + l.debit, 0)
+        const needsApproval = await requiresApprovalForAmount(ctx.organizationId, totalAmount)
+        if (needsApproval) {
+          const approvalId = await submitAgentActionForApproval({
+            organizationId: ctx.organizationId,
+            entityType: "AGENT_JOURNAL",
+            agentActionId: input.agentActionId,
+            submittedBy: ctx.userId,
+            notes: `Agent-proposed entry: ${input.description} (£${totalAmount.toFixed(2)})`,
+          })
+          return { requiresApproval: true, approvalRequestId: approvalId, reference: input.reference }
+        }
+      }
+
       const result = await postDoubleEntry({
         date: new Date(input.date),
         lines: resolvedLines,
@@ -271,7 +289,47 @@ export const aiRouter = createTRPCRouter({
         metadata: { type: input.type, notes: input.notes, reversalDate: input.reversalDate },
       })
 
-      return { ...result, reference: input.reference }
+      return { ...result, reference: input.reference, requiresApproval: false }
+    }),
+
+  // ── Approve an agent action (executes the pending action) ───────────────────
+
+  approveAgentAction: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.BILLS_CREATE))
+    .input(z.object({
+      organizationId: z.string(),
+      approvalRequestId: z.string(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const request = await prisma.approvalRequest.findUnique({
+        where: { id: input.approvalRequestId, organizationId: ctx.organizationId },
+        include: { agentAction: true },
+      })
+
+      if (!request) throw new TRPCError({ code: "NOT_FOUND" })
+      if (request.status !== "PENDING") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Approval request is not pending" })
+      }
+      if (!request.agentActionId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No agent action linked to this approval" })
+      }
+
+      await prisma.$transaction([
+        prisma.approvalRequest.update({
+          where: { id: request.id },
+          data: { status: "APPROVED", completedAt: new Date(), completedBy: ctx.userId },
+        }),
+        prisma.approvalAction.create({
+          data: { approvalRequestId: request.id, actionType: "APPROVED", actorId: ctx.userId, notes: input.notes },
+        }),
+        prisma.agentAction.update({
+          where: { id: request.agentActionId },
+          data: { status: "APPROVED" },
+        }),
+      ])
+
+      return { approved: true }
     }),
 
   // ── Reverse a journal entry by reference ─────────────────────────────────────

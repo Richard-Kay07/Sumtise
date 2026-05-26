@@ -3,13 +3,24 @@ import { TRPCError } from "@trpc/server"
 import { createTRPCRouter, orgScopedProcedure } from "@/lib/trpc"
 import { prisma } from "@/lib/prisma"
 
+const ENTITY_TYPES = [
+  "MANUAL_JOURNAL",
+  "PAYMENT_RUN",
+  "EXPENSE_REPORT",
+  "AGENT_JOURNAL",
+  "VAT_RETURN",
+  "PAYROLL_RUN_AGENT",
+  "BANK_FEED_SYNC",
+] as const
+
 const policyBodySchema = z.object({
-  entityType: z.enum(["MANUAL_JOURNAL"]),
+  entityType: z.enum(ENTITY_TYPES),
   approverUserId: z.string().min(1, "Approver is required"),
   deadlineHours: z.number().int().min(1).max(720).default(48),
   reminderHours: z.number().int().min(1).max(168).default(24),
   maxReminders: z.number().int().min(0).max(10).default(3),
   delegateUserId: z.string().optional().nullable(),
+  amountThreshold: z.number().min(0).optional().nullable(),
   isActive: z.boolean().default(true),
 })
 
@@ -33,7 +44,7 @@ export const workflowPoliciesRouter = createTRPCRouter({
   get: orgScopedProcedure
     .input(z.object({
       organizationId: z.string(),
-      entityType: z.enum(["MANUAL_JOURNAL"]),
+      entityType: z.enum(ENTITY_TYPES),
     }))
     .query(async ({ ctx, input }) => {
       return prisma.workflowPolicy.findUnique({
@@ -58,7 +69,7 @@ export const workflowPoliciesRouter = createTRPCRouter({
   toggle: orgScopedProcedure
     .input(z.object({
       organizationId: z.string(),
-      entityType: z.enum(["MANUAL_JOURNAL"]),
+      entityType: z.enum(ENTITY_TYPES),
       isActive: z.boolean(),
     }))
     .mutation(async ({ ctx, input }) => {

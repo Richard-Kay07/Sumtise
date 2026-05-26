@@ -579,7 +579,6 @@ export const manualJournalsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const where: Prisma.ApprovalRequestWhereInput = {
         organizationId: ctx.organizationId,
-        entityType: "MANUAL_JOURNAL",
         ...(input.status ? { status: input.status } : {}),
       }
 
@@ -590,7 +589,8 @@ export const manualJournalsRouter = createTRPCRouter({
           skip: (input.page - 1) * input.limit,
           take: input.limit,
           include: {
-            manualJournal: true,
+            manualJournal: { include: { lines: { include: { account: true }, orderBy: { sortOrder: "asc" } } } },
+            agentAction: true,
             actions: { orderBy: { createdAt: "asc" } },
           },
         }),
