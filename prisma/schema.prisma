@@ -156,6 +156,9 @@ model Organization {
   accountingPeriods       AccountingPeriod[]
   accrualEntries          AccrualEntry[]
   closingEntries          ClosingEntry[]
+  manualJournals          ManualJournal[]
+  workflowPolicies        WorkflowPolicy[]
+  approvalRequests        ApprovalRequest[]
 
   @@map("organizations")
 }
@@ -229,6 +232,7 @@ model ChartOfAccount {
   payrollDebitMappings      PayrollCOAMapping[]  @relation("PayrollDebitAccount")
   payrollCreditMappings     PayrollCOAMapping[]  @relation("PayrollCreditAccount")
   payrollJournalLines       PayrollJournalLine[]
+  manualJournalLines        ManualJournalLine[]
 
   @@unique([organizationId, code])
   @@map("chart_of_accounts")
@@ -1052,6 +1056,10 @@ enum NotificationType {
   LOW_BALANCE_ALERT
   SYSTEM_MAINTENANCE
   FEATURE_UPDATE
+  APPROVAL_REQUIRED
+  APPROVAL_REMINDER
+  APPROVAL_OVERDUE
+  APPROVAL_COMPLETED
 }
 
 enum NotificationPriority {
@@ -2493,4 +2501,142 @@ model ClosingEntry {
 
   @@index([organizationId, periodId])
   @@map("closing_entries")
+}
+
+// ─── Approval Workflow ────────────────────────────────────────────────────────
+
+enum JournalStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  POSTED
+}
+
+enum WorkflowEntityType {
+  MANUAL_JOURNAL
+  PAYMENT_RUN
+  EXPENSE_REPORT
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+  WITHDRAWN
+}
+
+enum ApprovalActionType {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  DELEGATED
+  REMINDER_SENT
+  ESCALATED
+  WITHDRAWN
+  REASSIGNED
+}
+
+model ManualJournal {
+  id             String        @id @default(cuid())
+  organizationId String
+  reference      String
+  description    String
+  date           DateTime      @db.Date
+  currency       String        @default("GBP")
+  exchangeRate   Decimal       @default(1) @db.Decimal(19, 6)
+  status         JournalStatus @default(DRAFT)
+  notes          String?       @db.Text
+  metadata       Json?
+  preparedBy     String
+  preparedAt     DateTime      @default(now())
+  submittedAt    DateTime?
+  postedAt       DateTime?
+  postedBy       String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lines           ManualJournalLine[]
+  approvalRequest ApprovalRequest?
+
+  @@index([organizationId, status])
+  @@index([organizationId, date])
+  @@map("manual_journals")
+}
+
+model ManualJournalLine {
+  id              String   @id @default(cuid())
+  manualJournalId String
+  accountId       String
+  description     String?
+  debit           Decimal  @default(0) @db.Decimal(19, 4)
+  credit          Decimal  @default(0) @db.Decimal(19, 4)
+  sortOrder       Int      @default(0)
+
+  manualJournal   ManualJournal  @relation(fields: [manualJournalId], references: [id], onDelete: Cascade)
+  account         ChartOfAccount @relation(fields: [accountId], references: [id])
+
+  @@map("manual_journal_lines")
+}
+
+model WorkflowPolicy {
+  id              String             @id @default(cuid())
+  organizationId  String
+  entityType      WorkflowEntityType
+  isActive        Boolean            @default(true)
+  approverUserId  String?
+  approverRole    String?
+  deadlineHours   Int                @default(48)
+  reminderHours   Int                @default(24)
+  maxReminders    Int                @default(3)
+  delegateUserId  String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, entityType])
+  @@map("workflow_policies")
+}
+
+model ApprovalRequest {
+  id              String             @id @default(cuid())
+  organizationId  String
+  entityType      WorkflowEntityType
+  manualJournalId String?            @unique
+  status          ApprovalStatus     @default(PENDING)
+  submittedBy     String
+  submittedAt     DateTime           @default(now())
+  assignedTo      String?
+  deadline        DateTime?
+  completedAt     DateTime?
+  completedBy     String?
+  reminderCount   Int                @default(0)
+  lastReminderAt  DateTime?
+  notes           String?            @db.Text
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  manualJournal ManualJournal? @relation(fields: [manualJournalId], references: [id])
+  actions       ApprovalAction[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, assignedTo, status])
+  @@map("approval_requests")
+}
+
+model ApprovalAction {
+  id                String             @id @default(cuid())
+  approvalRequestId String
+  actionType        ApprovalActionType
+  actorId           String
+  notes             String?            @db.Text
+  createdAt         DateTime           @default(now())
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+
+  @@map("approval_actions")
 }

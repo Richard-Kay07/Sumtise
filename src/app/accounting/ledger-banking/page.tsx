@@ -1,16 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import { BookOpen, ArrowLeftRight, Scale } from "lucide-react"
+import { BookOpen, ArrowLeftRight, Scale, ClipboardCheck } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 
 const BRAND = "#50B0E0"
 const DARK  = "#1A1D24"
 
 const TILES = [
-  { href: "/transactions/journal",    icon: BookOpen,       label: "Journals",             desc: "View and post manual journal entries" },
-  { href: "/banking/reconciliation",  icon: ArrowLeftRight, label: "Bank Reconciliation",  desc: "Reconcile transactions with bank feeds" },
-  { href: "/reports/trial-balance",   icon: Scale,          label: "Trial Balance",        desc: "Verify debit/credit balance" },
+  { href: "/transactions/journal",    icon: BookOpen,        label: "Journals",             desc: "View and post manual journal entries" },
+  { href: "/approvals",               icon: ClipboardCheck,  label: "Approvals",            desc: "Review and authorise journals pending approval" },
+  { href: "/banking/reconciliation",  icon: ArrowLeftRight,  label: "Bank Reconciliation",  desc: "Reconcile transactions with bank feeds" },
+  { href: "/reports/trial-balance",   icon: Scale,           label: "Trial Balance",        desc: "Verify debit/credit balance" },
 ]
 
 export default function LedgerBankingPage() {

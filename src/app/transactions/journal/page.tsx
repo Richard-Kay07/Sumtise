@@ -100,7 +100,7 @@ export default function JournalEntriesPage() {
                 Manual journal entries and adjustments
               </p>
             </div>
-            <Link href="/transactions/new">
+            <Link href="/transactions/journal/new">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
                 New Journal Entry
@@ -181,7 +181,7 @@ export default function JournalEntriesPage() {
                       : "Get started by creating your first journal entry"}
                   </p>
                   {!searchTerm && accountFilter === "all" && !startDate && !endDate && (
-                    <Link href="/transactions/new">
+                    <Link href="/transactions/journal/new">
                       <Button>
                         <Plus className="mr-2 h-4 w-4" />
                         Create Journal Entry
