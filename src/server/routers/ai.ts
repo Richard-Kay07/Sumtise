@@ -13,8 +13,12 @@ import {
 } from "@/lib/ai/ai-service"
 import { resolveAccountCode } from "@/lib/ai/accountant-agent"
 import { LedgerAgent } from "@/lib/agents/ledger-agent"
+import { TaxAgent } from "@/lib/agents/tax-agent"
+import { FpnaAgent } from "@/lib/agents/fpna-agent"
 import { submitAgentActionForApproval, requiresApprovalForAmount } from "@/lib/agents/approval-gateway"
 import { postDoubleEntry, reversePosting } from "@/lib/posting"
+import { getBoss } from "@/lib/queue/boss"
+import { JOBS } from "@/lib/queue/jobs"
 
 // Reusable optional model override schema
 const modelOverrideSchema = z.object({
@@ -290,6 +294,85 @@ export const aiRouter = createTRPCRouter({
       })
 
       return { ...result, reference: input.reference, requiresApproval: false }
+    }),
+
+  // ── Tax Agent ────────────────────────────────────────────────────────────────
+
+  runTaxAgent: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.REPORTS_VIEW))
+    .input(z.object({
+      organizationId: z.string(),
+      periodKey: z.string().optional(),
+      async: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const message = input.periodKey
+        ? `Compile the VAT return for period ${input.periodKey}. Check for missing VAT treatments, calculate all 9 boxes, and flag any anomalies.`
+        : 'Find all open VAT periods. For the most recent open period, compile the VAT return with all 9 boxes and flag any issues.'
+
+      if (input.async) {
+        const boss = await getBoss()
+        const jobId = await boss.send(JOBS.TAX_COMPILE_VAT, {
+          organizationId: ctx.organizationId,
+          triggeredBy: ctx.userId,
+          periodKey: input.periodKey ?? 'latest',
+        })
+        return { queued: true, jobId }
+      }
+
+      const agent = new TaxAgent()
+      const result = await agent.run(message, { organizationId: ctx.organizationId, triggeredBy: ctx.userId })
+      return result
+    }),
+
+  // ── FP&A Agent ───────────────────────────────────────────────────────────────
+
+  runFpnaForecast: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.REPORTS_VIEW))
+    .input(z.object({
+      organizationId: z.string(),
+      async: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.async) {
+        const boss = await getBoss()
+        const jobId = await boss.send(JOBS.FPNA_FORECAST, {
+          organizationId: ctx.organizationId,
+          triggeredBy: ctx.userId,
+        })
+        return { queued: true, jobId }
+      }
+
+      const agent = new FpnaAgent()
+      const result = await agent.run(
+        'Generate a 6-month cash flow forecast. Analyse historical trends, review budget vs actuals, and identify the top 5 variances.',
+        { organizationId: ctx.organizationId, triggeredBy: ctx.userId }
+      )
+      return result
+    }),
+
+  runVarianceAnalysis: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.REPORTS_VIEW))
+    .input(z.object({
+      organizationId: z.string(),
+      async: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.async) {
+        const boss = await getBoss()
+        const jobId = await boss.send(JOBS.FPNA_VARIANCE, {
+          organizationId: ctx.organizationId,
+          triggeredBy: ctx.userId,
+        })
+        return { queued: true, jobId }
+      }
+
+      const agent = new FpnaAgent()
+      const result = await agent.run(
+        'Run a full budget vs actuals variance analysis for the current period. Identify accounts where actuals exceed budget by more than 15%. Explain each variance.',
+        { organizationId: ctx.organizationId, triggeredBy: ctx.userId }
+      )
+      return result
     }),
 
   // ── Approve an agent action (executes the pending action) ───────────────────
