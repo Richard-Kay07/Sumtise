@@ -159,6 +159,7 @@ model Organization {
   manualJournals          ManualJournal[]
   workflowPolicies        WorkflowPolicy[]
   approvalRequests        ApprovalRequest[]
+  agentActions            AgentAction[]
 
   @@map("organizations")
 }
@@ -2639,4 +2640,46 @@ model ApprovalAction {
   approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
 
   @@map("approval_actions")
+}
+
+enum AgentType {
+  LEDGER
+  TAX
+  APAR
+  PAYROLL
+  FPNA
+}
+
+enum AgentActionStatus {
+  RUNNING
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  COMPLETED
+  FAILED
+}
+
+model AgentAction {
+  id              String            @id @default(cuid())
+  organizationId  String
+  agentType       AgentType
+  triggeredBy     String
+  jobId           String?
+  status          AgentActionStatus @default(RUNNING)
+  inputSummary    String?           @db.Text
+  outputSummary   String?           @db.Text
+  reasoning       String?           @db.Text
+  toolCallCount   Int               @default(0)
+  tokensUsed      Int               @default(0)
+  error           String?           @db.Text
+  proposedActions Json?
+  durationMs      Int?
+  startedAt       DateTime          @default(now())
+  completedAt     DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, agentType, status])
+  @@index([organizationId, startedAt])
+  @@map("agent_actions")
 }
