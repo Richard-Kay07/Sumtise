@@ -1,6 +1,6 @@
 import { initTRPC, TRPCError } from "@trpc/server"
 import { type NextRequest } from "next/server"
-import { auth } from "@clerk/nextjs/server"
+import { auth, verifyToken } from "@clerk/nextjs/server"
 import superjson from "superjson"
 import { ZodError } from "zod"
 import { prisma } from "@/lib/prisma"
@@ -23,7 +23,25 @@ const createInnerTRPCContext = (opts: CreateContextOptions) => {
 }
 
 export const createTRPCContext = async (opts: { req: NextRequest }) => {
-  const { userId } = auth()
+  // Try cookie-based Clerk session first (normal browser flow)
+  let { userId } = auth()
+
+  // Fall back to Bearer token if the cookie session isn't present
+  // (handles the window between Clerk client init and cookie propagation)
+  if (!userId) {
+    const authHeader = opts.req.headers.get("authorization")
+    const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null
+    if (bearer) {
+      try {
+        const payload = await verifyToken(bearer, {
+          secretKey: process.env.CLERK_SECRET_KEY,
+        })
+        userId = payload.sub ?? null
+      } catch {
+        // Invalid token — keep userId null
+      }
+    }
+  }
 
   const correlationId = getCorrelationId(
     Object.fromEntries(opts.req.headers.entries()) as Record<string, string>
