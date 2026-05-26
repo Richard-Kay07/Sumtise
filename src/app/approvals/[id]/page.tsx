@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/page-header"
 import { trpc } from "@/lib/trpc-client"
+import { useOrganization } from "@/contexts/organization-context"
 import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
@@ -38,13 +39,17 @@ export default function ApprovalDetailPage() {
   const params = useParams()
   const router = useRouter()
   const approvalId = params.id as string
+  const { orgId } = useOrganization()
 
   const [comment, setComment] = useState("")
 
   const utils = trpc.useUtils()
 
   // Fetch all approvals and find the one matching our ID
-  const { data: allData, isLoading } = trpc.manualJournals.allApprovals.useQuery({ limit: 100 })
+  const { data: allData, isLoading } = trpc.manualJournals.allApprovals.useQuery(
+    { organizationId: orgId || "", limit: 100 },
+    { enabled: !!orgId }
+  )
   const approval = allData?.requests?.find((r: any) => r.id === approvalId)
 
   const approveMutation = trpc.manualJournals.approve.useMutation({
@@ -66,14 +71,14 @@ export default function ApprovalDetailPage() {
   })
 
   const handleApprove = () => {
-    if (!approval?.manualJournalId) return
-    approveMutation.mutate({ id: approval.manualJournalId, notes: comment || undefined })
+    if (!approval?.manualJournalId || !orgId) return
+    approveMutation.mutate({ id: approval.manualJournalId, organizationId: orgId, notes: comment || undefined })
   }
 
   const handleReject = () => {
-    if (!approval?.manualJournalId) return
+    if (!approval?.manualJournalId || !orgId) return
     if (!comment.trim()) { alert("Please provide a reason for rejection"); return }
-    rejectMutation.mutate({ id: approval.manualJournalId, reason: comment })
+    rejectMutation.mutate({ id: approval.manualJournalId, organizationId: orgId, reason: comment })
   }
 
   if (isLoading) {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { PageHeader } from "@/components/page-header"
 import { trpc } from "@/lib/trpc-client"
+import { useOrganization } from "@/contexts/organization-context"
 import { RefreshCw, CheckCircle, Clock, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
@@ -57,10 +58,15 @@ function ApprovalRow({ req }: { req: any }) {
 export default function ApprovalsPage() {
   const [tab, setTab] = useState<"mine" | "all">("mine")
 
-  const { data: mine, isLoading: loadingMine } = trpc.manualJournals.myPendingApprovals.useQuery()
+  const { orgId } = useOrganization()
+
+  const { data: mine, isLoading: loadingMine } = trpc.manualJournals.myPendingApprovals.useQuery(
+    { organizationId: orgId || "" },
+    { enabled: !!orgId }
+  )
   const { data: allData, isLoading: loadingAll } = trpc.manualJournals.allApprovals.useQuery(
-    {},
-    { enabled: tab === "all" }
+    { organizationId: orgId || "" },
+    { enabled: !!orgId && tab === "all" }
   )
 
   const items = tab === "mine" ? (mine ?? []) : (allData?.requests ?? [])

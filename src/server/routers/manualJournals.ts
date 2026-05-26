@@ -164,7 +164,7 @@ export const manualJournalsRouter = createTRPCRouter({
 
   // ── Create draft ────────────────────────────────────────────────────────────
   create: orgScopedProcedure
-    .input(journalBodySchema)
+    .input(journalBodySchema.extend({ organizationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       assertBalanced(input.lines)
       const date = typeof input.date === "string" ? new Date(input.date) : input.date
@@ -207,7 +207,7 @@ export const manualJournalsRouter = createTRPCRouter({
 
   // ── Update draft ─────────────────────────────────────────────────────────────
   update: orgScopedProcedure
-    .input(journalBodySchema.extend({ id: z.string() }))
+    .input(journalBodySchema.extend({ id: z.string(), organizationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const existing = await prisma.manualJournal.findFirst({
         where: { id: input.id, organizationId: ctx.organizationId },
@@ -259,7 +259,7 @@ export const manualJournalsRouter = createTRPCRouter({
 
   // ── Delete draft ─────────────────────────────────────────────────────────────
   delete: orgScopedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string(), organizationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const existing = await prisma.manualJournal.findFirst({
         where: { id: input.id, organizationId: ctx.organizationId },
@@ -275,7 +275,7 @@ export const manualJournalsRouter = createTRPCRouter({
 
   // ── Submit for approval (or post directly if no policy) ──────────────────────
   submit: orgScopedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string(), organizationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const journal = await prisma.manualJournal.findFirst({
         where: { id: input.id, organizationId: ctx.organizationId },
@@ -355,7 +355,7 @@ export const manualJournalsRouter = createTRPCRouter({
 
   // ── Approve ──────────────────────────────────────────────────────────────────
   approve: orgScopedProcedure
-    .input(z.object({ id: z.string(), notes: z.string().optional() }))
+    .input(z.object({ id: z.string(), organizationId: z.string(), notes: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const journal = await prisma.manualJournal.findFirst({
         where: { id: input.id, organizationId: ctx.organizationId },
@@ -410,7 +410,7 @@ export const manualJournalsRouter = createTRPCRouter({
 
   // ── Reject ───────────────────────────────────────────────────────────────────
   reject: orgScopedProcedure
-    .input(z.object({ id: z.string(), reason: z.string().min(1, "Rejection reason required") }))
+    .input(z.object({ id: z.string(), organizationId: z.string(), reason: z.string().min(1, "Rejection reason required") }))
     .mutation(async ({ ctx, input }) => {
       const journal = await prisma.manualJournal.findFirst({
         where: { id: input.id, organizationId: ctx.organizationId },
@@ -467,7 +467,7 @@ export const manualJournalsRouter = createTRPCRouter({
 
   // ── Withdraw ─────────────────────────────────────────────────────────────────
   withdraw: orgScopedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string(), organizationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const journal = await prisma.manualJournal.findFirst({
         where: { id: input.id, organizationId: ctx.organizationId },
@@ -504,6 +504,7 @@ export const manualJournalsRouter = createTRPCRouter({
   // ── List ─────────────────────────────────────────────────────────────────────
   list: orgScopedProcedure
     .input(z.object({
+      organizationId: z.string(),
       status: z.enum(["DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED", "POSTED"]).optional(),
       page: z.number().int().min(1).default(1),
       limit: z.number().int().min(1).max(100).default(20),
@@ -533,7 +534,7 @@ export const manualJournalsRouter = createTRPCRouter({
 
   // ── Get single ───────────────────────────────────────────────────────────────
   get: orgScopedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string(), organizationId: z.string() }))
     .query(async ({ ctx, input }) => {
       const journal = await prisma.manualJournal.findFirst({
         where: { id: input.id, organizationId: ctx.organizationId },
@@ -548,6 +549,7 @@ export const manualJournalsRouter = createTRPCRouter({
 
   // ── List approvals assigned to current user ──────────────────────────────────
   myPendingApprovals: orgScopedProcedure
+    .input(z.object({ organizationId: z.string() }))
     .query(async ({ ctx }) => {
       const requests = await prisma.approvalRequest.findMany({
         where: {
@@ -569,6 +571,7 @@ export const manualJournalsRouter = createTRPCRouter({
   // ── All org approvals (admin view) ───────────────────────────────────────────
   allApprovals: orgScopedProcedure
     .input(z.object({
+      organizationId: z.string(),
       status: z.enum(["PENDING", "APPROVED", "REJECTED", "ESCALATED", "WITHDRAWN"]).optional(),
       page: z.number().int().min(1).default(1),
       limit: z.number().int().min(1).max(100).default(20),

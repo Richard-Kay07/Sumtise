@@ -56,6 +56,7 @@ export default function NewJournalPage() {
   }
 
   const buildPayload = () => ({
+    organizationId: orgId!,
     reference,
     description,
     date,
@@ -89,7 +90,7 @@ export default function NewJournalPage() {
     setSaving(true)
     try {
       const journal = await createMutation.mutateAsync(buildPayload())
-      await submitMutation.mutateAsync({ id: journal.id })
+      await submitMutation.mutateAsync({ id: journal.id, organizationId: orgId! })
       router.push("/transactions/journal")
     } catch (e: any) {
       alert(`Error: ${e.message}`)
