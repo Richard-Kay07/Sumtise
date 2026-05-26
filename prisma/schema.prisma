@@ -160,6 +160,9 @@ model Organization {
   workflowPolicies        WorkflowPolicy[]
   approvalRequests        ApprovalRequest[]
   agentActions            AgentAction[]
+  hmrcConnection          HmrcConnection?
+  vatPeriods              VatPeriod[]
+  bankFeedConnections     BankFeedConnection[]
 
   @@map("organizations")
 }
@@ -762,6 +765,7 @@ model BankAccount {
   bankTransactions BankTransaction[]
   reconciliations  Reconciliation[]
   statementImports BankStatementImport[]
+  feedConnection   BankFeedConnection?
 
   @@map("bank_accounts")
 }
@@ -782,6 +786,8 @@ model BankTransaction {
   category        String? // Auto-categorized
   reconciledAt   DateTime? // When reconciled
   reconciledBy   String? // User who reconciled
+  sourceType      String?   // 'FEED' | 'IMPORT' | 'MANUAL'
+  feedTxId        String?   // Provider transaction ID (deduplication)
   metadata        Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -2691,4 +2697,145 @@ model AgentAction {
   @@index([organizationId, agentType, status])
   @@index([organizationId, startedAt])
   @@map("agent_actions")
+}
+
+// ─── HMRC / MTD Tax Models ────────────────────────────────────────────────────
+
+enum HmrcConnectionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+enum VatPeriodStatus {
+  OPEN
+  FULFILLED
+  OVERDUE
+}
+
+enum VatScheme {
+  STANDARD
+  CASH
+  FLAT_RATE
+  ANNUAL
+}
+
+model HmrcConnection {
+  id             String               @id @default(cuid())
+  organizationId String               @unique
+  status         HmrcConnectionStatus @default(ACTIVE)
+
+  vatRegistrationNumber String?
+  businessName          String?
+
+  accessToken     String   @db.Text
+  refreshToken    String   @db.Text
+  tokenType       String   @default("Bearer")
+  scope           String?
+  expiresAt       DateTime
+
+  connectedAt     DateTime  @default(now())
+  lastRefreshedAt DateTime?
+  lastSyncAt      DateTime?
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vatPeriods   VatPeriod[]
+
+  @@map("hmrc_connections")
+}
+
+model VatPeriod {
+  id               String          @id @default(cuid())
+  organizationId   String
+  hmrcConnectionId String
+  vrn              String
+
+  periodKey        String
+  periodStart      DateTime        @db.Date
+  periodEnd        DateTime        @db.Date
+  dueDate          DateTime        @db.Date
+  status           VatPeriodStatus @default(OPEN)
+  scheme           VatScheme       @default(STANDARD)
+
+  box1OutputVat    Decimal?  @db.Decimal(19, 2)
+  box2             Decimal?  @db.Decimal(19, 2)
+  box3             Decimal?  @db.Decimal(19, 2)
+  box4InputVat     Decimal?  @db.Decimal(19, 2)
+  box5NetVat       Decimal?  @db.Decimal(19, 2)
+  box6SalesNet     Decimal?  @db.Decimal(19, 2)
+  box7PurchasesNet Decimal?  @db.Decimal(19, 2)
+  box8             Decimal?  @db.Decimal(19, 2)
+  box9             Decimal?  @db.Decimal(19, 2)
+
+  taxSubmissionId  String?
+  hmrcReceiptId    String?
+  submittedAt      DateTime?
+  lastSyncedAt     DateTime?
+
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  hmrcConnection HmrcConnection @relation(fields: [hmrcConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, periodKey])
+  @@index([organizationId, status])
+  @@index([organizationId, dueDate])
+  @@map("vat_periods")
+}
+
+// ─── Bank Feed Models ─────────────────────────────────────────────────────────
+
+enum BankFeedProvider {
+  TRUELAYER
+  PLAID
+  SALTEDGE
+  MANUAL
+}
+
+enum BankFeedStatus {
+  ACTIVE
+  RECONNECT_REQUIRED
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+model BankFeedConnection {
+  id             String          @id @default(cuid())
+  organizationId String
+  bankAccountId  String          @unique
+  provider       BankFeedProvider @default(TRUELAYER)
+  status         BankFeedStatus  @default(ACTIVE)
+
+  accessToken        String   @db.Text
+  refreshToken       String   @db.Text
+  expiresAt          DateTime
+
+  providerAccountId  String?
+  providerBankId     String?
+  bankDisplayName    String?
+
+  lastSyncedAt   DateTime?
+  lastSuccessAt  DateTime?
+  syncFromDate   DateTime?
+  errorMessage   String?   @db.Text
+  syncCount      Int       @default(0)
+
+  metadata    Json?
+  connectedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bankAccount  BankAccount  @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, provider])
+  @@map("bank_feed_connections")
 }

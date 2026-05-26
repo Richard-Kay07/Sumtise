@@ -4,6 +4,8 @@ import { createTRPCRouter, orgScopedProcedure, requirePermissionProcedure } from
 import { Permission } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
+import { getAuthorizationUrl } from "@/lib/hmrc/oauth"
+import { getVatObligations, submitVatReturn } from "@/lib/hmrc/mtd-vat"
 import {
   aggregateVATReturn,
   calculateVATAmount,
@@ -402,6 +404,113 @@ export const taxRouter = createTRPCRouter({
           submittedBy: ctx.userId ?? undefined,
         },
       })
+    }),
+
+  // ── HMRC MTD Connect ────────────────────────────────────────────────────────
+
+  connectHmrc: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.SETTINGS_EDIT))
+    .input(z.object({ organizationId: z.string() }))
+    .mutation(async ({ ctx }) => {
+      const url = getAuthorizationUrl(ctx.organizationId)
+      return { authorizationUrl: url }
+    }),
+
+  getHmrcConnection: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.SETTINGS_EDIT))
+    .input(z.object({ organizationId: z.string() }))
+    .query(async ({ ctx }) => {
+      const conn = await prisma.hmrcConnection.findUnique({
+        where: { organizationId: ctx.organizationId },
+        select: { id: true, status: true, vatRegistrationNumber: true, businessName: true, expiresAt: true, lastSyncAt: true, connectedAt: true },
+      })
+      return conn
+    }),
+
+  // ── HMRC VAT Obligations ────────────────────────────────────────────────────
+
+  getVatObligations: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.REPORTS_VIEW))
+    .input(z.object({
+      organizationId: z.string(),
+      fromDate: z.string(),
+      toDate: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const conn = await prisma.hmrcConnection.findUnique({
+        where: { organizationId: ctx.organizationId },
+      })
+      if (!conn?.vatRegistrationNumber) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "HMRC not connected or VRN not set" })
+      }
+      const obligations = await getVatObligations(
+        ctx.organizationId,
+        conn.vatRegistrationNumber,
+        input.fromDate,
+        input.toDate,
+        ctx.userId
+      )
+      const periods = await prisma.vatPeriod.findMany({
+        where: { organizationId: ctx.organizationId },
+        orderBy: { dueDate: "desc" },
+      })
+      return { obligations, periods }
+    }),
+
+  // ── Submit MTD VAT Return ───────────────────────────────────────────────────
+
+  submitMtdVatReturn: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.SETTINGS_EDIT))
+    .input(z.object({
+      organizationId: z.string(),
+      periodKey: z.string(),
+      vatDueSales: z.number(),
+      vatDueAcquisitions: z.number(),
+      totalVatDue: z.number(),
+      vatReclaimedCurrPeriod: z.number(),
+      netVatDue: z.number(),
+      totalValueSalesExVAT: z.number(),
+      totalValuePurchasesExVAT: z.number(),
+      totalValueGoodsSuppliedExVAT: z.number(),
+      totalAcquisitionsExVAT: z.number(),
+      finalised: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const conn = await prisma.hmrcConnection.findUnique({
+        where: { organizationId: ctx.organizationId },
+      })
+      if (!conn?.vatRegistrationNumber) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "HMRC not connected or VRN not set" })
+      }
+
+      const { organizationId: _org, ...payload } = input
+      const result = await submitVatReturn(
+        ctx.organizationId,
+        conn.vatRegistrationNumber,
+        payload,
+        ctx.userId
+      )
+
+      const vatPeriod = await prisma.vatPeriod.findFirst({
+        where: { organizationId: ctx.organizationId, periodKey: input.periodKey },
+      })
+
+      await prisma.taxSubmission.create({
+        data: {
+          organizationId: ctx.organizationId,
+          submissionType: "VAT_RETURN",
+          status: "ACCEPTED",
+          reference: result.formBundleNumber,
+          periodStart: vatPeriod?.periodStart ?? new Date(),
+          periodEnd: vatPeriod?.periodEnd ?? new Date(),
+          submissionDate: new Date(),
+          submittedAt: new Date(),
+          submittedBy: ctx.userId,
+          data: payload as any,
+        },
+      })
+
+      return result
     }),
 
   // ── All submissions list ──────────────────────────────────────────────────
