@@ -19,7 +19,7 @@ attempt=1
 
 while [ $attempt -le $MAX_RETRIES ]; do
   echo "Attempt $attempt/$MAX_RETRIES: running prisma db push..."
-  if node_modules/.bin/prisma db push --skip-generate 2>&1; then
+  if node_modules/.bin/prisma db push --skip-generate --accept-data-loss 2>&1; then
     echo "Database sync successful."
     break
   fi
