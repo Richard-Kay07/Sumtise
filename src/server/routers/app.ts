@@ -40,6 +40,7 @@ import { fxRatesRouter } from "./fxRates"
 import { periodEndRouter } from "./periodEnd"
 import { manualJournalsRouter } from "./manualJournals"
 import { workflowPoliciesRouter } from "./workflowPolicies"
+import { purchaseOrdersRouter } from "./purchaseOrders"
 
 /**
  * Generate and store invoice PDF
@@ -1631,6 +1632,7 @@ export const appRouter = createTRPCRouter({
   periodEnd: periodEndRouter,
   manualJournals: manualJournalsRouter,
   workflowPolicies: workflowPoliciesRouter,
+  purchaseOrders: purchaseOrdersRouter,
 
   // Dashboard routes
   dashboard: createTRPCRouter({

@@ -163,6 +163,7 @@ model Organization {
   hmrcConnection          HmrcConnection?
   vatPeriods              VatPeriod[]
   bankFeedConnections     BankFeedConnection[]
+  purchaseOrders          PurchaseOrder[]
 
   @@map("organizations")
 }
@@ -237,6 +238,7 @@ model ChartOfAccount {
   payrollCreditMappings     PayrollCOAMapping[]  @relation("PayrollCreditAccount")
   payrollJournalLines       PayrollJournalLine[]
   manualJournalLines        ManualJournalLine[]
+  purchaseOrderLines        PurchaseOrderLine[]
 
   @@unique([organizationId, code])
   @@map("chart_of_accounts")
@@ -352,6 +354,7 @@ model Vendor {
   organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   defaultExpenseAccount ChartOfAccount? @relation("VendorExpenseAccount", fields: [defaultExpenseAccountId], references: [id])
   bills                 Bill[]
+  purchaseOrders        PurchaseOrder[]
   debitNotes            DebitNote[]
   payments              Payment[]
   fixedAssets           FixedAsset[]
@@ -515,15 +518,17 @@ model Bill {
   approvedAt     DateTime?     // When bill was approved
   approvedBy     String?       // User who approved
   postedAt       DateTime?     // When bill was posted to ledger
+  purchaseOrderId String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  vendor       Vendor       @relation(fields: [vendorId], references: [id])
-  items        BillItem[]
-  amendments   BillAmendment[]
-  debitNotes   DebitNote[]
-  payments     Payment[]
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vendor        Vendor         @relation(fields: [vendorId], references: [id])
+  purchaseOrder PurchaseOrder? @relation("PurchaseOrderBills", fields: [purchaseOrderId], references: [id])
+  items         BillItem[]
+  amendments    BillAmendment[]
+  debitNotes    DebitNote[]
+  payments      Payment[]
 
   @@unique([organizationId, billNumber])
   @@index([organizationId, deletedAt])
@@ -2528,6 +2533,7 @@ enum WorkflowEntityType {
   VAT_RETURN
   PAYROLL_RUN_AGENT
   BANK_FEED_SYNC
+  PURCHASE_ORDER
 }
 
 enum ApprovalStatus {
@@ -2631,11 +2637,13 @@ model ApprovalRequest {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  agentActionId   String?        @unique
+  agentActionId    String?        @unique
+  purchaseOrderId  String?        @unique
 
   organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   manualJournal ManualJournal? @relation(fields: [manualJournalId], references: [id])
   agentAction   AgentAction?   @relation(fields: [agentActionId], references: [id])
+  purchaseOrder PurchaseOrder? @relation("PurchaseOrderApproval", fields: [purchaseOrderId], references: [id])
   actions       ApprovalAction[]
 
   @@index([organizationId, status])
@@ -2838,4 +2846,76 @@ model BankFeedConnection {
   @@index([organizationId, status])
   @@index([organizationId, provider])
   @@map("bank_feed_connections")
+}
+
+// ─── Purchase Orders ──────────────────────────────────────────────────────────
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PARTIALLY_RECEIVED
+  FULLY_RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id               String              @id @default(cuid())
+  organizationId   String
+  poNumber         String
+  vendorId         String
+  date             DateTime
+  expectedDelivery DateTime?
+  currency         String              @default("GBP")
+  status           PurchaseOrderStatus @default(DRAFT)
+  subtotal         Decimal             @default(0) @db.Decimal(19, 4)
+  taxAmount        Decimal             @default(0) @db.Decimal(19, 4)
+  total            Decimal             @default(0) @db.Decimal(19, 4)
+  notes            String?             @db.Text
+  tags             String[]
+  metadata         Json?
+  attachments      Json?
+  submittedAt      DateTime?
+  approvedAt       DateTime?
+  approvedBy       String?
+  closedAt         DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vendor          Vendor            @relation(fields: [vendorId], references: [id])
+  lines           PurchaseOrderLine[]
+  bills           Bill[]            @relation("PurchaseOrderBills")
+  approvalRequest ApprovalRequest?  @relation("PurchaseOrderApproval")
+
+  @@unique([organizationId, poNumber])
+  @@index([organizationId, vendorId])
+  @@index([organizationId, status])
+  @@index([organizationId, deletedAt])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id              String  @id @default(cuid())
+  purchaseOrderId String
+  accountId       String?
+  description     String
+  quantity        Decimal @db.Decimal(19, 4)
+  unitPrice       Decimal @db.Decimal(19, 4)
+  taxRate         Decimal @default(0) @db.Decimal(5, 2)
+  subtotal        Decimal @db.Decimal(19, 4)
+  taxAmount       Decimal @default(0) @db.Decimal(19, 4)
+  total           Decimal @db.Decimal(19, 4)
+  receivedQty     Decimal @default(0) @db.Decimal(19, 4)
+  invoicedQty     Decimal @default(0) @db.Decimal(19, 4)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchaseOrder PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  account       ChartOfAccount?  @relation(fields: [accountId], references: [id])
+
+  @@map("purchase_order_lines")
 }

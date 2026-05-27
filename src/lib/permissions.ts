@@ -143,6 +143,13 @@ export enum Permission {
 
   // Audit
   AUDIT_VIEW = "AUDIT_VIEW",
+
+  // Purchase Orders
+  PURCHASE_ORDERS_VIEW = "PURCHASE_ORDERS_VIEW",
+  PURCHASE_ORDERS_CREATE = "PURCHASE_ORDERS_CREATE",
+  PURCHASE_ORDERS_EDIT = "PURCHASE_ORDERS_EDIT",
+  PURCHASE_ORDERS_DELETE = "PURCHASE_ORDERS_DELETE",
+  PURCHASE_ORDERS_APPROVE = "PURCHASE_ORDERS_APPROVE",
 }
 
 /**
@@ -256,6 +263,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 
     // Audit
     Permission.AUDIT_VIEW,
+
+    // Purchase Orders
+    Permission.PURCHASE_ORDERS_VIEW,
+    Permission.PURCHASE_ORDERS_CREATE,
+    Permission.PURCHASE_ORDERS_EDIT,
+    Permission.PURCHASE_ORDERS_DELETE,
+    Permission.PURCHASE_ORDERS_APPROVE,
   ],
 
   [UserRole.ACCOUNTANT]: [
@@ -337,6 +351,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 
     // Audit
     Permission.AUDIT_VIEW,
+
+    // Purchase Orders
+    Permission.PURCHASE_ORDERS_VIEW,
+    Permission.PURCHASE_ORDERS_CREATE,
+    Permission.PURCHASE_ORDERS_EDIT,
+    Permission.PURCHASE_ORDERS_APPROVE,
   ],
 
   [UserRole.BOOKKEEPER]: [
@@ -386,6 +406,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 
     // Reports (view only)
     Permission.REPORTS_VIEW,
+
+    // Purchase Orders
+    Permission.PURCHASE_ORDERS_VIEW,
+    Permission.PURCHASE_ORDERS_CREATE,
+    Permission.PURCHASE_ORDERS_EDIT,
   ],
 
   [UserRole.VIEWER]: [
@@ -404,6 +429,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.BANK_ACCOUNTS_VIEW,
     Permission.REPORTS_VIEW,
     Permission.SETTINGS_VIEW,
+
+    // Purchase Orders (view only)
+    Permission.PURCHASE_ORDERS_VIEW,
   ],
 }
 
