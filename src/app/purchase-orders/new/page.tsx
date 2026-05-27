@@ -31,18 +31,18 @@ export default function NewPurchaseOrderPage() {
   const [lines, setLines]             = useState<Line[]>([{ ...EMPTY_LINE }])
   const [error, setError]             = useState<string | null>(null)
 
-  const { data: vendorsData } = trpc.vendors?.getAll?.useQuery(
-    { organizationId: orgId ?? "", page: 1, limit: 100 },
+  const { data: vendorsData } = trpc.vendors.getAll.useQuery(
+    { organizationId: orgId ?? "", page: 1, limit: 200 },
     { enabled: !!orgId }
-  ) as any
+  )
 
-  const { data: accountsData } = trpc.chartOfAccounts?.getAll?.useQuery(
-    { organizationId: orgId ?? "", type: "EXPENSE" },
+  const { data: allAccounts } = trpc.chartOfAccounts.getAll.useQuery(
+    { organizationId: orgId ?? "" },
     { enabled: !!orgId }
-  ) as any
+  )
 
-  const vendors  = vendorsData?.vendors  ?? []
-  const accounts = accountsData?.accounts ?? []
+  const vendors  = (vendorsData as any)?.vendors ?? []
+  const accounts = (allAccounts ?? []).filter((a: any) => a.type === "EXPENSE")
 
   const createMutation = trpc.purchaseOrders.create.useMutation({
     onSuccess: (po) => router.push(`/purchase-orders/${po.id}`),

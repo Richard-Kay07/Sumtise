@@ -92,12 +92,12 @@ function MatchBillModal({ po, onClose, orgId }: { po: any; onClose: () => void; 
   const [billId, setBillId] = useState("")
   const [error, setError]   = useState<string | null>(null)
 
-  const { data: billsData } = trpc.bills?.getAll?.useQuery(
+  const { data: billsData } = trpc.bills.getAll.useQuery(
     { organizationId: orgId, vendorId: po.vendorId, page: 1, limit: 100 },
     { enabled: !!orgId }
-  ) as any
+  )
 
-  const bills = (billsData?.bills ?? []).filter((b: any) => !b.purchaseOrderId || b.purchaseOrderId === po.id)
+  const bills = ((billsData as any)?.bills ?? []).filter((b: any) => !b.purchaseOrderId || b.purchaseOrderId === po.id)
 
   const match = trpc.purchaseOrders.matchBill.useMutation({
     onSuccess: () => { utils.purchaseOrders.getById.invalidate(); onClose() },

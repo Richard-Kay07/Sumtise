@@ -36,7 +36,7 @@ export async function verifyOrganizationMembership(
  * @throws TRPCError with FORBIDDEN code if resource doesn't belong to organization
  */
 export async function verifyResourceOwnership(
-  resourceType: "invoice" | "customer" | "vendor" | "bill" | "transaction" | "bankAccount" | "chartOfAccount" | "payment" | "paymentRun" | "creditNote" | "debitNote" | "journal" | "fixedAsset" | "helloItem" | "invoiceReminder" | "emailOutbox",
+  resourceType: "invoice" | "customer" | "vendor" | "bill" | "transaction" | "bankAccount" | "chartOfAccount" | "payment" | "paymentRun" | "creditNote" | "debitNote" | "journal" | "fixedAsset" | "helloItem" | "invoiceReminder" | "emailOutbox" | "purchaseOrder",
   resourceId: string,
   organizationId: string
 ): Promise<void> {
@@ -131,6 +131,12 @@ export async function verifyResourceOwnership(
       break
     case "emailOutbox":
       resource = await prisma.emailOutbox.findUnique({
+        where: { id: resourceId },
+        select: { organizationId: true },
+      })
+      break
+    case "purchaseOrder":
+      resource = await prisma.purchaseOrder.findUnique({
         where: { id: resourceId },
         select: { organizationId: true },
       })

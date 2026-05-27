@@ -15,7 +15,7 @@ import {
   FileBarChart2, TrendingUp, ArrowLeftRight, Clock3,
   FileSearch, Tags, Waves,
   BadgePercent, Building, LayoutGrid, Globe, UserCog, Layers,
-  Sparkles,
+  Sparkles, ShoppingCart,
 } from "lucide-react"
 
 // ─── Brand tokens ──────────────────────────────────────────────────────────────
@@ -236,6 +236,11 @@ export function Nav() {
               <Divider />
               <NavItem href="/invoices"            icon={<FileText />}>Invoices</NavItem>
               <NavItem href="/expenses"            icon={<Receipt />}>Expenses</NavItem>
+              <NavSubMenu label="Purchase Orders" icon={<ShoppingCart />}>
+                <NavItem href="/purchase-orders/all"             icon={<ShoppingCart />}>All Purchase Orders</NavItem>
+                <NavItem href="/purchase-orders/new"             icon={<ShoppingCart />}>New Purchase Order</NavItem>
+                <NavItem href="/purchase-orders/committed-spend" icon={<BarChart3 />}>Committed Spend</NavItem>
+              </NavSubMenu>
               <NavItem href="/budgets"             icon={<PiggyBank />}>Budgets</NavItem>
 
               <Divider />
