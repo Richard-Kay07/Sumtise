@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
 import { parseJournalCSV } from "@/lib/journal-import/csv-parser"
+import { excelToCSV, isExcelBuffer } from "@/lib/journal-import/excel-parser"
 
 // ─── Shared validation ────────────────────────────────────────────────────────
 
@@ -601,15 +602,37 @@ export const manualJournalsRouter = createTRPCRouter({
       return { requests, total, page: input.page, limit: input.limit }
     }),
 
-  // ── Preview CSV import ────────────────────────────────────────────────────────
+  // ── COA data for template generation ─────────────────────────────────────────
+  getTemplateData: orgScopedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .query(async ({ ctx }) => {
+      const accounts = await prisma.chartOfAccount.findMany({
+        where: { organizationId: ctx.organizationId, isActive: true },
+        select: {
+          code: true, name: true, type: true, subType: true,
+          normalBalance: true, description: true,
+          costCentreCode: true, departmentCode: true,
+          analysisCode1: true, analysisCode2: true, analysisCode3: true,
+          projectCode: true, grantCode: true, fundCode: true,
+          isControlAccount: true,
+        },
+        orderBy: [{ type: "asc" }, { code: "asc" }],
+      })
+      return { accounts }
+    }),
+
+  // ── Preview import (CSV or XLSX) ──────────────────────────────────────────────
   previewImport: orgScopedProcedure
     .input(z.object({
       organizationId: z.string(),
       csvBase64: z.string().min(1),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Decode base64
-      const csvText = Buffer.from(input.csvBase64, "base64").toString("utf-8")
+      // Decode base64 and detect format
+      const buffer  = Buffer.from(input.csvBase64, "base64")
+      const csvText = isExcelBuffer(buffer)
+        ? excelToCSV(buffer)
+        : buffer.toString("utf-8")
       const parsed = parseJournalCSV(csvText)
 
       // Resolve account codes to IDs for the org
@@ -618,7 +641,11 @@ export const manualJournalsRouter = createTRPCRouter({
       )]
       const accounts = await prisma.chartOfAccount.findMany({
         where: { organizationId: ctx.organizationId, code: { in: codes } },
-        select: { id: true, code: true, name: true, type: true },
+        select: {
+          id: true, code: true, name: true, type: true,
+          departmentCode: true, costCentreCode: true,
+          analysisCode1: true, analysisCode2: true, analysisCode3: true,
+        },
       })
       const accountByCode = new Map(accounts.map((a) => [a.code, a]))
 
@@ -634,7 +661,17 @@ export const manualJournalsRouter = createTRPCRouter({
               message: `Account code "${line.accountCode}" not found in chart of accounts`,
             })
           }
-          return { ...line, accountId: account?.id ?? null, accountName: account?.name ?? null }
+          return {
+            ...line,
+            accountId:     account?.id   ?? null,
+            accountName:   account?.name ?? null,
+            // Prefer file values; fall back to COA defaults
+            department:    line.department  ?? account?.departmentCode  ?? null,
+            costCentre:    line.costCentre  ?? account?.costCentreCode  ?? null,
+            analysisCode1: line.analysisCode1 ?? account?.analysisCode1 ?? null,
+            analysisCode2: line.analysisCode2 ?? account?.analysisCode2 ?? null,
+            analysisCode3: line.analysisCode3 ?? account?.analysisCode3 ?? null,
+          }
         }),
       }))
 
@@ -645,7 +682,7 @@ export const manualJournalsRouter = createTRPCRouter({
       }
     }),
 
-  // ── Import journals from CSV ──────────────────────────────────────────────────
+  // ── Import journals (CSV or XLSX) ─────────────────────────────────────────────
   importJournals: orgScopedProcedure
     .input(z.object({
       organizationId: z.string(),
@@ -653,7 +690,10 @@ export const manualJournalsRouter = createTRPCRouter({
       currency: z.string().default("GBP"),
     }))
     .mutation(async ({ ctx, input }) => {
-      const csvText = Buffer.from(input.csvBase64, "base64").toString("utf-8")
+      const buffer  = Buffer.from(input.csvBase64, "base64")
+      const csvText = isExcelBuffer(buffer)
+        ? excelToCSV(buffer)
+        : buffer.toString("utf-8")
       const parsed = parseJournalCSV(csvText)
 
       if (parsed.errors.length > 0) {
