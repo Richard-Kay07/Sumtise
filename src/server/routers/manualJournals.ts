@@ -14,6 +14,7 @@ import { createTRPCRouter, orgScopedProcedure } from "@/lib/trpc"
 import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
+import { parseJournalCSV } from "@/lib/journal-import/csv-parser"
 
 // ─── Shared validation ────────────────────────────────────────────────────────
 
@@ -598,5 +599,145 @@ export const manualJournalsRouter = createTRPCRouter({
       ])
 
       return { requests, total, page: input.page, limit: input.limit }
+    }),
+
+  // ── Preview CSV import ────────────────────────────────────────────────────────
+  previewImport: orgScopedProcedure
+    .input(z.object({
+      organizationId: z.string(),
+      csvBase64: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Decode base64
+      const csvText = Buffer.from(input.csvBase64, "base64").toString("utf-8")
+      const parsed = parseJournalCSV(csvText)
+
+      // Resolve account codes to IDs for the org
+      const codes = [...new Set(
+        parsed.journals.flatMap((j) => j.lines.map((l) => l.accountCode))
+      )]
+      const accounts = await prisma.chartOfAccount.findMany({
+        where: { organizationId: ctx.organizationId, code: { in: codes } },
+        select: { id: true, code: true, name: true, type: true },
+      })
+      const accountByCode = new Map(accounts.map((a) => [a.code, a]))
+
+      // Enrich groups with resolved accounts; flag missing codes
+      const extraErrors: typeof parsed.errors = []
+      const preview = parsed.journals.map((group) => ({
+        ...group,
+        lines: group.lines.map((line, li) => {
+          const account = accountByCode.get(line.accountCode)
+          if (!account) {
+            extraErrors.push({
+              row: group.rowNumbers[li] ?? group.rowNumbers[0],
+              message: `Account code "${line.accountCode}" not found in chart of accounts`,
+            })
+          }
+          return { ...line, accountId: account?.id ?? null, accountName: account?.name ?? null }
+        }),
+      }))
+
+      return {
+        journals: preview,
+        errors: [...parsed.errors, ...extraErrors],
+        metadata: parsed.metadata,
+      }
+    }),
+
+  // ── Import journals from CSV ──────────────────────────────────────────────────
+  importJournals: orgScopedProcedure
+    .input(z.object({
+      organizationId: z.string(),
+      csvBase64: z.string().min(1),
+      currency: z.string().default("GBP"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const csvText = Buffer.from(input.csvBase64, "base64").toString("utf-8")
+      const parsed = parseJournalCSV(csvText)
+
+      if (parsed.errors.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `CSV has ${parsed.errors.length} error(s). Fix them before importing.`,
+        })
+      }
+
+      // Resolve all account codes up front
+      const codes = [...new Set(
+        parsed.journals.flatMap((j) => j.lines.map((l) => l.accountCode))
+      )]
+      const accounts = await prisma.chartOfAccount.findMany({
+        where: { organizationId: ctx.organizationId, code: { in: codes } },
+        select: { id: true, code: true },
+      })
+      const accountByCode = new Map(accounts.map((a) => [a.code, a.id]))
+
+      // Validate all codes resolve before writing anything
+      const missing = codes.filter((c) => !accountByCode.has(c))
+      if (missing.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unknown account codes: ${missing.join(", ")}`,
+        })
+      }
+
+      // Validate all journals balanced and have ≥ 2 lines
+      for (const group of parsed.journals) {
+        if (!group.isBalanced) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Journal "${group.reference}" is not balanced`,
+          })
+        }
+        if (group.lines.length < 2) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Journal "${group.reference}" has fewer than 2 lines`,
+          })
+        }
+      }
+
+      // Create all journals
+      const created: string[] = []
+      for (const group of parsed.journals) {
+        const journal = await prisma.manualJournal.create({
+          data: {
+            organizationId: ctx.organizationId,
+            reference: group.reference,
+            description: group.description,
+            date: new Date(group.date),
+            currency: group.currency,
+            exchangeRate: new Prisma.Decimal(1),
+            notes: group.notes,
+            preparedBy: ctx.userId,
+            status: "DRAFT",
+            lines: {
+              create: group.lines.map((line, i) => ({
+                accountId: accountByCode.get(line.accountCode)!,
+                description: line.lineDescription,
+                debit: new Prisma.Decimal(line.debit),
+                credit: new Prisma.Decimal(line.credit),
+                sortOrder: i,
+              })),
+            },
+          },
+        })
+        created.push(journal.id)
+      }
+
+      await recordAudit({
+        entity: "manual_journal",
+        entityId: created[0] ?? "",
+        action: "import",
+        organizationId: ctx.organizationId,
+        userId: ctx.userId,
+        details: `Imported ${created.length} journal(s) from CSV`,
+      })
+
+      return {
+        imported: created.length,
+        journalIds: created,
+      }
     }),
 })

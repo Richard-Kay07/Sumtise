@@ -15,7 +15,7 @@ import {
   FileBarChart2, TrendingUp, ArrowLeftRight, Clock3,
   FileSearch, Tags, Waves,
   BadgePercent, Building, LayoutGrid, Globe, UserCog, Layers,
-  Sparkles, ShoppingCart,
+  Sparkles, ShoppingCart, Upload,
 } from "lucide-react"
 
 // ─── Brand tokens ──────────────────────────────────────────────────────────────
@@ -251,9 +251,10 @@ export function Nav() {
               </NavSubMenu>
 
               <NavSubMenu label="Ledger & Banking" icon={<Landmark />}>
-                <NavItem href="/transactions/journal"       icon={<BookOpen />}>Journals</NavItem>
-                <NavItem href="/banking/reconciliation"     icon={<ArrowLeftRight />}>Bank Reconciliation</NavItem>
-                <NavItem href="/reports/trial-balance"      icon={<Scale />}>Trial Balance</NavItem>
+                <NavItem href="/transactions/journal"        icon={<BookOpen />}>Journals</NavItem>
+                <NavItem href="/transactions/journal/import" icon={<Upload />}>Import Journals</NavItem>
+                <NavItem href="/banking/reconciliation"      icon={<ArrowLeftRight />}>Bank Reconciliation</NavItem>
+                <NavItem href="/reports/trial-balance"       icon={<Scale />}>Trial Balance</NavItem>
               </NavSubMenu>
 
               <NavSubMenu label="Assets & Inventory" icon={<Package />}>
