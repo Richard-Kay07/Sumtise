@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
-import { Plus, RefreshCw, BookOpen, CheckCircle, Clock, XCircle, FileText, Send } from "lucide-react"
+import { Plus, RefreshCw, BookOpen, CheckCircle, Clock, XCircle, FileText, Upload } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -96,6 +96,11 @@ export default function JournalEntriesPage() {
             <Button size="sm" variant="outline" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" />
             </Button>
+            <Link href="/transactions/journal/import">
+              <Button size="sm" variant="outline">
+                <Upload className="h-4 w-4 mr-1" /> Import
+              </Button>
+            </Link>
             <Link href="/transactions/journal/new">
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-1" /> New Journal

@@ -250,9 +250,13 @@ export function Nav() {
                 <NavItem href="/expenses/payment-run"     icon={<Wallet />}>Payment Runs</NavItem>
               </NavSubMenu>
 
-              <NavSubMenu label="Ledger & Banking" icon={<Landmark />}>
-                <NavItem href="/transactions/journal"        icon={<BookOpen />}>Journals</NavItem>
-                <NavItem href="/transactions/journal/import" icon={<Upload />}>Import Journals</NavItem>
+              <Divider />
+
+              <SectionLabel>Ledger</SectionLabel>
+              <NavItem href="/transactions/journal"        icon={<BookOpen />}>Journals</NavItem>
+              <NavItem href="/transactions/journal/import" icon={<Upload />}>Import Journals</NavItem>
+
+              <NavSubMenu label="Banking" icon={<Landmark />}>
                 <NavItem href="/banking/reconciliation"      icon={<ArrowLeftRight />}>Bank Reconciliation</NavItem>
                 <NavItem href="/reports/trial-balance"       icon={<Scale />}>Trial Balance</NavItem>
               </NavSubMenu>
