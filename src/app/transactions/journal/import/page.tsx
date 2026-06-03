@@ -157,7 +157,7 @@ export default function JournalImportPage() {
 
   const templateQuery = trpc.manualJournals.getTemplateData.useQuery(
     { organizationId: orgId ?? "" },
-    { enabled: !!orgId, staleTime: 5 * 60 * 1000 },
+    { enabled: !!orgId, staleTime: 5 * 60 * 1000, retry: 1 },
   )
 
   const previewMutation = trpc.manualJournals.previewImport.useMutation({
@@ -364,11 +364,11 @@ export default function JournalImportPage() {
                     size="sm"
                     className="w-full justify-start"
                     onClick={downloadExcel}
-                    disabled={templateQuery.isLoading || !orgId}
                   >
-                    {templateQuery.isLoading
-                      ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Loading accounts…</>
-                      : <><FileSpreadsheet className="h-4 w-4 mr-2" />Download Excel Template (.xlsx)</>}
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />Download Excel Template (.xlsx)
+                    {templateQuery.isSuccess && (
+                      <span className="ml-auto text-xs opacity-60">{templateQuery.data.accounts.length} accs</span>
+                    )}
                   </Button>
                   <Button variant="outline" size="sm" className="w-full justify-start" onClick={downloadCSV}>
                     <FileText className="h-4 w-4 mr-2" />Download CSV Template (.csv)
