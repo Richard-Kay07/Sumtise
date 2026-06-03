@@ -1,5 +1,6 @@
 "use client"
 
+import * as XLSX from "xlsx"
 import { useState, useCallback } from "react"
 import Link from "next/link"
 import {
@@ -31,7 +32,6 @@ async function validateFileClientSide(
 ): Promise<JournalParseResult> {
   let csvText: string
   if (ext === "xlsx" || ext === "xls") {
-    const XLSX = await import("xlsx")
     const data = new Uint8Array(ab)
     const wb   = XLSX.read(data, { type: "array", cellDates: true })
     csvText    = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]], { blankrows: false })
@@ -39,6 +39,104 @@ async function validateFileClientSide(
     csvText = new TextDecoder().decode(ab)
   }
   return parseJournalCSV(csvText)
+}
+
+// ─── Client-side Excel template builder ───────────────────────────────────────
+
+type AccountRow = {
+  code: string; name: string; type: string; subType: string | null
+  normalBalance: string; departmentCode: string | null; costCentreCode: string | null
+  analysisCode1: string | null; analysisCode2: string | null; analysisCode3: string | null
+  projectCode: string | null; grantCode: string | null; fundCode: string | null
+  isControlAccount: boolean; description: string | null
+}
+
+function buildAndDownloadExcel(accounts: AccountRow[]) {
+  const today    = new Date().toISOString().split("T")[0]
+  const curMonth = new Date().getMonth() + 1
+
+  const wb = XLSX.utils.book_new()
+
+  // Sheet 1: Journal Import
+  const importHeaders = JOURNAL_COLUMNS.map((c) => c.header)
+  const sampleRows = [
+    [today, curMonth, "JNL-001", "Accrued expenses",  "6100", "Rent Expense",      "EXPENSE",   "Operations", "CC-001", "", "", "", 500, "",  "Accrued rent Q1",   "", "GBP"],
+    [today, curMonth, "JNL-001", "Accrued expenses",  "2100", "Accruals Payable",  "LIABILITY", "",           "",       "", "", "", "",  500, "Accruals payable",  "", "GBP"],
+    [today, curMonth, "JNL-002", "Prepaid insurance", "1200", "Prepayments",       "ASSET",     "Finance",    "",       "", "", "", 250, "",  "Prepayment Q1",     "", "GBP"],
+    [today, curMonth, "JNL-002", "Prepaid insurance", "6200", "Insurance Expense", "EXPENSE",   "",           "",       "", "", "", "",  250, "Insurance expense", "", "GBP"],
+  ]
+  const wsImport = XLSX.utils.aoa_to_sheet([importHeaders, ...sampleRows])
+  wsImport["!cols"]  = JOURNAL_COLUMNS.map((c) => ({ wch: c.width }))
+  wsImport["!views"] = [{ state: "frozen", ySplit: 1 }]
+  XLSX.utils.book_append_sheet(wb, wsImport, "Journal Import")
+
+  // Sheet 2: Account Reference
+  const refHeaders = [
+    "account_code", "account_name", "account_type", "sub_type",
+    "normal_balance", "department_code", "cost_centre_code",
+    "analysis_code_1", "analysis_code_2", "analysis_code_3",
+    "project_code", "grant_code", "fund_code",
+    "is_control_account", "description",
+  ]
+  const refRows = accounts.map((a) => [
+    a.code, a.name, a.type, a.subType ?? "",
+    a.normalBalance, a.departmentCode ?? "", a.costCentreCode ?? "",
+    a.analysisCode1 ?? "", a.analysisCode2 ?? "", a.analysisCode3 ?? "",
+    a.projectCode ?? "", a.grantCode ?? "", a.fundCode ?? "",
+    a.isControlAccount ? "Yes" : "No", a.description ?? "",
+  ])
+  const wsRef = XLSX.utils.aoa_to_sheet([refHeaders, ...refRows])
+  wsRef["!cols"] = [
+    { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 16 },
+    { wch: 14 }, { wch: 16 }, { wch: 16 },
+    { wch: 16 }, { wch: 16 }, { wch: 16 },
+    { wch: 14 }, { wch: 14 }, { wch: 14 },
+    { wch: 16 }, { wch: 30 },
+  ]
+  wsRef["!views"] = [{ state: "frozen", ySplit: 1 }]
+  XLSX.utils.book_append_sheet(wb, wsRef, "Account Reference")
+
+  // Sheet 3: Instructions
+  const instrRows: (string | number)[][] = [
+    ["SUMTISE — JOURNAL IMPORT TEMPLATE"],
+    [`Generated: ${new Date().toISOString()}`, `Accounts loaded: ${accounts.length}`],
+    [],
+    ["JOURNAL IMPORT SHEET — Column guide"],
+    [],
+    ["Column", "Required", "Description", "Example"],
+    ...JOURNAL_COLUMNS.map((c) => [c.header, c.required ? "YES" : "no", c.description, c.example]),
+    [],
+    ["RULES"],
+    ["• Each row is one journal line."],
+    ["• Rows with the same 'reference' are grouped into one balanced journal entry."],
+    ["• Debits must equal credits per journal (the journal must balance)."],
+    ["• 'account_code' must match a code in the Account Reference sheet."],
+    ["• 'period' is an optional accounting period number (1–12)."],
+    ["• Informational columns (account_name, account_type, department, cost_centre,"],
+    ["  analysis_code_1/2/3) are pre-populated from your COA on import if left blank."],
+    [],
+    ["DATE FORMATS ACCEPTED"],
+    ["YYYY-MM-DD  |  DD/MM/YYYY  |  MM/DD/YYYY"],
+    [],
+    ["ACCOUNT REFERENCE SHEET"],
+    ["Contains all active accounts in your Chart of Accounts."],
+    ["Use the 'account_code' value in the Journal Import sheet."],
+  ]
+  const wsInstr = XLSX.utils.aoa_to_sheet(instrRows)
+  wsInstr["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 55 }, { wch: 22 }]
+  XLSX.utils.book_append_sheet(wb, wsInstr, "Instructions")
+
+  // Write to array buffer and trigger download
+  const wbArray = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer
+  const blob = new Blob([wbArray], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement("a")
+  a.href     = url
+  a.download = "journal_import_template.xlsx"
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -57,19 +155,10 @@ export default function JournalImportPage() {
 
   // ── tRPC ─────────────────────────────────────────────────────────────────────
 
-  const templateMutation = trpc.manualJournals.generateTemplate.useMutation({
-    onSuccess: ({ base64 }) => {
-      const bytes = atob(base64)
-      const arr   = new Uint8Array(bytes.length)
-      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
-      const blob = new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement("a")
-      a.href = url; a.download = "journal_import_template.xlsx"; a.click()
-      URL.revokeObjectURL(url)
-    },
-    onError: (e) => setUploadError(`Template generation failed: ${e.message}`),
-  })
+  const templateQuery = trpc.manualJournals.getTemplateData.useQuery(
+    { organizationId: orgId ?? "" },
+    { enabled: !!orgId, staleTime: 5 * 60 * 1000 },
+  )
 
   const previewMutation = trpc.manualJournals.previewImport.useMutation({
     onSuccess: (data) => { setPreviewData(data); setStep("preview") },
@@ -99,12 +188,10 @@ export default function JournalImportPage() {
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const ab    = ev.target?.result as ArrayBuffer
-      // Encode to base64 for server calls
       const bytes = new Uint8Array(ab)
       let bin = ""
       for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i])
       setCsvBase64(btoa(bin))
-      // Run client-side validation immediately
       const validation = await validateFileClientSide(ab, ext)
       setLocalResult(validation)
     }
@@ -134,30 +221,38 @@ export default function JournalImportPage() {
   function downloadCSV() {
     const blob = new Blob([JOURNAL_CSV_TEMPLATE], { type: "text/csv" })
     const url  = URL.createObjectURL(blob)
-    const a    = document.createElement("a"); a.href = url; a.download = "journal_template.csv"; a.click()
-    URL.revokeObjectURL(url)
+    const a    = document.createElement("a")
+    a.href     = url
+    a.download = "journal_template.csv"
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  function downloadExcel() {
+    const accounts = templateQuery.data?.accounts ?? []
+    buildAndDownloadExcel(accounts)
   }
 
   // ── Derived state ─────────────────────────────────────────────────────────────
 
-  const localErrors      = localResult?.errors ?? []
-  const localHasErrors   = localErrors.length > 0
+  const localErrors       = localResult?.errors ?? []
+  const localHasErrors    = localErrors.length > 0
   const localJournalCount = localResult?.journals.length ?? 0
-  const localBalanced    = localResult?.journals.every((j) => j.isBalanced) ?? false
-  const canPreview       = !!csvBase64 && !localHasErrors && localJournalCount > 0
+  const localBalanced     = localResult?.journals.every((j) => j.isBalanced) ?? false
+  const canPreview        = !!csvBase64 && !localHasErrors && localJournalCount > 0
 
-  const serverErrors     = (previewData?.errors ?? [])
-  const serverHasErrors  = serverErrors.length > 0
-  const canImport        = previewData && !serverHasErrors && (previewData?.journals?.length ?? 0) > 0
+  const serverErrors      = (previewData?.errors ?? [])
+  const serverHasErrors   = serverErrors.length > 0
+  const canImport         = previewData && !serverHasErrors && (previewData?.journals?.length ?? 0) > 0
 
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-background">
       <PageHeader
-        crumbs={[
-          { label: "Journals", href: "/transactions/journal" },
-        ]}
+        crumbs={[{ label: "Journals", href: "/transactions/journal" }]}
         title="Journal Upload"
       />
 
@@ -268,11 +363,11 @@ export default function JournalImportPage() {
                   <Button
                     size="sm"
                     className="w-full justify-start"
-                    onClick={() => orgId && templateMutation.mutate({ organizationId: orgId })}
-                    disabled={templateMutation.isPending || !orgId}
+                    onClick={downloadExcel}
+                    disabled={templateQuery.isLoading || !orgId}
                   >
-                    {templateMutation.isPending
-                      ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Generating…</>
+                    {templateQuery.isLoading
+                      ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Loading accounts…</>
                       : <><FileSpreadsheet className="h-4 w-4 mr-2" />Download Excel Template (.xlsx)</>}
                   </Button>
                   <Button variant="outline" size="sm" className="w-full justify-start" onClick={downloadCSV}>
@@ -467,7 +562,7 @@ export default function JournalImportPage() {
                   <span>DRAFT — pending submission and approval</span>
                 </div>
                 <p className="pt-2 text-xs text-muted-foreground">
-                  The import batch ID is stored in each journal's metadata and in the audit log,
+                  The import batch ID is stored in each journal&apos;s metadata and in the audit log,
                   allowing auditors to trace all journals created from this file.
                 </p>
               </CardContent>

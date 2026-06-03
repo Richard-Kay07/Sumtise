@@ -14,9 +14,8 @@ import { createTRPCRouter, orgScopedProcedure } from "@/lib/trpc"
 import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
-import { parseJournalCSV, JOURNAL_COLUMNS } from "@/lib/journal-import/csv-parser"
+import { parseJournalCSV } from "@/lib/journal-import/csv-parser"
 import { excelToCSV, isExcelBuffer } from "@/lib/journal-import/excel-parser"
-import * as XLSX from "xlsx"
 import { randomUUID } from "crypto"
 
 // ─── Shared validation ────────────────────────────────────────────────────────
@@ -604,13 +603,10 @@ export const manualJournalsRouter = createTRPCRouter({
       return { requests, total, page: input.page, limit: input.limit }
     }),
 
-  // ── Generate Excel template (server-side, with live COA) ─────────────────────
-  generateTemplate: orgScopedProcedure
+  // ── Template data — plain JSON for client-side Excel generation ──────────────
+  getTemplateData: orgScopedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .mutation(async ({ ctx }) => {
-      const today      = new Date().toISOString().split("T")[0]
-      const curMonth   = new Date().getMonth() + 1 // calendar month as default period
-
+    .query(async ({ ctx }) => {
       const accounts = await prisma.chartOfAccount.findMany({
         where: { organizationId: ctx.organizationId, isActive: true },
         select: {
@@ -623,82 +619,7 @@ export const manualJournalsRouter = createTRPCRouter({
         },
         orderBy: [{ type: "asc" }, { code: "asc" }],
       })
-
-      const wb = XLSX.utils.book_new()
-
-      // ── Sheet 1: Journal Import ─────────────────────────────────────────────
-      const importHeaders = JOURNAL_COLUMNS.map((c) => c.header)
-      const sampleRows = [
-        [today, curMonth, "JNL-001", "Accrued expenses",  "6100", "Rent Expense",     "EXPENSE",   "Operations", "CC-001", "", "", "", 500, "",   "Accrued rent Q1", "", "GBP"],
-        [today, curMonth, "JNL-001", "Accrued expenses",  "2100", "Accruals Payable", "LIABILITY", "",           "",       "", "", "", "",  500,  "Accruals payable","", "GBP"],
-        [today, curMonth, "JNL-002", "Prepaid insurance", "1200", "Prepayments",      "ASSET",     "Finance",    "",       "", "", "", 250, "",   "Prepayment Q1",   "", "GBP"],
-        [today, curMonth, "JNL-002", "Prepaid insurance", "6200", "Insurance Expense","EXPENSE",   "",           "",       "", "", "", "",  250,  "Insurance expense","","GBP"],
-      ]
-      const wsImport = XLSX.utils.aoa_to_sheet([importHeaders, ...sampleRows])
-      wsImport["!cols"] = JOURNAL_COLUMNS.map((c) => ({ wch: c.width }))
-      // Freeze header row
-      wsImport["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft" as any, state: "frozen" }
-      XLSX.utils.book_append_sheet(wb, wsImport, "Journal Import")
-
-      // ── Sheet 2: Account Reference ──────────────────────────────────────────
-      const refHeaders = [
-        "account_code", "account_name", "account_type", "sub_type",
-        "normal_balance", "department_code", "cost_centre_code",
-        "analysis_code_1", "analysis_code_2", "analysis_code_3",
-        "project_code", "grant_code", "fund_code",
-        "is_control_account", "description",
-      ]
-      const refRows = accounts.map((a) => [
-        a.code, a.name, a.type, a.subType ?? "",
-        a.normalBalance, a.departmentCode ?? "", a.costCentreCode ?? "",
-        a.analysisCode1 ?? "", a.analysisCode2 ?? "", a.analysisCode3 ?? "",
-        a.projectCode ?? "", a.grantCode ?? "", a.fundCode ?? "",
-        a.isControlAccount ? "Yes" : "No", a.description ?? "",
-      ])
-      const wsRef = XLSX.utils.aoa_to_sheet([refHeaders, ...refRows])
-      wsRef["!cols"] = [
-        { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 16 },
-        { wch: 14 }, { wch: 16 }, { wch: 16 },
-        { wch: 16 }, { wch: 16 }, { wch: 16 },
-        { wch: 14 }, { wch: 14 }, { wch: 14 },
-        { wch: 16 }, { wch: 30 },
-      ]
-      wsRef["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft" as any, state: "frozen" }
-      XLSX.utils.book_append_sheet(wb, wsRef, "Account Reference")
-
-      // ── Sheet 3: Instructions ───────────────────────────────────────────────
-      const instrRows: (string | number)[][] = [
-        ["SUMTISE — JOURNAL IMPORT TEMPLATE"],
-        [`Generated: ${new Date().toISOString()}`, `Accounts loaded: ${accounts.length}`],
-        [],
-        ["JOURNAL IMPORT SHEET — Column guide"],
-        [],
-        ["Column", "Required", "Description", "Example"],
-        ...JOURNAL_COLUMNS.map((c) => [c.header, c.required ? "YES" : "no", c.description, c.example]),
-        [],
-        ["RULES"],
-        ["• Each row is one journal line."],
-        ["• Rows with the same 'reference' are grouped into one balanced journal entry."],
-        ["• Debits must equal credits per journal (the journal must balance)."],
-        ["• 'account_code' must match a code in the Account Reference sheet."],
-        ["• 'period' is an optional accounting period number (1–12)."],
-        ["• Informational columns (account_name, account_type, department, cost_centre,"],
-        ["  analysis_code_1/2/3) are pre-populated from your COA on import if left blank."],
-        [],
-        ["DATE FORMATS ACCEPTED"],
-        ["YYYY-MM-DD  |  DD/MM/YYYY  |  MM/DD/YYYY"],
-        [],
-        ["ACCOUNT REFERENCE SHEET"],
-        ["Contains all active accounts in your Chart of Accounts."],
-        ["Use the 'account_code' value in the Journal Import sheet."],
-      ]
-      const wsInstr = XLSX.utils.aoa_to_sheet(instrRows)
-      wsInstr["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 55 }, { wch: 22 }]
-      XLSX.utils.book_append_sheet(wb, wsInstr, "Instructions")
-
-      // type:"base64" returns a plain string — avoids Buffer serialisation issues over tRPC
-      const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" }) as string
-      return { base64 }
+      return { accounts }
     }),
 
   // ── Preview import (CSV or XLSX) ──────────────────────────────────────────────
