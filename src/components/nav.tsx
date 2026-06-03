@@ -259,8 +259,9 @@ export function Nav() {
               </NavSubMenu>
 
               <NavSubMenu label="Banking" icon={<Landmark />}>
+                <NavItem href="/banking"                     icon={<Landmark />}>Banking Overview</NavItem>
                 <NavItem href="/banking/reconciliation"      icon={<ArrowLeftRight />}>Bank Reconciliation</NavItem>
-                <NavItem href="/reports/trial-balance"       icon={<Scale />}>Trial Balance</NavItem>
+                <NavItem href="/banking/import"              icon={<Upload />}>Import Transactions</NavItem>
               </NavSubMenu>
 
               <NavSubMenu label="Assets & Inventory" icon={<Package />}>

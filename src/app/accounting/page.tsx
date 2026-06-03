@@ -15,7 +15,7 @@ const TILES = [
   { href: "/expenses",                          icon: Receipt,      label: "Expenses",              desc: "Record and track business expenses" },
   { href: "/budgets",                           icon: PiggyBank,    label: "Budgets",               desc: "Plan and monitor budgets" },
   { href: "/accounting/billing-payments",       icon: CreditCard,   label: "Billing & Payments",    desc: "Recurring invoices and payment runs" },
-  { href: "/accounting/ledger-banking",         icon: Landmark,     label: "Ledger & Banking",      desc: "Journals, bank reconciliation and trial balance" },
+  { href: "/accounting/ledger-banking",         icon: Landmark,     label: "Ledger & Banking",      desc: "Manual journals, journal upload, bank reconciliation" },
   { href: "/accounting/assets-inventory",       icon: Package,      label: "Assets & Inventory",    desc: "Fixed assets and inventory management" },
   { href: "/accounting/period-end",             icon: CalendarClock, label: "Period End & Close",   desc: "Run period-end close and reconciliations" },
   { href: "/accounting/accounting-settings",    icon: Settings2,    label: "Accounting Settings",   desc: "COA, analysis codes and accounting config" },

@@ -68,6 +68,7 @@ export default function JournalImportPage() {
       a.href = url; a.download = "journal_import_template.xlsx"; a.click()
       URL.revokeObjectURL(url)
     },
+    onError: (e) => setUploadError(`Template generation failed: ${e.message}`),
   })
 
   const previewMutation = trpc.manualJournals.previewImport.useMutation({

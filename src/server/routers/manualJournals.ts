@@ -696,8 +696,9 @@ export const manualJournalsRouter = createTRPCRouter({
       wsInstr["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 55 }, { wch: 22 }]
       XLSX.utils.book_append_sheet(wb, wsInstr, "Instructions")
 
-      const buffer = XLSX.write(wb, { bookType: "xlsx", type: "buffer" }) as Buffer
-      return { base64: buffer.toString("base64") }
+      // type:"base64" returns a plain string — avoids Buffer serialisation issues over tRPC
+      const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" }) as string
+      return { base64 }
     }),
 
   // ── Preview import (CSV or XLSX) ──────────────────────────────────────────────
