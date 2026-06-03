@@ -253,8 +253,10 @@ export function Nav() {
               <Divider />
 
               <SectionLabel>Ledger</SectionLabel>
-              <NavItem href="/transactions/journal"        icon={<BookOpen />}>Journals</NavItem>
-              <NavItem href="/transactions/journal/import" icon={<Upload />}>Import Journals</NavItem>
+              <NavSubMenu label="Journals" icon={<BookOpen />}>
+                <NavItem href="/transactions/journal"        icon={<BookOpen />}>Manual Journals</NavItem>
+                <NavItem href="/transactions/journal/import" icon={<Upload />}>Journal Upload</NavItem>
+              </NavSubMenu>
 
               <NavSubMenu label="Banking" icon={<Landmark />}>
                 <NavItem href="/banking/reconciliation"      icon={<ArrowLeftRight />}>Bank Reconciliation</NavItem>

@@ -14,8 +14,10 @@ import { createTRPCRouter, orgScopedProcedure } from "@/lib/trpc"
 import { prisma } from "@/lib/prisma"
 import { recordAudit } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
-import { parseJournalCSV } from "@/lib/journal-import/csv-parser"
+import { parseJournalCSV, JOURNAL_COLUMNS } from "@/lib/journal-import/csv-parser"
 import { excelToCSV, isExcelBuffer } from "@/lib/journal-import/excel-parser"
+import * as XLSX from "xlsx"
+import { randomUUID } from "crypto"
 
 // ─── Shared validation ────────────────────────────────────────────────────────
 
@@ -602,10 +604,13 @@ export const manualJournalsRouter = createTRPCRouter({
       return { requests, total, page: input.page, limit: input.limit }
     }),
 
-  // ── COA data for template generation ─────────────────────────────────────────
-  getTemplateData: orgScopedProcedure
+  // ── Generate Excel template (server-side, with live COA) ─────────────────────
+  generateTemplate: orgScopedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .query(async ({ ctx }) => {
+    .mutation(async ({ ctx }) => {
+      const today      = new Date().toISOString().split("T")[0]
+      const curMonth   = new Date().getMonth() + 1 // calendar month as default period
+
       const accounts = await prisma.chartOfAccount.findMany({
         where: { organizationId: ctx.organizationId, isActive: true },
         select: {
@@ -618,7 +623,81 @@ export const manualJournalsRouter = createTRPCRouter({
         },
         orderBy: [{ type: "asc" }, { code: "asc" }],
       })
-      return { accounts }
+
+      const wb = XLSX.utils.book_new()
+
+      // ── Sheet 1: Journal Import ─────────────────────────────────────────────
+      const importHeaders = JOURNAL_COLUMNS.map((c) => c.header)
+      const sampleRows = [
+        [today, curMonth, "JNL-001", "Accrued expenses",  "6100", "Rent Expense",     "EXPENSE",   "Operations", "CC-001", "", "", "", 500, "",   "Accrued rent Q1", "", "GBP"],
+        [today, curMonth, "JNL-001", "Accrued expenses",  "2100", "Accruals Payable", "LIABILITY", "",           "",       "", "", "", "",  500,  "Accruals payable","", "GBP"],
+        [today, curMonth, "JNL-002", "Prepaid insurance", "1200", "Prepayments",      "ASSET",     "Finance",    "",       "", "", "", 250, "",   "Prepayment Q1",   "", "GBP"],
+        [today, curMonth, "JNL-002", "Prepaid insurance", "6200", "Insurance Expense","EXPENSE",   "",           "",       "", "", "", "",  250,  "Insurance expense","","GBP"],
+      ]
+      const wsImport = XLSX.utils.aoa_to_sheet([importHeaders, ...sampleRows])
+      wsImport["!cols"] = JOURNAL_COLUMNS.map((c) => ({ wch: c.width }))
+      // Freeze header row
+      wsImport["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft" as any, state: "frozen" }
+      XLSX.utils.book_append_sheet(wb, wsImport, "Journal Import")
+
+      // ── Sheet 2: Account Reference ──────────────────────────────────────────
+      const refHeaders = [
+        "account_code", "account_name", "account_type", "sub_type",
+        "normal_balance", "department_code", "cost_centre_code",
+        "analysis_code_1", "analysis_code_2", "analysis_code_3",
+        "project_code", "grant_code", "fund_code",
+        "is_control_account", "description",
+      ]
+      const refRows = accounts.map((a) => [
+        a.code, a.name, a.type, a.subType ?? "",
+        a.normalBalance, a.departmentCode ?? "", a.costCentreCode ?? "",
+        a.analysisCode1 ?? "", a.analysisCode2 ?? "", a.analysisCode3 ?? "",
+        a.projectCode ?? "", a.grantCode ?? "", a.fundCode ?? "",
+        a.isControlAccount ? "Yes" : "No", a.description ?? "",
+      ])
+      const wsRef = XLSX.utils.aoa_to_sheet([refHeaders, ...refRows])
+      wsRef["!cols"] = [
+        { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 16 },
+        { wch: 14 }, { wch: 16 }, { wch: 16 },
+        { wch: 16 }, { wch: 16 }, { wch: 16 },
+        { wch: 14 }, { wch: 14 }, { wch: 14 },
+        { wch: 16 }, { wch: 30 },
+      ]
+      wsRef["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft" as any, state: "frozen" }
+      XLSX.utils.book_append_sheet(wb, wsRef, "Account Reference")
+
+      // ── Sheet 3: Instructions ───────────────────────────────────────────────
+      const instrRows: (string | number)[][] = [
+        ["SUMTISE — JOURNAL IMPORT TEMPLATE"],
+        [`Generated: ${new Date().toISOString()}`, `Accounts loaded: ${accounts.length}`],
+        [],
+        ["JOURNAL IMPORT SHEET — Column guide"],
+        [],
+        ["Column", "Required", "Description", "Example"],
+        ...JOURNAL_COLUMNS.map((c) => [c.header, c.required ? "YES" : "no", c.description, c.example]),
+        [],
+        ["RULES"],
+        ["• Each row is one journal line."],
+        ["• Rows with the same 'reference' are grouped into one balanced journal entry."],
+        ["• Debits must equal credits per journal (the journal must balance)."],
+        ["• 'account_code' must match a code in the Account Reference sheet."],
+        ["• 'period' is an optional accounting period number (1–12)."],
+        ["• Informational columns (account_name, account_type, department, cost_centre,"],
+        ["  analysis_code_1/2/3) are pre-populated from your COA on import if left blank."],
+        [],
+        ["DATE FORMATS ACCEPTED"],
+        ["YYYY-MM-DD  |  DD/MM/YYYY  |  MM/DD/YYYY"],
+        [],
+        ["ACCOUNT REFERENCE SHEET"],
+        ["Contains all active accounts in your Chart of Accounts."],
+        ["Use the 'account_code' value in the Journal Import sheet."],
+      ]
+      const wsInstr = XLSX.utils.aoa_to_sheet(instrRows)
+      wsInstr["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 55 }, { wch: 22 }]
+      XLSX.utils.book_append_sheet(wb, wsInstr, "Instructions")
+
+      const buffer = XLSX.write(wb, { bookType: "xlsx", type: "buffer" }) as Buffer
+      return { base64: buffer.toString("base64") }
     }),
 
   // ── Preview import (CSV or XLSX) ──────────────────────────────────────────────
@@ -628,17 +707,11 @@ export const manualJournalsRouter = createTRPCRouter({
       csvBase64: z.string().min(1),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Decode base64 and detect format
       const buffer  = Buffer.from(input.csvBase64, "base64")
-      const csvText = isExcelBuffer(buffer)
-        ? excelToCSV(buffer)
-        : buffer.toString("utf-8")
-      const parsed = parseJournalCSV(csvText)
+      const csvText = isExcelBuffer(buffer) ? excelToCSV(buffer) : buffer.toString("utf-8")
+      const parsed  = parseJournalCSV(csvText)
 
-      // Resolve account codes to IDs for the org
-      const codes = [...new Set(
-        parsed.journals.flatMap((j) => j.lines.map((l) => l.accountCode))
-      )]
+      const codes = [...new Set(parsed.journals.flatMap((j) => j.lines.map((l) => l.accountCode)))]
       const accounts = await prisma.chartOfAccount.findMany({
         where: { organizationId: ctx.organizationId, code: { in: codes } },
         select: {
@@ -647,15 +720,14 @@ export const manualJournalsRouter = createTRPCRouter({
           analysisCode1: true, analysisCode2: true, analysisCode3: true,
         },
       })
-      const accountByCode = new Map(accounts.map((a) => [a.code, a]))
+      const byCode = new Map(accounts.map((a) => [a.code, a]))
 
-      // Enrich groups with resolved accounts; flag missing codes
       const extraErrors: typeof parsed.errors = []
       const preview = parsed.journals.map((group) => ({
         ...group,
         lines: group.lines.map((line, li) => {
-          const account = accountByCode.get(line.accountCode)
-          if (!account) {
+          const acct = byCode.get(line.accountCode)
+          if (!acct) {
             extraErrors.push({
               row: group.rowNumbers[li] ?? group.rowNumbers[0],
               message: `Account code "${line.accountCode}" not found in chart of accounts`,
@@ -663,14 +735,14 @@ export const manualJournalsRouter = createTRPCRouter({
           }
           return {
             ...line,
-            accountId:     account?.id   ?? null,
-            accountName:   account?.name ?? null,
-            // Prefer file values; fall back to COA defaults
-            department:    line.department  ?? account?.departmentCode  ?? null,
-            costCentre:    line.costCentre  ?? account?.costCentreCode  ?? null,
-            analysisCode1: line.analysisCode1 ?? account?.analysisCode1 ?? null,
-            analysisCode2: line.analysisCode2 ?? account?.analysisCode2 ?? null,
-            analysisCode3: line.analysisCode3 ?? account?.analysisCode3 ?? null,
+            accountId:     acct?.id   ?? null,
+            accountName:   acct?.name ?? null,
+            accountType:   acct?.type ?? null,
+            department:    line.department    ?? acct?.departmentCode ?? null,
+            costCentre:    line.costCentre    ?? acct?.costCentreCode ?? null,
+            analysisCode1: line.analysisCode1 ?? acct?.analysisCode1 ?? null,
+            analysisCode2: line.analysisCode2 ?? acct?.analysisCode2 ?? null,
+            analysisCode3: line.analysisCode3 ?? acct?.analysisCode3 ?? null,
           }
         }),
       }))
@@ -682,83 +754,75 @@ export const manualJournalsRouter = createTRPCRouter({
       }
     }),
 
-  // ── Import journals (CSV or XLSX) ─────────────────────────────────────────────
+  // ── Import journals (CSV or XLSX) — full audit trail ─────────────────────────
   importJournals: orgScopedProcedure
     .input(z.object({
       organizationId: z.string(),
       csvBase64: z.string().min(1),
-      currency: z.string().default("GBP"),
+      filename: z.string().default("upload"),
     }))
     .mutation(async ({ ctx, input }) => {
       const buffer  = Buffer.from(input.csvBase64, "base64")
-      const csvText = isExcelBuffer(buffer)
-        ? excelToCSV(buffer)
-        : buffer.toString("utf-8")
-      const parsed = parseJournalCSV(csvText)
+      const csvText = isExcelBuffer(buffer) ? excelToCSV(buffer) : buffer.toString("utf-8")
+      const parsed  = parseJournalCSV(csvText)
 
       if (parsed.errors.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `CSV has ${parsed.errors.length} error(s). Fix them before importing.`,
+          message: `File has ${parsed.errors.length} validation error(s). Fix them before importing.`,
         })
       }
 
-      // Resolve all account codes up front
-      const codes = [...new Set(
-        parsed.journals.flatMap((j) => j.lines.map((l) => l.accountCode))
-      )]
+      // Resolve account codes
+      const codes = [...new Set(parsed.journals.flatMap((j) => j.lines.map((l) => l.accountCode)))]
       const accounts = await prisma.chartOfAccount.findMany({
         where: { organizationId: ctx.organizationId, code: { in: codes } },
         select: { id: true, code: true },
       })
-      const accountByCode = new Map(accounts.map((a) => [a.code, a.id]))
+      const byCode = new Map(accounts.map((a) => [a.code, a.id]))
 
-      // Validate all codes resolve before writing anything
-      const missing = codes.filter((c) => !accountByCode.has(c))
+      const missing = codes.filter((c) => !byCode.has(c))
       if (missing.length) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Unknown account codes: ${missing.join(", ")}`,
-        })
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unknown account codes: ${missing.join(", ")}` })
       }
 
-      // Validate all journals balanced and have ≥ 2 lines
       for (const group of parsed.journals) {
-        if (!group.isBalanced) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Journal "${group.reference}" is not balanced`,
-          })
-        }
-        if (group.lines.length < 2) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Journal "${group.reference}" has fewer than 2 lines`,
-          })
-        }
+        if (!group.isBalanced) throw new TRPCError({ code: "BAD_REQUEST", message: `Journal "${group.reference}" is not balanced` })
+        if (group.lines.length < 2) throw new TRPCError({ code: "BAD_REQUEST", message: `Journal "${group.reference}" has fewer than 2 lines` })
       }
 
-      // Create all journals
+      // Batch identifier — links all journals from this import in audit trail
+      const importBatchId = randomUUID()
+      const importedAt    = new Date().toISOString()
+
       const created: string[] = []
       for (const group of parsed.journals) {
         const journal = await prisma.manualJournal.create({
           data: {
             organizationId: ctx.organizationId,
-            reference: group.reference,
+            reference:   group.reference,
             description: group.description,
-            date: new Date(group.date),
-            currency: group.currency,
+            date:        new Date(group.date),
+            currency:    group.currency,
             exchangeRate: new Prisma.Decimal(1),
-            notes: group.notes,
-            preparedBy: ctx.userId,
-            status: "DRAFT",
+            notes:       group.notes,
+            preparedBy:  ctx.userId,
+            status:      "DRAFT",
+            metadata: {
+              source:        "spreadsheet_import",
+              importBatchId,
+              importedFile:  input.filename,
+              importedAt,
+              importedBy:    ctx.userId,
+              period:        group.period ?? null,
+            },
             lines: {
               create: group.lines.map((line, i) => ({
-                accountId: accountByCode.get(line.accountCode)!,
+                accountId:   byCode.get(line.accountCode)!,
                 description: line.lineDescription,
-                debit: new Prisma.Decimal(line.debit),
-                credit: new Prisma.Decimal(line.credit),
-                sortOrder: i,
+                debit:       new Prisma.Decimal(line.debit),
+                credit:      new Prisma.Decimal(line.credit),
+                sortOrder:   i,
               })),
             },
           },
@@ -766,18 +830,16 @@ export const manualJournalsRouter = createTRPCRouter({
         created.push(journal.id)
       }
 
+      // Audit log — one batch-level entry for auditor traceability
       await recordAudit({
-        entity: "manual_journal",
-        entityId: created[0] ?? "",
-        action: "import",
+        entity:         "manual_journal",
+        entityId:       importBatchId,
+        action:         "import",
         organizationId: ctx.organizationId,
-        userId: ctx.userId,
-        details: `Imported ${created.length} journal(s) from CSV`,
+        userId:         ctx.userId,
+        details:        `Import batch ${importBatchId}: ${created.length} journal(s) created from "${input.filename}" at ${importedAt}. Journal IDs: ${created.join(", ")}`,
       })
 
-      return {
-        imported: created.length,
-        journalIds: created,
-      }
+      return { imported: created.length, importBatchId, journalIds: created }
     }),
 })
