@@ -34,8 +34,5 @@ while [ $attempt -le $MAX_RETRIES ]; do
   attempt=$((attempt + 1))
 done
 
-echo "=== Running demo seed (one-off) ==="
-npx tsx prisma/seed-demo.ts || echo "WARNING: Demo seed failed or already run — continuing."
-
 echo "=== Starting Next.js server ==="
 exec node server.js
