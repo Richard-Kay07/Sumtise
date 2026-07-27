@@ -14,6 +14,9 @@ export interface HmrcErrorBody {
   code?: string
   message?: string
   errors?: Array<{ code?: string; message?: string; path?: string }>
+  /** HMRC's OAuth endpoints use the RFC 6749 shape instead of code/message. */
+  error?: string
+  error_description?: string
 }
 
 export type HmrcErrorKind =
@@ -204,6 +207,28 @@ const CODE_MAP: Record<string, Mapping> = {
     userMessage: "Invalid API version header. This is a configuration fault.",
   },
 
+  // ── OAuth endpoint errors (RFC 6749 shape) ─────────────────────────────────
+  INVALID_REQUEST_OAUTH: {
+    kind: "VALIDATION",
+    userMessage: "The HMRC authorisation request was rejected. This is a configuration fault.",
+  },
+  INVALID_GRANT: {
+    kind: "AUTH",
+    userMessage: "Your HMRC authorisation is no longer valid. Reconnect your HMRC account.",
+  },
+  INVALID_CLIENT: {
+    kind: "AUTH",
+    userMessage: "HMRC did not recognise this application's credentials. Check HMRC_CLIENT_ID and HMRC_CLIENT_SECRET.",
+  },
+  UNAUTHORIZED_CLIENT: {
+    kind: "AUTH",
+    userMessage: "This application is not permitted to use that HMRC grant type.",
+  },
+  ACCESS_DENIED: {
+    kind: "AUTH",
+    userMessage: "Access was declined at HMRC. Connect again to grant permission.",
+  },
+
   // ── Throttling / server (429, 5xx) ─────────────────────────────────────────
   MESSAGE_THROTTLED_OUT: {
     kind: "RATE_LIMIT",
@@ -281,8 +306,14 @@ export function parseHmrcError(
   }
 
   // Prefer the first nested error code: it is more specific than the envelope,
-  // which is often the generic INVALID_REQUEST.
-  const code = body.errors?.[0]?.code ?? body.code ?? `HTTP_${status}`
+  // which is often the generic INVALID_REQUEST. `error` covers the RFC 6749
+  // shape returned by /oauth/authorize and /oauth/token, which uses different
+  // field names from the REST APIs.
+  const code =
+    body.errors?.[0]?.code ??
+    body.code ??
+    (body.error ? body.error.toUpperCase() : undefined) ??
+    `HTTP_${status}`
   const mapping = CODE_MAP[code] ?? fallbackForStatus(status)
 
   return new HmrcApiError({
