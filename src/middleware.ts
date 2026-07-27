@@ -9,6 +9,10 @@ const isPublicRoute = createRouteMatcher([
   '/auth/verify-email(.*)',
   '/api/auth/(.*)',
   '/api/webhooks/(.*)',
+  // Reports only the caller's own connection metadata back to the caller.
+  // Public because it must be observable from outside to answer whether the
+  // edge forwards the client TCP source port that HMRC requires.
+  '/api/diagnostics/edge-headers',
 ])
 
 export default clerkMiddleware(async (auth, req) => {

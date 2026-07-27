@@ -5,6 +5,8 @@ import { verifyOAuthState } from '@/lib/hmrc/state'
 import { verifyOrganizationMembership } from '@/lib/guards/organization'
 import { requirePermission, Permission } from '@/lib/permissions'
 
+export const dynamic = 'force-dynamic'
+
 const RETURN_PATH = '/tax/settings'
 
 function fail(req: NextRequest, reason: string) {
