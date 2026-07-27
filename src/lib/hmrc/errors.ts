@@ -138,8 +138,12 @@ const CODE_MAP: Record<string, Mapping> = {
   },
 
   // ── Business rules (403) ───────────────────────────────────────────────────
+  // NOT "AUTH": the OAuth token is perfectly valid, the client simply is not
+  // MTD-enrolled or the agent lacks authorisation for that VRN. Classifying it
+  // as AUTH marked a healthy connection as broken and told the user to
+  // reconnect, which cannot fix it.
   CLIENT_OR_AGENT_NOT_AUTHORISED: {
-    kind: "AUTH",
+    kind: "BUSINESS",
     userMessage:
       "HMRC says this account is not authorised for that VAT number. Check you signed in with the VAT (MTD) business account — or, if you are an agent, your Agent Services Account rather than an older Government Gateway agent ID.",
   },

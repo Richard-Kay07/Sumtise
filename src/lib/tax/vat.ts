@@ -203,20 +203,25 @@ export function isVATReturnDue(periodEndDate: Date, filingDeadlineDays = 37): bo
   return now >= deadline
 }
 
-/** Determine VAT quarter boundaries from any date. */
-export function getVATQuarter(
-  date: Date,
-  quarterMonths: [number, number, number] = [3, 6, 9, 12].slice(0, 3) as [number, number, number]
-): { start: Date; end: Date } {
-  // Default: calendar quarters ending March, June, September, December
+/**
+ * Determine VAT quarter boundaries from any date.
+ *
+ * Dates are built in UTC. Local-time construction shifted quarter ends by an
+ * hour under BST, which pushed 30 June transactions into the following quarter.
+ */
+export function getVATQuarter(date: Date): { start: Date; end: Date } {
+  // Calendar quarters ending March, June, September, December.
   const ends = [3, 6, 9, 12]
-  const month = date.getMonth() + 1 // 1-based
+  const month = date.getUTCMonth() + 1 // 1-based
   const endMonth = ends.find((m) => m >= month) ?? 12
-  const year = date.getFullYear()
+  const year = date.getUTCFullYear()
 
-  const end = new Date(year, endMonth - 1, 0)  // last day of endMonth
-  const start = new Date(end)
-  start.setMonth(start.getMonth() - 2, 1)
+  // Day 0 of month N gives the last day of month N-1, and Date months are
+  // 0-based — so `endMonth` (not endMonth-1) is the last day OF endMonth.
+  // The previous form returned the month BEFORE the quarter end, which for a
+  // March date produced a period ending before the date itself.
+  const end = new Date(Date.UTC(year, endMonth, 0, 23, 59, 59, 999))
+  const start = new Date(Date.UTC(year, endMonth - 3, 1, 0, 0, 0, 0))
 
   return { start, end }
 }

@@ -255,3 +255,70 @@ Agents must use an **Agent Services Account**, not an old Government Gateway
 agent ID — this is the most common support failure. Getting an ASA requires the
 firm's UTR and **proof of anti-money-laundering supervision**. The AML
 obligation is on the accountancy firm, not on Sumtise.
+
+---
+
+## Review findings addressed (2026-07-27)
+
+Three independent zero-context review agents audited this integration. Fixed:
+
+**Security**
+- OAuth `state` was the raw org ID → now HMAC-signed, TTL'd, bound to (org, user)
+- Callback verified membership but not `SETTINGS_EDIT` → permission now re-checked
+- `HMRC_STATE_SECRET` fell back to `NEXTAUTH_SECRET`, which env templates ship as
+  the literal `"your-secret-key-here"` → fallback removed, placeholders rejected
+- Tokens stored in plaintext → AES-256-GCM at rest (`src/lib/crypto/tokens.ts`)
+- Refresh was a read-modify-write race; HMRC refresh tokens are single-use, so
+  concurrent refreshes could persist a revoked token and permanently brick the
+  connection → advisory lock + compare-and-swap + in-process coalescing
+- Transient HMRC 5xx unconditionally marked the connection `ERROR` → only 4xx now
+- Reconnecting kept the OLD VRN paired with NEW credentials → VRN cleared on
+  token replacement
+- Raw HMRC token-endpoint bodies reached the browser → generic message, detail logged
+
+**Fraud prevention headers**
+- `"unknown"` and empty-string placeholders could be emitted → now fails closed
+- `X-Forwarded-For` left-most entry is client-controlled → prefers platform
+  headers, falls back to right-most; `??` → `||` so empty headers fall through
+- `navigator.userAgent` passed through unsanitised (CRLF injection) → sanitised
+- Client-supplied fingerprint unvalidated → UUID / `UTC±hh:mm` / positive ints
+
+**Accounting correctness**
+- `getVATQuarter` was off by one month — a March date returned a period ending
+  28 Feb, *before the date itself* → fixed, and moved to UTC
+- `OUT_OF_SCOPE` mapped to a truthy rate code, so wages and PAYE landed in
+  Box 7 → now excluded per VAT Notice 700/12
+- Input VAT on capital items was dropped because purchases post to ASSET
+  accounts → ASSET debits now included
+- Period boundaries used local-time midnight with `lte`, so under BST a 30 June
+  posting moved into the next quarter → half-open UTC interval
+- Double-submission guard required `status === "FULFILLED"`, which
+  `syncObligations` overwrites → now keyed on the receipt alone
+- Receipt persisted with `updateMany`, silently matching zero rows when
+  obligations had never synced → upsert, and stored *before* response validation
+- `CLIENT_OR_AGENT_NOT_AUTHORISED` (403) marked the connection broken though the
+  token is valid → reclassified as a business error
+- POST timeouts reported as safely retryable → now flagged indeterminate
+
+### Deliberately blocked rather than silently wrong
+
+`getVATReturn` now **rejects** `cash` and `flat_rate`. Cash accounting was
+computing on the invoice basis (declaring VAT on unpaid invoices); FRS had Box 6
+on a net rather than gross basis, never reclaimed capital-goods input VAT, and
+filed a **nil return** when the flat-rate percentage was omitted. Refusing is the
+only safe behaviour — the alternative is a wrong number on a filed return.
+
+### Known gaps — NOT production-ready for general use
+
+- **Boxes 1 and 4 are imputed** from the account's VAT treatment
+  (`net × rate`) rather than read from VAT actually charged. Mixed-rate
+  invoices, supplier rounding, fuel scale charges and bad-debt relief will not
+  reconcile. Box 1 should come from the VAT control account.
+- **Reverse charge (CIS), Postponed VAT Accounting, partial exemption and
+  blocked input tax are not modelled.** `VatTreatment` has no values for them.
+- **Boxes 2, 8 and 9 are hardcoded to 0** — wrong for Northern Ireland traders
+  under the NI Protocol.
+- **`exchangeRate` is ignored** — a USD invoice enters Box 6 at face value.
+- **`submitMtdVatReturn` has no UI caller yet.** `/tax/vat-mtd` still calls
+  `createVATSubmission`, which only writes a local row. Filing is reachable via
+  the API but not yet from the page.

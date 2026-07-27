@@ -55,6 +55,25 @@ function list(values: string[]): string {
   return values.filter((v) => v !== '').join(',')
 }
 
+/**
+ * Make a client-supplied string safe to place in an HTTP header.
+ *
+ * navigator.userAgent is fully attacker-controlled. A CR/LF would be a header
+ * injection vector (and makes undici throw ERR_INVALID_CHAR, taking down the
+ * submission), and HMRC requires US-ASCII with everything else percent-encoded.
+ * Printable ASCII is left literal so the value still matches HMRC's examples.
+ */
+function sanitiseHeaderValue(value: string, maxLength = 512): string {
+  return Array.from(value.slice(0, maxLength))
+    .map((ch) => {
+      const code = ch.charCodeAt(0)
+      // Printable ASCII except '%', which must be escaped to stay unambiguous.
+      if (code >= 0x20 && code <= 0x7e && ch !== '%') return ch
+      return pct(ch)
+    })
+    .join('')
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** Values only the browser can supply. Collected client-side, sent to our server. */
@@ -129,14 +148,38 @@ export function buildFraudPreventionHeaders(
 ): Record<string, string> {
   const { browser, server } = input
 
+  // Fail closed rather than emit an empty or placeholder value for a header
+  // HMRC treats as mandatory. Both of these feed cross-validated headers.
+  if (!server.clientPublicIp) {
+    throw new Error(
+      'Cannot build fraud prevention headers: the end user public IP is unknown. ' +
+        'HMRC forbids placeholder values, so the request must not proceed.',
+    )
+  }
+  if (!server.vendorPublicIp) {
+    throw new Error(
+      'Cannot build fraud prevention headers: HMRC_VENDOR_PUBLIC_IP is not configured. ' +
+        'HMRC cross-validates Gov-Vendor-Public-IP against Gov-Vendor-Forwarded and ' +
+        'Gov-Client-Public-IP, so an empty value is a compliance breach.',
+    )
+  }
+  if (!server.userId) {
+    throw new Error(
+      'Cannot build fraud prevention headers: no authenticated user. ' +
+        'Gov-Client-User-IDs must identify a real user, never a placeholder.',
+    )
+  }
+
   const headers: Record<string, string> = {}
 
   // 1 — fixed literal
   headers['Gov-Client-Connection-Method'] = 'WEB_APP_VIA_SERVER'
 
-  // 2 — navigator.userAgent, sent verbatim (ASCII in practice)
+  // 2 — navigator.userAgent. HMRC's example is unencoded, but this value is
+  //     fully client-controlled, so strip control characters (CR/LF would be a
+  //     header-injection vector and make fetch throw) and encode non-ASCII.
   if (browser.jsUserAgent) {
-    headers['Gov-Client-Browser-JS-User-Agent'] = browser.jsUserAgent
+    headers['Gov-Client-Browser-JS-User-Agent'] = sanitiseHeaderValue(browser.jsUserAgent)
   }
 
   // 3 — stable device UUID
@@ -250,13 +293,27 @@ export function extractClientNetwork(headers: Headers): {
   clientPublicIpTimestamp: string
   clientPublicPort?: string
 } {
-  // Left-most XFF entry is the original client; the rest are proxies.
-  const xff = headers.get('x-forwarded-for')
-  const clientPublicIp =
-    xff?.split(',')[0]?.trim() ??
-    headers.get('x-real-ip')?.trim() ??
-    headers.get('cf-connecting-ip')?.trim() ??
+  // Prefer platform-set headers: they are written by our own edge and cannot be
+  // spoofed by the client. X-Forwarded-For is a LAST resort because a client
+  // can pre-seed it — proxies append rather than replace, so the left-most
+  // entry is attacker-controlled. Feeding HMRC a forged client IP on a
+  // fraud-prevention header is the worst possible failure mode.
+  //
+  // Note `||` not `??`: an empty-but-present header is not nullish, so `??`
+  // would stop at "" and never reach the fallbacks.
+  const trusted =
+    headers.get('cf-connecting-ip')?.trim() ||
+    headers.get('x-real-ip')?.trim() ||
     ''
+
+  // When only XFF is available, take the RIGHT-most entry, which our own proxy
+  // appended, rather than the left-most, which the client may have supplied.
+  const xffChain = (headers.get('x-forwarded-for') ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  const clientPublicIp = normaliseIp(trusted || xffChain[xffChain.length - 1] || '')
 
   // Cloudflare exposes the source port; most other edges do not.
   const port =
@@ -277,6 +334,20 @@ export function extractClientNetwork(headers: Headers): {
     clientPublicIpTimestamp: new Date().toISOString(),
     clientPublicPort: validPort,
   }
+}
+
+/**
+ * Strip a port suffix and brackets that some proxies attach.
+ * `[2001:db8::1]:443` → `2001:db8::1`; `198.51.100.4:51234` → `198.51.100.4`.
+ * Sending either form verbatim would be an invalid IP to HMRC.
+ */
+function normaliseIp(raw: string): string {
+  if (!raw) return ''
+  const bracketed = raw.match(/^\[([^\]]+)\](?::\d+)?$/)
+  if (bracketed) return bracketed[1]
+  // Only strip a trailing :port for IPv4 — a bare IPv6 is full of colons.
+  if (/^\d{1,3}(\.\d{1,3}){3}:\d+$/.test(raw)) return raw.split(':')[0]
+  return raw
 }
 
 /** Convert a JS timezone offset (minutes behind UTC) to HMRC's UTC±hh:mm. */

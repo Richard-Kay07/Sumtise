@@ -36,17 +36,23 @@ import {
  * result in an HMRC call. For the WEB_APP_VIA_SERVER connection method these
  * values describe the END USER'S DEVICE and cannot be derived on the server.
  */
+// Every field is client-supplied and reaches an HTTP header, so validate
+// strictly rather than coercing: HMRC requires a UUID device ID, a UTC±hh:mm
+// timezone, and positive whole numbers for screen and window dimensions.
 const BrowserFingerprintSchema = z.object({
-  jsUserAgent: z.string(),
-  deviceId:    z.string(),
-  timezone:    z.string(),
+  jsUserAgent: z.string().min(1).max(512),
+  deviceId:    z.string().uuid(),
+  timezone:    z.string().regex(/^UTC[+-]\d{2}:\d{2}$/, "Timezone must be UTC±hh:mm"),
   screens: z.array(z.object({
-    width:         z.number(),
-    height:        z.number(),
-    scalingFactor: z.number(),
-    colourDepth:   z.number(),
-  })),
-  windowSize: z.object({ width: z.number(), height: z.number() }),
+    width:         z.number().int().positive(),
+    height:        z.number().int().positive(),
+    scalingFactor: z.number().positive(),
+    colourDepth:   z.number().int().positive(),
+  })).min(1),
+  windowSize: z.object({
+    width:  z.number().int().positive(),
+    height: z.number().int().positive(),
+  }),
 })
 
 type BrowserFingerprintInput = z.infer<typeof BrowserFingerprintSchema>
@@ -86,16 +92,19 @@ function buildFraudPrevention(
   if (!fingerprint || !ctx.headers) return undefined
 
   const network = extractClientNetwork(ctx.headers)
-  if (!network.clientPublicIp) return undefined
+
+  // The public IP our own infrastructure presents to the end user. HMRC
+  // cross-validates this against Gov-Vendor-Forwarded and Gov-Client-Public-IP.
+  const vendorPublicIp = process.env.HMRC_VENDOR_PUBLIC_IP?.trim()
+
+  // Bail out rather than substitute anything. HMRC explicitly forbids
+  // placeholder values ("null", "undefined", "unknown", "", "0.0.0.0"), so an
+  // incomplete set must abort the call, not be padded out.
+  if (!network.clientPublicIp || !vendorPublicIp || !ctx.userId) return undefined
 
   return {
     browser: fingerprint,
-    server: {
-      ...network,
-      // The public IP our own infrastructure presents to the end user.
-      vendorPublicIp: process.env.HMRC_VENDOR_PUBLIC_IP ?? "",
-      userId: ctx.userId ?? "unknown",
-    },
+    server: { ...network, vendorPublicIp, userId: ctx.userId },
   }
 }
 
@@ -111,9 +120,12 @@ function toTrpcError(err: unknown): TRPCError {
     return new TRPCError({ code, message: err.userMessage, cause: err })
   }
   if (err instanceof TRPCError) return err
+  // Never surface raw upstream text: HMRC OAuth/token error bodies are
+  // internal detail and this message is serialised straight to the browser.
+  console.error("[HMRC] unhandled error", err)
   return new TRPCError({
     code: "INTERNAL_SERVER_ERROR",
-    message: err instanceof Error ? err.message : "Unexpected error contacting HMRC.",
+    message: "Could not complete the request with HMRC. Try again shortly.",
     cause: err,
   })
 }
@@ -151,12 +163,43 @@ export const taxRouter = createTRPCRouter({
       flatRatePercent: z.number().optional(),
     }))
     .query(async ({ ctx, input }) => {
+      // Cash accounting and the Flat Rate Scheme are NOT supported by this
+      // derivation. Cash accounting requires matching to payment dates, which
+      // this query does not do — it would silently compute an invoice-basis
+      // return and declare VAT the business does not yet owe. FRS requires a
+      // gross Box 6 and capital-goods tracking that the ledger does not carry.
+      // Refusing is the only safe behaviour: the alternative is a wrong number
+      // on a filed return.
+      if (input.scheme !== "standard") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            input.scheme === "cash"
+              ? "Cash accounting is not yet supported. Figures would be calculated on the invoice basis and would overstate VAT due on unpaid invoices."
+              : "The Flat Rate Scheme is not yet supported. Box 6 and capital-goods reclaims require data the ledger does not yet capture.",
+        })
+      }
+
+      // Normalise the period to whole UTC days. The browser sends local-time
+      // midnights, so under BST a 30 June posting fell outside `lte` and
+      // silently moved into the next quarter.
+      const periodStart = new Date(Date.UTC(
+        input.periodStart.getFullYear(), input.periodStart.getMonth(), input.periodStart.getDate(),
+        0, 0, 0, 0,
+      ))
+      const periodEndExclusive = new Date(Date.UTC(
+        input.periodEnd.getFullYear(), input.periodEnd.getMonth(), input.periodEnd.getDate() + 1,
+        0, 0, 0, 0,
+      ))
+
       // Pull ledger postings in range, joined to their account so we can read
       // the VAT treatment and work out whether each line is an output or input.
       const transactions = await prisma.transaction.findMany({
         where: {
           organizationId: ctx.organizationId,
-          date:           { gte: input.periodStart, lte: input.periodEnd },
+          // Half-open interval: `lte` on a midnight boundary excluded any
+          // same-day posting with a non-zero time component.
+          date:           { gte: periodStart, lt: periodEndExclusive },
         },
         select: {
           id:      true,
@@ -168,12 +211,17 @@ export const taxRouter = createTRPCRouter({
 
       // ChartOfAccount.vatTreatment is the source of truth for the rate — there
       // is no per-transaction tax rate in the ledger.
+      //
+      // OUT_OF_SCOPE maps to null, not "OUTSIDE": VAT Notice 700/12 requires
+      // out-of-scope items (wages, PAYE, drawings, dividends) to be EXCLUDED
+      // from boxes 6 and 7. Mapping it to a truthy rate code passed the filter
+      // and put the entire wage bill into Box 7.
       const RATE_BY_TREATMENT: Record<string, VATRateCode | null> = {
         STANDARD_RATE:  "STANDARD",
         REDUCED_RATE:   "REDUCED",
         ZERO_RATE:      "ZERO",
         EXEMPT:         "EXEMPT",
-        OUT_OF_SCOPE:   "OUTSIDE",
+        OUT_OF_SCOPE:   null,
         NOT_APPLICABLE: null,
       }
 
@@ -182,10 +230,13 @@ export const taxRouter = createTRPCRouter({
           const rateCode = RATE_BY_TREATMENT[t.account.vatTreatment]
           if (!rateCode) return null
 
-          // Only trading accounts carry VAT. Revenue is an output (credit
-          // balance); expenses are inputs (debit balance).
+          // Revenue is an output (credit balance). Expenses AND asset purchases
+          // are inputs: input VAT on capital items is fully reclaimable, and
+          // excluding ASSET accounts understated Box 4 and Box 7 by the whole
+          // value of every capitalised purchase.
           const isOutput = t.account.type === "REVENUE"
-          if (!isOutput && t.account.type !== "EXPENSE") return null
+          const isInput  = t.account.type === "EXPENSE" || t.account.type === "ASSET"
+          if (!isOutput && !isInput) return null
 
           const debit  = t.debit.toNumber()
           const credit = t.credit.toNumber()
@@ -224,6 +275,15 @@ export const taxRouter = createTRPCRouter({
         box7PurchasesNet: toPounds(vatReturn.box7TotalPurchasesNet),
         isRepayment:   vatReturn.box5NetVAT < 0,
         transactionsAnalysed: transactions.length,
+        linesWithVatTreatment: lines.length,
+        // vatTreatment defaults to NOT_APPLICABLE, so an unmapped chart of
+        // accounts produces an all-zero return that looks finished. Surface it
+        // rather than letting someone file a nil return by accident.
+        warning:
+          transactions.length > 0 && lines.length === 0
+            ? `None of the ${transactions.length} transactions in this period are on accounts with a VAT treatment set. ` +
+              `Set the VAT treatment on your chart of accounts before filing — this return would be nil.`
+            : null,
       }
     }),
 
@@ -616,7 +676,12 @@ export const taxRouter = createTRPCRouter({
           },
         },
       })
-      if (existing?.status === "FULFILLED" && existing.hmrcReceiptId) {
+      // Key the guard on the receipt ALONE. Requiring status === "FULFILLED"
+      // too made it defeatable: syncObligations re-derives status from HMRC on
+      // every sync, and HMRC's obligation flips to "F" only after a lag, so a
+      // sync in that window reset the row to OPEN while the receipt remained —
+      // re-arming the double-submit path.
+      if (existing?.hmrcReceiptId) {
         throw new TRPCError({
           code: "CONFLICT",
           message:

@@ -147,13 +147,18 @@ export async function hmrcRequest<T>(
       clearTimeout(timer)
       // Network failure or timeout. Retry unless this is a no-retry call.
       if (noRetry || attempt === MAX_RETRIES) {
+        // A timeout on a POST is INDETERMINATE — HMRC may have accepted the
+        // submission. Telling the user to "try again" would invite a duplicate
+        // filing, so say plainly that the outcome must be checked first.
+        const indeterminate = method === "POST"
         throw new HmrcApiError({
           status: 0,
-          code: "NETWORK_ERROR",
+          code: indeterminate ? "NETWORK_ERROR_INDETERMINATE" : "NETWORK_ERROR",
           kind: "SERVER",
-          userMessage:
-            "Could not reach HMRC. Check your connection and try again shortly.",
-          retryable: true,
+          userMessage: indeterminate
+            ? "The connection to HMRC was lost while submitting. HMRC may or may not have received it — check the return status before submitting again."
+            : "Could not reach HMRC. Check your connection and try again shortly.",
+          retryable: !indeterminate,
           message: `HMRC request failed: ${(err as Error).message}`,
         })
       }

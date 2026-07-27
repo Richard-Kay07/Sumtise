@@ -249,25 +249,59 @@ export async function submitReturn(
     { ...opts, method: "POST", body: validated, noRetry: true },
   )
 
-  const result = SubmitReturnResponseSchema.parse(data)
+  // The return is now FILED. Persist the receipt BEFORE validating the
+  // response shape: if HMRC returned a 201 with an unexpected body, throwing
+  // first would lose the only proof of filing and invite a duplicate submission.
+  const raw = data as Record<string, unknown>
+  const formBundleNumber =
+    typeof raw?.formBundleNumber === "string" ? raw.formBundleNumber : null
 
-  await prisma.vatPeriod.updateMany({
-    where: { organizationId, periodKey: validated.periodKey },
-    data: {
+  const boxes = {
+    box1OutputVat: validated.vatDueSales,
+    box2: validated.vatDueAcquisitions,
+    box3: validated.totalVatDue,
+    box4InputVat: validated.vatReclaimedCurrPeriod,
+    box5NetVat: validated.netVatDue,
+    box6SalesNet: validated.totalValueSalesExVAT,
+    box7PurchasesNet: validated.totalValuePurchasesExVAT,
+    box8: validated.totalValueGoodsSuppliedExVAT,
+    box9: validated.totalAcquisitionsExVAT,
+  }
+
+  const conn = await prisma.hmrcConnection.findUnique({ where: { organizationId } })
+
+  // upsert, not updateMany: a VatPeriod row only exists if obligations were
+  // synced first. updateMany silently matched zero rows, so filing without a
+  // prior sync stored no receipt and left the duplicate guard permanently open.
+  await prisma.vatPeriod.upsert({
+    where: {
+      organizationId_periodKey: { organizationId, periodKey: validated.periodKey },
+    },
+    create: {
+      organizationId,
+      hmrcConnectionId: conn?.id ?? "",
+      vrn,
+      periodKey: validated.periodKey,
+      // Real dates arrive on the next obligations sync; the receipt is what
+      // matters here and must not be lost for want of them.
+      periodStart: new Date(),
+      periodEnd: new Date(),
+      dueDate: new Date(),
       status: "FULFILLED",
-      hmrcReceiptId: result.formBundleNumber,
+      hmrcReceiptId: formBundleNumber,
       submittedAt: new Date(),
-      box1OutputVat: validated.vatDueSales,
-      box2: validated.vatDueAcquisitions,
-      box3: validated.totalVatDue,
-      box4InputVat: validated.vatReclaimedCurrPeriod,
-      box5NetVat: validated.netVatDue,
-      box6SalesNet: validated.totalValueSalesExVAT,
-      box7PurchasesNet: validated.totalValuePurchasesExVAT,
-      box8: validated.totalValueGoodsSuppliedExVAT,
-      box9: validated.totalAcquisitionsExVAT,
+      ...boxes,
+    },
+    update: {
+      status: "FULFILLED",
+      hmrcReceiptId: formBundleNumber,
+      submittedAt: new Date(),
+      ...boxes,
     },
   })
+
+  // Validate only after the receipt is safely stored.
+  const result = SubmitReturnResponseSchema.parse(data)
 
   return {
     ...result,

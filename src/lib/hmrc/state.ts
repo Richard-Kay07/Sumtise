@@ -16,15 +16,37 @@ import { createHmac, timingSafeEqual, randomBytes } from "crypto"
 /** State is only valid briefly — the user is redirected straight to HMRC. */
 const STATE_TTL_MS = 15 * 60 * 1000 // 15 minutes
 
-function secret(): string {
-  const s =
-    process.env.HMRC_STATE_SECRET ??
-    process.env.NEXTAUTH_SECRET ??
-    process.env.CLERK_SECRET_KEY
+/** Values shipped in env templates that must never be used as a real key. */
+const PLACEHOLDERS = new Set([
+  "your-secret-key-here",
+  "changeme",
+  "secret",
+  "development",
+  "",
+])
 
-  if (!s) {
+/**
+ * No fallback chain here, deliberately.
+ *
+ * Falling back to NEXTAUTH_SECRET was dangerous: this project uses Clerk, so
+ * NEXTAUTH_SECRET is vestigial and env templates ship it as the literal string
+ * "your-secret-key-here" — meaning the HMAC key protecting the OAuth state
+ * would be a publicly known constant. Falling back to CLERK_SECRET_KEY instead
+ * reuses a live session-minting credential for an unrelated protocol, which
+ * breaks key separation.
+ */
+function secret(): string {
+  const s = process.env.HMRC_STATE_SECRET?.trim()
+
+  if (!s || PLACEHOLDERS.has(s.toLowerCase())) {
     throw new Error(
-      "HMRC_STATE_SECRET (or NEXTAUTH_SECRET / CLERK_SECRET_KEY) must be set to sign the OAuth state.",
+      "HMRC_STATE_SECRET must be set to a unique random value to sign the OAuth state. " +
+        "Generate one with: openssl rand -base64 32",
+    )
+  }
+  if (s.length < 32) {
+    throw new Error(
+      "HMRC_STATE_SECRET must be at least 32 characters. Generate one with: openssl rand -base64 32",
     )
   }
   return s
