@@ -43,3 +43,10 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
+
+# Firecrawl scrape cache (HMRC API docs research)
+.firecrawl/
+
+# Diagnostic tsconfig that bypasses the seed/scripts syntax errors
+# masking real type errors (see docs/hmrc-integration.md)
+tsconfig.check.json

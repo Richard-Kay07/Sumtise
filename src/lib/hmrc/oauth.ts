@@ -13,15 +13,38 @@ export interface HmrcTokenResponse {
   scope?: string
 }
 
+/**
+ * The browser-facing authorize endpoint is NOT on the API host.
+ * HMRC serves /oauth/authorize from www.tax.service.gov.uk (test-www in
+ * sandbox), while /oauth/token is on the api host. Pointing the browser at
+ * the API host breaks the consent journey.
+ */
+function authorizeHost(): string {
+  const isProduction = HMRC_BASE_URL.includes('//api.service.hmrc.gov.uk')
+  return process.env.HMRC_AUTHORIZE_URL ??
+    (isProduction
+      ? 'https://www.tax.service.gov.uk'
+      : 'https://test-www.tax.service.gov.uk')
+}
+
 export function getAuthorizationUrl(state: string): string {
+  if (!CLIENT_ID) {
+    // Empty-string defaults would otherwise produce a valid-looking URL with a
+    // blank client_id, failing confusingly at HMRC instead of here.
+    throw new Error('HMRC_CLIENT_ID is not configured.')
+  }
+  if (!REDIRECT_URI) {
+    throw new Error('HMRC_REDIRECT_URI is not configured.')
+  }
+
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: CLIENT_ID,
-    scope: 'read:vat write:vat',
+    scope: process.env.HMRC_SCOPE ?? 'read:vat write:vat',
     redirect_uri: REDIRECT_URI,
     state,
   })
-  return `${HMRC_BASE_URL}/oauth/authorize?${params}`
+  return `${authorizeHost()}/oauth/authorize?${params}`
 }
 
 export async function exchangeCodeForTokens(code: string): Promise<HmrcTokenResponse> {

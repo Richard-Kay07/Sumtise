@@ -11,6 +11,12 @@ type CreateContextOptions = {
   userId: string | null
   correlationId?: string
   logger?: ReturnType<typeof createLogger>
+  /**
+   * Inbound request headers. Needed to derive the end user's public IP for
+   * HMRC fraud prevention headers, which are a legal requirement on MTD calls
+   * and must reflect the ORIGINATING DEVICE, not our server.
+   */
+  headers?: Headers
 }
 
 const createInnerTRPCContext = (opts: CreateContextOptions) => {
@@ -19,6 +25,7 @@ const createInnerTRPCContext = (opts: CreateContextOptions) => {
     prisma,
     correlationId: opts.correlationId,
     logger: opts.logger,
+    headers: opts.headers,
   }
 }
 
@@ -52,6 +59,7 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
     userId,
     correlationId,
     logger,
+    headers: opts.req.headers,
   })
 }
 

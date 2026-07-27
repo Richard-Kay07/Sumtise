@@ -5,7 +5,13 @@ import { Permission } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { getAuthorizationUrl } from "@/lib/hmrc/oauth"
-import { getVatObligations, submitVatReturn } from "@/lib/hmrc/mtd-vat"
+import { createOAuthState } from "@/lib/hmrc/state"
+import { syncObligations, submitReturn } from "@/lib/hmrc/vat"
+import { HmrcApiError } from "@/lib/hmrc/errors"
+import {
+  extractClientNetwork,
+  type FraudPreventionInput,
+} from "@/lib/hmrc/fraud-prevention"
 import {
   aggregateVATReturn,
   calculateVATAmount,
@@ -24,6 +30,94 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Browser half of the HMRC fraud prevention data. Collected client-side by
+ * src/lib/hmrc/fingerprint-client.ts and posted with any request that will
+ * result in an HMRC call. For the WEB_APP_VIA_SERVER connection method these
+ * values describe the END USER'S DEVICE and cannot be derived on the server.
+ */
+const BrowserFingerprintSchema = z.object({
+  jsUserAgent: z.string(),
+  deviceId:    z.string(),
+  timezone:    z.string(),
+  screens: z.array(z.object({
+    width:         z.number(),
+    height:        z.number(),
+    scalingFactor: z.number(),
+    colourDepth:   z.number(),
+  })),
+  windowSize: z.object({ width: z.number(), height: z.number() }),
+})
+
+type BrowserFingerprintInput = z.infer<typeof BrowserFingerprintSchema>
+
+/** Load the HMRC connection, failing clearly if it is unusable. */
+async function requireVrn(organizationId: string) {
+  const conn = await prisma.hmrcConnection.findUnique({ where: { organizationId } })
+
+  if (!conn) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Not connected to HMRC. Connect your HMRC account in Tax Settings.",
+    })
+  }
+  if (!conn.vatRegistrationNumber) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "Your VAT registration number has not been set. Add it in Tax Settings before filing.",
+    })
+  }
+  return { ...conn, vatRegistrationNumber: conn.vatRegistrationNumber }
+}
+
+/**
+ * Assemble the fraud prevention payload from the browser fingerprint plus
+ * server-derived network data.
+ *
+ * Returns undefined when the browser half is absent — the client then throws
+ * before contacting production, rather than sending placeholder values, which
+ * HMRC explicitly forbids.
+ */
+function buildFraudPrevention(
+  ctx: { userId: string | null; headers?: Headers },
+  fingerprint?: BrowserFingerprintInput,
+): FraudPreventionInput | undefined {
+  if (!fingerprint || !ctx.headers) return undefined
+
+  const network = extractClientNetwork(ctx.headers)
+  if (!network.clientPublicIp) return undefined
+
+  return {
+    browser: fingerprint,
+    server: {
+      ...network,
+      // The public IP our own infrastructure presents to the end user.
+      vendorPublicIp: process.env.HMRC_VENDOR_PUBLIC_IP ?? "",
+      userId: ctx.userId ?? "unknown",
+    },
+  }
+}
+
+/** Surface HMRC's user-facing message rather than a raw stack trace. */
+function toTrpcError(err: unknown): TRPCError {
+  if (err instanceof HmrcApiError) {
+    const code =
+      err.kind === "AUTH"      ? "UNAUTHORIZED" :
+      err.kind === "NOT_FOUND" ? "NOT_FOUND" :
+      err.kind === "RATE_LIMIT"? "TOO_MANY_REQUESTS" :
+      err.kind === "SERVER"    ? "INTERNAL_SERVER_ERROR" :
+      "BAD_REQUEST"
+    return new TRPCError({ code, message: err.userMessage, cause: err })
+  }
+  if (err instanceof TRPCError) return err
+  return new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: err instanceof Error ? err.message : "Unexpected error contacting HMRC.",
+    cause: err,
+  })
+}
+
 async function getCashFlowForPeriod(organizationId: string, start: Date, end: Date) {
   return prisma.transaction.findMany({
     where: {
@@ -32,8 +126,8 @@ async function getCashFlowForPeriod(organizationId: string, start: Date, end: Da
     },
     select: {
       id:          true,
-      amount:      true,
-      type:        true,
+      debit:       true,
+      credit:      true,
       description: true,
       accountId:   true,
     },
@@ -57,35 +151,56 @@ export const taxRouter = createTRPCRouter({
       flatRatePercent: z.number().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      // Pull transactions in range and use their tax amounts
+      // Pull ledger postings in range, joined to their account so we can read
+      // the VAT treatment and work out whether each line is an output or input.
       const transactions = await prisma.transaction.findMany({
         where: {
           organizationId: ctx.organizationId,
           date:           { gte: input.periodStart, lte: input.periodEnd },
         },
         select: {
-          id:       true,
-          amount:   true,
-          type:     true,
-          taxRate:  true,
-          account:  { select: { accountType: true, normalBalance: true } },
+          id:      true,
+          debit:   true,
+          credit:  true,
+          account: { select: { type: true, vatTreatment: true } },
         },
       })
 
-      const lines: VATTransactionLine[] = transactions
-        .filter((t) => t.taxRate != null && t.taxRate.greaterThan(0))
-        .map((t): VATTransactionLine => {
-          const taxRate  = t.taxRate!.toNumber()
-          const rateCode: VATRateCode =
-            Math.abs(taxRate - 0.20) < 0.001 ? "STANDARD" :
-            Math.abs(taxRate - 0.05) < 0.001 ? "REDUCED"  : "ZERO"
+      // ChartOfAccount.vatTreatment is the source of truth for the rate — there
+      // is no per-transaction tax rate in the ledger.
+      const RATE_BY_TREATMENT: Record<string, VATRateCode | null> = {
+        STANDARD_RATE:  "STANDARD",
+        REDUCED_RATE:   "REDUCED",
+        ZERO_RATE:      "ZERO",
+        EXEMPT:         "EXEMPT",
+        OUT_OF_SCOPE:   "OUTSIDE",
+        NOT_APPLICABLE: null,
+      }
 
-          const netPence = Math.round(t.amount.toNumber() * 100)
+      const lines: VATTransactionLine[] = transactions
+        .map((t): VATTransactionLine | null => {
+          const rateCode = RATE_BY_TREATMENT[t.account.vatTreatment]
+          if (!rateCode) return null
+
+          // Only trading accounts carry VAT. Revenue is an output (credit
+          // balance); expenses are inputs (debit balance).
+          const isOutput = t.account.type === "REVENUE"
+          if (!isOutput && t.account.type !== "EXPENSE") return null
+
+          const debit  = t.debit.toNumber()
+          const credit = t.credit.toNumber()
+
+          // Signed net in the account's natural direction, so that contras and
+          // credit notes reduce the box rather than inflating it.
+          const net = isOutput ? credit - debit : debit - credit
+          if (net === 0) return null
+
+          const netPence = Math.round(net * 100)
           const vatPence = calculateVATAmount(netPence, rateCode)
-          const isOutput = t.account?.accountType === "INCOME" || t.type === "CREDIT"
 
           return { netPence, vatPence, rateCode, isOutput }
         })
+        .filter((l): l is VATTransactionLine => l !== null)
 
       const vatReturn = aggregateVATReturn({
         transactions: lines,
@@ -154,7 +269,7 @@ export const taxRouter = createTRPCRouter({
           status:          "SUBMITTED",
           reference:       input.reference,
           totalAmount:     new Prisma.Decimal(input.totalAmount),
-          data:            input.data,
+          data:            (input.data ?? undefined) as Prisma.InputJsonValue | undefined,
           submittedAt:     new Date(),
           submittedBy:     ctx.userId ?? undefined,
         },
@@ -181,18 +296,21 @@ export const taxRouter = createTRPCRouter({
           organizationId: ctx.organizationId,
           date:           { gte: input.periodStart, lte: input.periodEnd },
         },
-        include: { account: { select: { accountType: true } } },
+        include: { account: { select: { type: true } } },
       })
 
       const ZERO = new Prisma.Decimal(0)
       let revenue = ZERO, expenses = ZERO
 
+      // Revenue accounts carry a credit balance, expense accounts a debit
+      // balance. Netting the two directions (rather than summing absolutes)
+      // means refunds, credit notes and reversals reduce the figure correctly.
       for (const t of transactions) {
         if (!t.account) continue
-        if (t.account.accountType === "INCOME") {
-          revenue = revenue.plus(t.amount.abs())
-        } else if (t.account.accountType === "EXPENSE") {
-          expenses = expenses.plus(t.amount.abs())
+        if (t.account.type === "REVENUE") {
+          revenue = revenue.plus(t.credit).minus(t.debit)
+        } else if (t.account.type === "EXPENSE") {
+          expenses = expenses.plus(t.debit).minus(t.credit)
         }
       }
 
@@ -274,7 +392,7 @@ export const taxRouter = createTRPCRouter({
           status:          "SUBMITTED",
           reference:       input.reference,
           totalAmount:     new Prisma.Decimal(input.totalAmount),
-          data:            input.data,
+          data:            (input.data ?? undefined) as Prisma.InputJsonValue | undefined,
           submittedAt:     new Date(),
           submittedBy:     ctx.userId ?? undefined,
         },
@@ -317,7 +435,7 @@ export const taxRouter = createTRPCRouter({
           reference:       input.reference,
           totalAmount:     new Prisma.Decimal(input.totalAmount),
           employeeCount:   input.employeeCount,
-          data:            input.data,
+          data:            (input.data ?? undefined) as Prisma.InputJsonValue | undefined,
           submittedAt:     new Date(),
           submittedBy:     ctx.userId ?? undefined,
         },
@@ -347,7 +465,7 @@ export const taxRouter = createTRPCRouter({
           status:         "DRAFT",
           reference:      input.reference,
           totalAmount:    new Prisma.Decimal(input.totalAmount),
-          data:           input.data,
+          data:           (input.data ?? undefined) as Prisma.InputJsonValue | undefined,
           submittedBy:    ctx.userId ?? undefined,
         },
       })
@@ -374,7 +492,7 @@ export const taxRouter = createTRPCRouter({
           status:         "DRAFT",
           reference:      input.reference,
           totalAmount:    new Prisma.Decimal(input.totalAmount),
-          data:           input.data,
+          data:           (input.data ?? undefined) as Prisma.InputJsonValue | undefined,
           submittedBy:    ctx.userId ?? undefined,
         },
       })
@@ -412,8 +530,12 @@ export const taxRouter = createTRPCRouter({
     .use(requirePermissionProcedure(Permission.SETTINGS_EDIT))
     .input(z.object({ organizationId: z.string() }))
     .mutation(async ({ ctx }) => {
-      const url = getAuthorizationUrl(ctx.organizationId)
-      return { authorizationUrl: url }
+      if (!ctx.userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Sign in to connect HMRC." })
+      }
+      // Signed, time-limited state bound to this user AND this organisation.
+      const state = createOAuthState(ctx.organizationId, ctx.userId)
+      return { authorizationUrl: getAuthorizationUrl(state) }
     }),
 
   getHmrcConnection: orgScopedProcedure
@@ -434,27 +556,28 @@ export const taxRouter = createTRPCRouter({
     .input(z.object({
       organizationId: z.string(),
       fromDate: z.string(),
-      toDate: z.string(),
+      toDate:   z.string(),
+      status:   z.enum(["O", "F"]).optional(),
+      fingerprint: BrowserFingerprintSchema.optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const conn = await prisma.hmrcConnection.findUnique({
-        where: { organizationId: ctx.organizationId },
-      })
-      if (!conn?.vatRegistrationNumber) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "HMRC not connected or VRN not set" })
+      const conn = await requireVrn(ctx.organizationId)
+
+      try {
+        const obligations = await syncObligations(
+          ctx.organizationId,
+          conn.vatRegistrationNumber,
+          { from: input.fromDate, to: input.toDate, status: input.status },
+          { fraudPrevention: buildFraudPrevention(ctx, input.fingerprint) },
+        )
+        const periods = await prisma.vatPeriod.findMany({
+          where:   { organizationId: ctx.organizationId },
+          orderBy: { dueDate: "desc" },
+        })
+        return { obligations, periods }
+      } catch (err) {
+        throw toTrpcError(err)
       }
-      const obligations = await getVatObligations(
-        ctx.organizationId,
-        conn.vatRegistrationNumber,
-        input.fromDate,
-        input.toDate,
-        ctx.userId
-      )
-      const periods = await prisma.vatPeriod.findMany({
-        where: { organizationId: ctx.organizationId },
-        orderBy: { dueDate: "desc" },
-      })
-      return { obligations, periods }
     }),
 
   // ── Submit MTD VAT Return ───────────────────────────────────────────────────
@@ -463,33 +586,56 @@ export const taxRouter = createTRPCRouter({
     .use(requirePermissionProcedure(Permission.SETTINGS_EDIT))
     .input(z.object({
       organizationId: z.string(),
-      periodKey: z.string(),
+      periodKey: z.string().min(4).max(4),
       vatDueSales: z.number(),
       vatDueAcquisitions: z.number(),
       totalVatDue: z.number(),
       vatReclaimedCurrPeriod: z.number(),
-      netVatDue: z.number(),
-      totalValueSalesExVAT: z.number(),
-      totalValuePurchasesExVAT: z.number(),
-      totalValueGoodsSuppliedExVAT: z.number(),
-      totalAcquisitionsExVAT: z.number(),
-      finalised: z.boolean().default(true),
+      netVatDue: z.number().min(0),
+      // Boxes 6–9 must be whole pounds — HMRC rejects decimals here.
+      totalValueSalesExVAT: z.number().int(),
+      totalValuePurchasesExVAT: z.number().int(),
+      totalValueGoodsSuppliedExVAT: z.number().int(),
+      totalAcquisitionsExVAT: z.number().int(),
+      finalised: z.boolean(),
+      fingerprint: BrowserFingerprintSchema.optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const conn = await prisma.hmrcConnection.findUnique({
-        where: { organizationId: ctx.organizationId },
+      const conn = await requireVrn(ctx.organizationId)
+
+      const { organizationId: _org, fingerprint, ...payload } = input
+
+      // Guard against double-filing before we ever reach HMRC. HMRC would
+      // return DUPLICATE_SUBMISSION anyway, but a local check gives a clearer
+      // message and avoids burning a request against the rate limit.
+      const existing = await prisma.vatPeriod.findUnique({
+        where: {
+          organizationId_periodKey: {
+            organizationId: ctx.organizationId,
+            periodKey: input.periodKey,
+          },
+        },
       })
-      if (!conn?.vatRegistrationNumber) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "HMRC not connected or VRN not set" })
+      if (existing?.status === "FULFILLED" && existing.hmrcReceiptId) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            `A VAT return for this period was already submitted to HMRC (receipt ${existing.hmrcReceiptId}). ` +
+            `Returns cannot be filed twice — corrections go through HMRC's separate amendment process.`,
+        })
       }
 
-      const { organizationId: _org, ...payload } = input
-      const result = await submitVatReturn(
-        ctx.organizationId,
-        conn.vatRegistrationNumber,
-        payload,
-        ctx.userId
-      )
+      let result: Awaited<ReturnType<typeof submitReturn>>
+      try {
+        result = await submitReturn(
+          ctx.organizationId,
+          conn.vatRegistrationNumber,
+          payload,
+          { fraudPrevention: buildFraudPrevention(ctx, fingerprint) },
+        )
+      } catch (err) {
+        throw toTrpcError(err)
+      }
 
       const vatPeriod = await prisma.vatPeriod.findFirst({
         where: { organizationId: ctx.organizationId, periodKey: input.periodKey },
@@ -499,18 +645,49 @@ export const taxRouter = createTRPCRouter({
         data: {
           organizationId: ctx.organizationId,
           submissionType: "VAT_RETURN",
-          status: "ACCEPTED",
-          reference: result.formBundleNumber,
-          periodStart: vatPeriod?.periodStart ?? new Date(),
-          periodEnd: vatPeriod?.periodEnd ?? new Date(),
+          status:         "ACCEPTED",
+          reference:      result.formBundleNumber,
+          periodStart:    vatPeriod?.periodStart ?? new Date(),
+          periodEnd:      vatPeriod?.periodEnd ?? new Date(),
           submissionDate: new Date(),
-          submittedAt: new Date(),
-          submittedBy: ctx.userId,
-          data: payload as any,
+          submittedAt:    new Date(),
+          submittedBy:    ctx.userId ?? undefined,
+          totalAmount:    new Prisma.Decimal(payload.netVatDue),
+          data:           payload as unknown as Prisma.InputJsonValue,
+          // Persist HMRC's receipt — this is the legal proof of filing.
+          response:       result as unknown as Prisma.InputJsonValue,
         },
       })
 
       return result
+    }),
+
+  // ── Set the VAT registration number ─────────────────────────────────────────
+  // Without this the OAuth connect succeeds but every subsequent HMRC call
+  // fails, because the VRN is not part of the token response.
+
+  setVatRegistrationNumber: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.SETTINGS_EDIT))
+    .input(z.object({
+      organizationId: z.string(),
+      // 9 digits, no GB prefix, no spaces.
+      vrn: z.string().regex(/^\d{9}$/, "VAT registration number must be exactly 9 digits"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const conn = await prisma.hmrcConnection.findUnique({
+        where: { organizationId: ctx.organizationId },
+      })
+      if (!conn) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Connect to HMRC before setting the VAT registration number.",
+        })
+      }
+      return prisma.hmrcConnection.update({
+        where: { organizationId: ctx.organizationId },
+        data:  { vatRegistrationNumber: input.vrn },
+        select: { vatRegistrationNumber: true, status: true, connectedAt: true },
+      })
     }),
 
   // ── All submissions list ──────────────────────────────────────────────────

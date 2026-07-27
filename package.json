@@ -13,6 +13,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed-demo": "tsx prisma/seed-demo.ts",
+    "hmrc:verify-headers": "tsx scripts/verify-fraud-prevention-headers.ts",
     "demo:populate": "tsx scripts/populate-demo-org.ts",
     "phase1:verify": "tsx scripts/verify-phase1-done.ts",
     "uat:init": "tsx scripts/uat-initializer.ts",
