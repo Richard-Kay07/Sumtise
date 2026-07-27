@@ -84,13 +84,17 @@ HMRC_REDIRECT_URI="https://sumtise-production.up.railway.app/api/hmrc/callback"
 # Optional — defaults to "read:vat write:vat"
 HMRC_SCOPE="read:vat write:vat"
 
-# Secret used to sign the OAuth state parameter.
-# Falls back to NEXTAUTH_SECRET / CLERK_SECRET_KEY, but set it explicitly.
+# REQUIRED. Signs the OAuth state parameter. No fallback — must be >= 32 chars
+# and must not be a placeholder. Generate: openssl rand -base64 32
 HMRC_STATE_SECRET=""
 
 # REQUIRED for fraud prevention: the public IP that end users' browsers
 # connect to (our WAF / load balancer / edge). See the open item below.
 HMRC_VENDOR_PUBLIC_IP=""
+
+# REQUIRED. AES-256-GCM key encrypting OAuth tokens at rest, per HMRC's terms
+# of use. Generate: openssl rand -base64 32
+TOKEN_ENCRYPTION_KEY=""
 ```
 
 Note the **authorize** endpoint is on a different host from the API and is
