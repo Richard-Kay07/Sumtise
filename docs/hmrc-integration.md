@@ -179,13 +179,58 @@ submission — exactly the "unrealistic data" their manual review looks for.
 Fixed: `x-forwarded-port` is no longer consulted at all, and a `SERVER_PORTS`
 list rejects known listener ports.
 
-`Gov-Client-Public-Port` is therefore **omitted**. Two ways forward:
+`Gov-Client-Public-Port` is therefore **omitted**. Two ways forward.
 
-1. **Email `SDSTeam@hmrc.gov.uk`** explaining the platform restriction and
-   agree the omission. This is the documented process and must happen BEFORE
-   production. Do it early — it is on the critical path for Gate A.
-2. **Put Cloudflare in front of Railway**, which exposes `cf-connecting-port`.
-   The code already reads it, so this needs no change beyond DNS.
+#### Option A — Email HMRC and agree the omission (no infrastructure change)
+
+The documented process, and the only route if you stay on Railway alone.
+HMRC's rule is **contact first, omit second**:
+
+> "If you are unable to submit a header, you must contact us to explain why.
+> Make sure you include full details of the restrictions. After discussing a
+> missing header with us, you can omit the header or submit it with an empty
+> value. You must not include a placeholder value."
+
+Email `SDSTeam@hmrc.gov.uk` before applying for production credentials. State:
+the connection method (`WEB_APP_VIA_SERVER`), that the hosting platform's edge
+proxy does not forward the client TCP source port, that `x-forwarded-port`
+carries only the container listener (`8080`) and would be a fabricated value,
+and that all 15 other headers are supplied and validate cleanly.
+
+This is on the critical path for Gate A — HMRC take **10 working days** to
+respond, so start it early. Risk: HMRC may take the view that changing
+platform is within your reasonable control.
+
+#### Option B — Cloudflare in front of Railway (removes the problem)
+
+Cloudflare **does not** send a client-port header by default. There is no
+`CF-Connecting-Port` in their standard header set. But the port IS exposed as
+the Rules-language field **`cf.edge.client_port`**, which Cloudflare lists as
+available when setting a request header value.
+
+Setup:
+1. Move DNS for the production hostname to Cloudflare, proxied (orange cloud).
+2. Rules → **Transform Rules** → **Modify Request Header** → Create.
+3. Action: **Set dynamic**, header name `CF-Connecting-Port`,
+   value expression `cf.edge.client_port`.
+4. Deploy. No code change needed — that header name is already read. If you
+   name it something else, set `HMRC_CLIENT_PORT_HEADER` to match.
+
+Verify with `/api/diagnostics/edge-headers`: `canSendGovClientPublicPort`
+should flip to `true` with a realistic high-numbered port (not 8080).
+
+**Knock-on effects — do not miss these.** Putting Cloudflare in front changes
+two other headers that HMRC cross-validates:
+
+- **`HMRC_VENDOR_PUBLIC_IP` must change.** The browser now connects to
+  Cloudflare, not Railway, so `Gov-Vendor-Public-IP` becomes the Cloudflare
+  edge IP your hostname resolves to — not `69.46.46.108`.
+- **`Gov-Vendor-Forwarded` gains a hop.** Cloudflare terminates TLS, so it is
+  a real internet hop: `by=<cloudflare-ip>&for=<client-ip>`, then
+  `by=<railway-ip>&for=<cloudflare-ip>`. Populate `extraHops` accordingly.
+
+Getting either wrong fails HMRC's cross-validation, which is checked. Re-run
+`npm run hmrc:sandbox-check` after the change.
 
 `Gov-Client-Public-IP` **is** obtainable and correct — `x-real-ip` carries the
 true client IP and is preferred over `x-forwarded-for`. Note XFF here is

@@ -325,8 +325,16 @@ export function extractClientNetwork(headers: Headers): {
   // obviously-wrong value on every submission, which is precisely the
   // "unrealistic data" their manual review looks for. Omitting is safer than
   // sending something false.
+  // Cloudflare does NOT send a client-port header by default — there is no
+  // `CF-Connecting-Port`. The port is available as the Rules-language field
+  // `cf.edge.client_port`, which must be surfaced with a Request Header
+  // Transform Rule. Set HMRC_CLIENT_PORT_HEADER to whatever that rule names.
+  // See docs/hmrc-integration.md.
+  const configuredHeader = process.env.HMRC_CLIENT_PORT_HEADER?.trim().toLowerCase()
+
   const port =
-    headers.get('cf-connecting-port')?.trim() ||   // Cloudflare
+    (configuredHeader ? headers.get(configuredHeader)?.trim() : '') ||
+    headers.get('cf-connecting-port')?.trim() ||   // conventional Transform Rule name
     headers.get('x-real-port')?.trim() ||          // some nginx configs
     headers.get('true-client-port')?.trim() ||     // Akamai
     ''
