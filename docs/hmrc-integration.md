@@ -154,22 +154,55 @@ evidence. You may say "HMRC recognised" only after formal recognition — never
 
 These are known gaps. Each must be closed before Gate A.
 
-### 1. `Gov-Client-Public-Port` may be unobtainable — HIGHEST RISK
+### 1. `Gov-Client-Public-Port` is UNOBTAINABLE on Railway — MEASURED
 
-HMRC mandates the end user's **ephemeral TCP source port**. Railway's proxy
-sets `X-Forwarded-For` but is not known to expose the client source port.
-`extractClientNetwork()` returns `undefined` when it cannot find a valid one,
-and the header is then omitted rather than filled with a placeholder.
+**Resolved 2026-07-28 by measurement, not inference.** Railway does **not**
+forward the end user's ephemeral TCP source port.
 
-HMRC's own warning: *"some popular load balancers do not pass on users' public
-IPs or ports… If you find out later that your chosen technology stack does not
-support sending all required values, it may involve effort to change."*
+Evidence from a live request to `/api/diagnostics/edge-headers`:
 
-**Action:** verify empirically against Railway before Gate A. If unobtainable,
-either front the app with an edge that exposes it (Cloudflare provides
-`cf-connecting-port`) or email `SDSTeam@hmrc.gov.uk` to agree the omission.
+```
+x-forwarded-for:  143.58.195.243, 152.233.29.4
+x-forwarded-port: 8080          <-- container listener, NOT the client
+x-real-ip:        143.58.195.243
+x-railway-edge:   lhr1
+```
 
-### 2. `HMRC_VENDOR_PUBLIC_IP` must be set to a real, stable IP
+`x-forwarded-port` is a constant `8080` — Railway's internal container port —
+for every request regardless of client. No `cf-connecting-port`, `x-real-port`
+or `true-client-port` is present.
+
+This initially produced a **false positive**: `extractClientNetwork()` excluded
+only 80 and 443, so it accepted 8080 and reported the port as obtainable.
+Sending that would have given HMRC a constant, obviously-wrong value on every
+submission — exactly the "unrealistic data" their manual review looks for.
+Fixed: `x-forwarded-port` is no longer consulted at all, and a `SERVER_PORTS`
+list rejects known listener ports.
+
+`Gov-Client-Public-Port` is therefore **omitted**. Two ways forward:
+
+1. **Email `SDSTeam@hmrc.gov.uk`** explaining the platform restriction and
+   agree the omission. This is the documented process and must happen BEFORE
+   production. Do it early — it is on the critical path for Gate A.
+2. **Put Cloudflare in front of Railway**, which exposes `cf-connecting-port`.
+   The code already reads it, so this needs no change beyond DNS.
+
+`Gov-Client-Public-IP` **is** obtainable and correct — `x-real-ip` carries the
+true client IP and is preferred over `x-forwarded-for`. Note XFF here is
+`<client>, <railway-internal>`, so the right-most entry is Railway's own proxy,
+not the client; the `x-real-ip` preference is what makes this correct.
+
+### 2. `HMRC_VENDOR_PUBLIC_IP` — resolved, but watch for drift
+
+Set to **`69.46.46.108`**, confirmed 2026-07-28. This is what
+`sumtise-production.up.railway.app` resolves to, consistent across Google,
+Cloudflare, Quad9 and OpenDNS. WHOIS: `OrgName: Railway`,
+`NetName: RLWY-HIKARI-01`, range `69.46.46.0/24`.
+
+**Risk:** the DNS TTL is 60 seconds and the netblock is a /24, so Railway can
+move the service within that range. HMRC cross-validates this against
+`Gov-Vendor-Forwarded`, so drift would silently start failing their checks.
+Re-verify periodically, or move to a custom domain with a pinned record.
 
 `Gov-Vendor-Public-IP` and the first hop of `Gov-Vendor-Forwarded` both use it,
 and HMRC **cross-validates them against `Gov-Client-Public-IP`**. If egress IPs

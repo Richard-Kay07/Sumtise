@@ -315,16 +315,31 @@ export function extractClientNetwork(headers: Headers): {
 
   const clientPublicIp = normaliseIp(trusted || xffChain[xffChain.length - 1] || '')
 
-  // Cloudflare exposes the source port; most other edges do not.
+  // Only headers that genuinely carry the CLIENT's ephemeral source port are
+  // accepted. `x-forwarded-port` is deliberately NOT consulted: by convention
+  // it reports the port the PROXY was listening on, not the client's.
+  //
+  // Measured on Railway (2026-07-28): x-forwarded-port is `8080` — the
+  // internal container listener — for every request regardless of client.
+  // Sending that as Gov-Client-Public-Port would give HMRC a constant,
+  // obviously-wrong value on every submission, which is precisely the
+  // "unrealistic data" their manual review looks for. Omitting is safer than
+  // sending something false.
   const port =
-    headers.get('cf-connecting-port')?.trim() ??
-    headers.get('x-forwarded-port')?.trim() ??
-    undefined
+    headers.get('cf-connecting-port')?.trim() ||   // Cloudflare
+    headers.get('x-real-port')?.trim() ||          // some nginx configs
+    headers.get('true-client-port')?.trim() ||     // Akamai
+    ''
 
-  // Reject server ports — HMRC explicitly forbids 80/443 here, and a
-  // proxy-reported x-forwarded-port is usually the listener, not the client.
+  const portNum = Number(port)
   const validPort =
-    port && port !== '80' && port !== '443' && Number(port) >= 1 && Number(port) <= 65535
+    port &&
+    Number.isInteger(portNum) &&
+    portNum >= 1 &&
+    portNum <= 65535 &&
+    // HMRC: "This must not be a server port, for example 80 for http
+    // connections and 443 for https connections."
+    !SERVER_PORTS.has(portNum)
       ? port
       : undefined
 
@@ -335,6 +350,13 @@ export function extractClientNetwork(headers: Headers): {
     clientPublicPort: validPort,
   }
 }
+
+/**
+ * Ports that are listeners rather than client source ports. An ephemeral
+ * client port is in the high range; seeing any of these means we have picked
+ * up a proxy's own port by mistake.
+ */
+const SERVER_PORTS = new Set([80, 443, 8080, 8443, 3000, 8000, 5000, 3001])
 
 /**
  * Strip a port suffix and brackets that some proxies attach.
