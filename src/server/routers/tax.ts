@@ -8,6 +8,7 @@ import { getAuthorizationUrl } from "@/lib/hmrc/oauth"
 import { createOAuthState } from "@/lib/hmrc/state"
 import { syncObligations, submitReturn } from "@/lib/hmrc/vat"
 import { HmrcApiError } from "@/lib/hmrc/errors"
+import { deriveVatReturnFromDocuments, toHmrcPayload } from "@/lib/tax/vat-derivation"
 import {
   extractClientNetwork,
   type FraudPreventionInput,
@@ -644,26 +645,80 @@ export const taxRouter = createTRPCRouter({
 
   submitMtdVatReturn: orgScopedProcedure
     .use(requirePermissionProcedure(Permission.SETTINGS_EDIT))
+    // The box values are deliberately NOT accepted from the client. They are
+    // derived server-side at submission time from the source documents.
+    // Accepting them would mean a stale query result, a client-side edit, or a
+    // race between calculating and filing could be submitted to HMRC as final —
+    // and `finalised: true` is a legal declaration.
     .input(z.object({
       organizationId: z.string(),
       periodKey: z.string().min(4).max(4),
-      vatDueSales: z.number(),
-      vatDueAcquisitions: z.number(),
-      totalVatDue: z.number(),
-      vatReclaimedCurrPeriod: z.number(),
-      netVatDue: z.number().min(0),
-      // Boxes 6–9 must be whole pounds — HMRC rejects decimals here.
-      totalValueSalesExVAT: z.number().int(),
-      totalValuePurchasesExVAT: z.number().int(),
-      totalValueGoodsSuppliedExVAT: z.number().int(),
-      totalAcquisitionsExVAT: z.number().int(),
-      finalised: z.boolean(),
+      finalised: z.literal(true),
       fingerprint: BrowserFingerprintSchema.optional(),
+      /**
+       * Values the user saw on screen. Used ONLY to detect that the figures
+       * changed between review and submission; never sent to HMRC.
+       */
+      reviewed: z.object({
+        box1: z.number(), box4: z.number(), box5: z.number(),
+        box6: z.number(), box7: z.number(),
+      }).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const conn = await requireVrn(ctx.organizationId)
+      const fingerprint = input.fingerprint
 
-      const { organizationId: _org, fingerprint, ...payload } = input
+      // The period comes from HMRC's own obligation, not from the client.
+      const period = await prisma.vatPeriod.findUnique({
+        where: {
+          organizationId_periodKey: {
+            organizationId: ctx.organizationId,
+            periodKey: input.periodKey,
+          },
+        },
+      })
+      if (!period) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "That VAT period is not known. Refresh your obligations from HMRC and try again.",
+        })
+      }
+
+      const derivation = await deriveVatReturnFromDocuments(
+        ctx.organizationId,
+        period.periodStart,
+        period.periodEnd,
+      )
+
+      if (derivation.blockers.length > 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            `This return cannot be filed yet:\n• ${derivation.blockers.join("\n• ")}`,
+        })
+      }
+
+      // If the figures moved since the user reviewed them, refuse and make them
+      // look again rather than filing something they did not see.
+      if (input.reviewed) {
+        const b = derivation.boxes
+        const drift =
+          Math.abs(input.reviewed.box1 - b.box1OutputVat) > 0.005 ||
+          Math.abs(input.reviewed.box4 - b.box4InputVat) > 0.005 ||
+          Math.abs(input.reviewed.box6 - b.box6SalesExVat) > 0.5 ||
+          Math.abs(input.reviewed.box7 - b.box7PurchasesExVat) > 0.5
+        if (drift) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message:
+              "The figures changed since you reviewed them — a document in this period was " +
+              "added or edited. Review the updated return before submitting.",
+          })
+        }
+      }
+
+      const payload = toHmrcPayload(derivation, input.periodKey, true)
 
       // Guard against double-filing before we ever reach HMRC. HMRC would
       // return DUPLICATE_SUBMISSION anyway, but a local check gives a clearer
@@ -702,18 +757,14 @@ export const taxRouter = createTRPCRouter({
         throw toTrpcError(err)
       }
 
-      const vatPeriod = await prisma.vatPeriod.findFirst({
-        where: { organizationId: ctx.organizationId, periodKey: input.periodKey },
-      })
-
       await prisma.taxSubmission.create({
         data: {
           organizationId: ctx.organizationId,
           submissionType: "VAT_RETURN",
           status:         "ACCEPTED",
           reference:      result.formBundleNumber,
-          periodStart:    vatPeriod?.periodStart ?? new Date(),
-          periodEnd:      vatPeriod?.periodEnd ?? new Date(),
+          periodStart:    period.periodStart,
+          periodEnd:      period.periodEnd,
           submissionDate: new Date(),
           submittedAt:    new Date(),
           submittedBy:    ctx.userId ?? undefined,
@@ -725,6 +776,52 @@ export const taxRouter = createTRPCRouter({
       })
 
       return result
+    }),
+
+  // ── Preview a return for an HMRC obligation period ──────────────────────────
+  // Keyed on HMRC's periodKey so the dates come from HMRC's own obligation
+  // rather than a client-guessed calendar quarter, and derived by exactly the
+  // same code path that submission uses — so what the user reviews is what
+  // gets filed.
+
+  previewVatReturn: orgScopedProcedure
+    .use(requirePermissionProcedure(Permission.REPORTS_VIEW))
+    .input(z.object({
+      organizationId: z.string(),
+      periodKey: z.string().min(4).max(4),
+    }))
+    .query(async ({ ctx, input }) => {
+      const period = await prisma.vatPeriod.findUnique({
+        where: {
+          organizationId_periodKey: {
+            organizationId: ctx.organizationId,
+            periodKey: input.periodKey,
+          },
+        },
+      })
+      if (!period) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message:
+            "That VAT period is not known. Refresh your obligations from HMRC and try again.",
+        })
+      }
+
+      const derivation = await deriveVatReturnFromDocuments(
+        ctx.organizationId,
+        period.periodStart,
+        period.periodEnd,
+      )
+
+      return {
+        ...derivation,
+        periodKey: input.periodKey,
+        periodStart: period.periodStart,
+        periodEnd: period.periodEnd,
+        dueDate: period.dueDate,
+        alreadyFiled: !!period.hmrcReceiptId,
+        hmrcReceiptId: period.hmrcReceiptId,
+      }
     }),
 
   // ── Set the VAT registration number ─────────────────────────────────────────

@@ -20,9 +20,15 @@ const prisma = new PrismaClient()
 
 // ─── Date / number helpers ────────────────────────────────────────────────────
 
-const d  = (y: number, m: number, day: number) => new Date(y, m - 1, day)
-const eom = (y: number, m: number) => new Date(y, m, 0)
-const addDays = (date: Date, n: number) => { const r = new Date(date); r.setDate(r.getDate() + n); return r }
+// All dates are constructed in UTC. Local-time constructors (`new Date(y, m, d)`)
+// are an hour behind UTC during BST, which stored 1 April documents as
+// 2025-03-31T23:00Z — putting every month-boundary invoice in the WRONG VAT
+// period. VAT periods are date-based, so this is a correctness issue, not
+// cosmetics.
+const d  = (y: number, m: number, day: number) => new Date(Date.UTC(y, m - 1, day))
+const eom = (y: number, m: number) => new Date(Date.UTC(y, m, 0))
+const addDays = (date: Date, n: number) =>
+  new Date(date.getTime() + n * 24 * 60 * 60 * 1000)
 const r2 = (n: number) => Math.round(n * 100) / 100
 const pad = (n: number, w = 3) => String(n).padStart(w, '0')
 const vat = (net: number) => r2(net * 0.2)
