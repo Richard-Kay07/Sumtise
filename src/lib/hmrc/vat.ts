@@ -117,11 +117,6 @@ export function money2dp(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-/** Boxes 6–9 must be whole pounds. HMRC rejects decimals here. */
-export function wholePounds(value: number): number {
-  return Math.round(value)
-}
-
 // ─── 1. Retrieve VAT obligations ─────────────────────────────────────────────
 
 export async function retrieveObligations(

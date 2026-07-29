@@ -8,7 +8,7 @@ import { getAuthorizationUrl } from "@/lib/hmrc/oauth"
 import { createOAuthState } from "@/lib/hmrc/state"
 import { syncObligations, submitReturn } from "@/lib/hmrc/vat"
 import { HmrcApiError } from "@/lib/hmrc/errors"
-import { deriveVatReturnFromDocuments, toHmrcPayload } from "@/lib/tax/vat-derivation"
+import { deriveVatReturnFromDocuments, toHmrcPayload, assertStandardScheme } from "@/lib/tax/vat-derivation"
 import {
   extractClientNetwork,
   type FraudPreventionInput,
@@ -654,15 +654,20 @@ export const taxRouter = createTRPCRouter({
       organizationId: z.string(),
       periodKey: z.string().min(4).max(4),
       finalised: z.literal(true),
+      // The declaration is a legal statement. Gating it only in the browser
+      // meant a direct API call could file without one ever being made.
+      declarationAccepted: z.literal(true),
       fingerprint: BrowserFingerprintSchema.optional(),
       /**
        * Values the user saw on screen. Used ONLY to detect that the figures
        * changed between review and submission; never sent to HMRC.
        */
+      // Required, not optional: making it optional meant a caller could skip
+      // drift detection entirely and file figures nobody had seen.
       reviewed: z.object({
-        box1: z.number(), box4: z.number(), box5: z.number(),
+        box1: z.number(), box4: z.number(),
         box6: z.number(), box7: z.number(),
-      }).optional(),
+      }),
     }))
     .mutation(async ({ ctx, input }) => {
       const conn = await requireVrn(ctx.organizationId)
@@ -691,17 +696,21 @@ export const taxRouter = createTRPCRouter({
         period.periodEnd,
       )
 
-      if (derivation.blockers.length > 0) {
+      const allBlockers = [
+        ...derivation.blockers,
+        ...assertStandardScheme(period.scheme),
+      ]
+      if (allBlockers.length > 0) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message:
-            `This return cannot be filed yet:\n• ${derivation.blockers.join("\n• ")}`,
+            `This return cannot be filed yet:\n• ${allBlockers.join("\n• ")}`,
         })
       }
 
       // If the figures moved since the user reviewed them, refuse and make them
       // look again rather than filing something they did not see.
-      if (input.reviewed) {
+      {
         const b = derivation.boxes
         const drift =
           Math.abs(input.reviewed.box1 - b.box1OutputVat) > 0.005 ||
@@ -736,12 +745,19 @@ export const taxRouter = createTRPCRouter({
       // every sync, and HMRC's obligation flips to "F" only after a lag, so a
       // sync in that window reset the row to OPEN while the receipt remained —
       // re-arming the double-submit path.
-      if (existing?.hmrcReceiptId) {
+      // Guard on submittedAt as well as the receipt. A 201 whose body could not
+      // be parsed stores hmrcReceiptId: null — the return IS filed, and keying
+      // the guard on the receipt alone left the double-submit path wide open in
+      // exactly that case. submittedAt is set unconditionally on filing and is
+      // never cleared by an obligations sync, so it is the reliable marker.
+      if (existing?.hmrcReceiptId || existing?.submittedAt) {
         throw new TRPCError({
           code: "CONFLICT",
           message:
-            `A VAT return for this period was already submitted to HMRC (receipt ${existing.hmrcReceiptId}). ` +
-            `Returns cannot be filed twice — corrections go through HMRC's separate amendment process.`,
+            `A VAT return for this period was already submitted to HMRC` +
+            (existing.hmrcReceiptId ? ` (receipt ${existing.hmrcReceiptId})` : "") +
+            `. Returns cannot be filed twice — corrections go through HMRC's separate ` +
+            `amendment process. Do not resubmit.`,
         })
       }
 
@@ -819,8 +835,9 @@ export const taxRouter = createTRPCRouter({
         periodStart: period.periodStart,
         periodEnd: period.periodEnd,
         dueDate: period.dueDate,
-        alreadyFiled: !!period.hmrcReceiptId,
+        alreadyFiled: !!(period.hmrcReceiptId || period.submittedAt),
         hmrcReceiptId: period.hmrcReceiptId,
+        blockers: [...derivation.blockers, ...assertStandardScheme(period.scheme)],
       }
     }),
 

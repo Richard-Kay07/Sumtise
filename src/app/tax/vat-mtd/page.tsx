@@ -107,13 +107,13 @@ export default function VatMtdPage() {
       organizationId: orgId,
       periodKey: selected.periodKey,
       finalised: true,
+      declarationAccepted: true,
       fingerprint,
       // Not sent to HMRC — lets the server detect that a document changed
       // between review and submission and refuse rather than file blind.
       reviewed: {
         box1: box.box1OutputVat,
         box4: box.box4InputVat,
-        box5: Math.abs(box.box5NetVatSigned),
         box6: box.box6SalesExVat,
         box7: box.box7PurchasesExVat,
       },
@@ -349,7 +349,7 @@ export default function VatMtdPage() {
             <CardContent className="space-y-4 text-sm">
               {vatReturn.isLoading && (
                 <p className="text-muted-foreground flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />Calculating from your ledger…
+                  <Loader2 className="h-4 w-4 animate-spin" />Calculating from your invoices and bills…
                 </p>
               )}
 

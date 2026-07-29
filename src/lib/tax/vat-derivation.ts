@@ -102,11 +102,16 @@ const wholePounds = (n: number) => Math.sign(n) * Math.round(Math.abs(n))
  * postings into the following quarter.
  */
 function utcInterval(periodStart: Date, periodEnd: Date) {
+  // getUTC* deliberately. VatPeriod.periodStart/periodEnd are @db.Date and
+  // arrive as exact UTC midnight; reading LOCAL components on a negative-offset
+  // server (e.g. UTC-5) resolved 2025-03-31T00:00Z to local 30 March, shifting
+  // the whole interval a day earlier and filing every boundary-dated document
+  // in the wrong quarter.
   const start = new Date(Date.UTC(
-    periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate(), 0, 0, 0, 0,
+    periodStart.getUTCFullYear(), periodStart.getUTCMonth(), periodStart.getUTCDate(), 0, 0, 0, 0,
   ))
   const endExclusive = new Date(Date.UTC(
-    periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate() + 1, 0, 0, 0, 0,
+    periodEnd.getUTCFullYear(), periodEnd.getUTCMonth(), periodEnd.getUTCDate() + 1, 0, 0, 0, 0,
   ))
   return { start, endExclusive }
 }
@@ -114,10 +119,11 @@ function utcInterval(periodStart: Date, periodEnd: Date) {
 /**
  * Derive the nine VAT boxes for a period from source documents.
  *
- * Standard (invoice-basis) VAT accounting only. Cash accounting requires
- * matching to payment dates and the Flat Rate Scheme requires a VAT-inclusive
- * Box 6 plus capital-goods tracking; both are refused by the caller rather
- * than silently computed on the wrong basis.
+ * Standard (invoice-basis) VAT accounting ONLY. Callers must reject any other
+ * scheme before filing — see `assertStandardScheme`. Cash accounting requires
+ * matching to payment dates; the Flat Rate Scheme requires a VAT-inclusive
+ * Box 6 and reclaims no input VAT. Computing either on this basis produces a
+ * wrong figure in every box.
  */
 export async function deriveVatReturnFromDocuments(
   organizationId: string,
@@ -169,11 +175,13 @@ export async function deriveVatReturnFromDocuments(
   // Foreign-currency documents would enter the boxes at face value, because
   // exchangeRate is not applied anywhere in the aggregation. Refuse rather
   // than file a figure in the wrong currency.
+  const notGbp = (d: { currency?: string | null }) =>
+    (d.currency ?? "").trim().toUpperCase() !== "GBP"
   const foreign = [
-    ...invoices.filter((d) => d.currency && d.currency !== "GBP"),
-    ...bills.filter((d) => d.currency && d.currency !== "GBP"),
-    ...creditNotes.filter((d) => d.currency && d.currency !== "GBP"),
-    ...debitNotes.filter((d) => d.currency && d.currency !== "GBP"),
+    ...invoices.filter(notGbp),
+    ...bills.filter(notGbp),
+    ...creditNotes.filter(notGbp),
+    ...debitNotes.filter(notGbp),
   ]
   if (foreign.length > 0) {
     blockers.push(
@@ -219,20 +227,26 @@ export async function deriveVatReturnFromDocuments(
   const box5Signed = round2(box3 - box4)
 
   // ── Plausibility checks, mirroring HMRC's own risking ───────────────────────
-  if (box1 > 0 && wholePounds(salesNet) === 0) {
+  if (Math.abs(box1) > 0 && wholePounds(salesNet) === 0) {
     warnings.push(
       "Box 1 shows output VAT but Box 6 is nil. HMRC queries returns where VAT is " +
         "declared with no corresponding sales value.",
     )
   }
-  if (box4 > 0 && wholePounds(purchasesNet) === 0) {
+  if (Math.abs(box4) > 0 && wholePounds(purchasesNet) === 0) {
     warnings.push(
       "Box 4 shows reclaimed VAT but Box 7 is nil. HMRC queries returns where VAT is " +
         "reclaimed with no corresponding purchase value.",
     )
   }
-  const impliedRate = salesNet > 0 ? box1 / salesNet : 0
-  if (salesNet > 0 && (impliedRate < 0 || impliedRate > 0.21)) {
+  if (box1 < 0 || salesNet < 0) {
+    warnings.push(
+      "Box 1 or Box 6 is negative — credit notes exceed invoices for this period. " +
+        "That is valid but unusual; check no credit note has been keyed to the wrong period.",
+    )
+  }
+  const impliedRate = Math.abs(salesNet) > 0 ? Math.abs(box1) / Math.abs(salesNet) : 0
+  if (Math.abs(salesNet) > 0 && (impliedRate < 0 || impliedRate > 0.21)) {
     warnings.push(
       `The implied VAT rate on sales is ${(impliedRate * 100).toFixed(1)}%, outside the ` +
         `expected 0–21% range. Check the VAT amounts on this period's invoices.`,
@@ -290,4 +304,23 @@ export function toHmrcPayload(d: VatDerivation, periodKey: string, finalised: bo
     totalAcquisitionsExVAT: b.box9AcquisitionsExVat,
     finalised,
   }
+}
+
+/**
+ * Guard for the filing path.
+ *
+ * `VatPeriod.scheme` defaults to STANDARD and is not yet populated from HMRC's
+ * customer information, so a non-standard scheme may simply be unknown rather
+ * than absent. Either way the derivation above is invoice-basis and must not be
+ * filed for a cash-accounting or Flat Rate business: under FRS, Box 1 is a
+ * percentage of VAT-INCLUSIVE turnover, Box 4 is nil, and Box 6 is gross — so
+ * every box would be wrong, not merely imprecise.
+ */
+export function assertStandardScheme(scheme: string | null | undefined): string[] {
+  if (!scheme || scheme === "STANDARD") return []
+  return [
+    `UNSUPPORTED_VAT_SCHEME: this business is recorded as using the ${scheme} scheme. ` +
+      `Only standard (invoice-basis) VAT accounting is supported. Filing on the wrong ` +
+      `basis would misstate every box.`,
+  ]
 }

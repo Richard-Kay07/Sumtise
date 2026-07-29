@@ -4,14 +4,18 @@ import { exchangeCodeForTokens, storeHmrcConnection } from '@/lib/hmrc/oauth'
 import { verifyOAuthState } from '@/lib/hmrc/state'
 import { verifyOrganizationMembership } from '@/lib/guards/organization'
 import { requirePermission, Permission } from '@/lib/permissions'
+import { publicUrl } from '@/lib/public-url'
 
 export const dynamic = 'force-dynamic'
 
 const RETURN_PATH = '/tax/settings'
 
 function fail(req: NextRequest, reason: string) {
+  // publicUrl, not req.url — see src/lib/public-url.ts. req.url resolves to the
+  // internal bind address (0.0.0.0:8080 on Railway) and redirecting a browser
+  // there fails with ERR_CONNECTION_REFUSED.
   return NextResponse.redirect(
-    new URL(`${RETURN_PATH}?hmrc_error=${encodeURIComponent(reason)}`, req.url),
+    publicUrl(`${RETURN_PATH}?hmrc_error=${encodeURIComponent(reason)}`, req.headers),
   )
 }
 
@@ -21,7 +25,7 @@ export async function GET(req: NextRequest) {
   try {
     // Clerk's types declare auth() as async; awaiting is safe either way.
     const { userId } = await auth()
-    if (!userId) return NextResponse.redirect(new URL('/auth/signin', req.url))
+    if (!userId) return NextResponse.redirect(publicUrl('/auth/signin', req.headers))
 
     const { searchParams } = new URL(req.url)
     const code = searchParams.get('code')
@@ -61,7 +65,7 @@ export async function GET(req: NextRequest) {
       await storeHmrcConnection(verified.organizationId, tokens)
       // The VRN is not part of the token response and must be captured
       // separately, so send the user somewhere that prompts for it.
-      return NextResponse.redirect(new URL(`${RETURN_PATH}?hmrc_connected=1`, req.url))
+      return NextResponse.redirect(publicUrl(`${RETURN_PATH}?hmrc_connected=1`, req.headers))
     } catch (err) {
       console.error('[HMRC callback] token exchange failed:', err)
       return fail(req, 'token_exchange_failed')
