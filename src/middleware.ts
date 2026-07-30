@@ -13,6 +13,9 @@ const isPublicRoute = createRouteMatcher([
   // Public because it must be observable from outside to answer whether the
   // edge forwards the client TCP source port that HMRC requires.
   '/api/diagnostics/edge-headers',
+  // Public so it can be opened directly in a browser to diagnose the auth
+  // chain. Returns only the caller's own identity and organisation names.
+  '/api/diagnostics/whoami',
 ])
 
 export default clerkMiddleware(async (auth, req) => {
