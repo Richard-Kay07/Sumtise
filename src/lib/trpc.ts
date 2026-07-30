@@ -115,7 +115,18 @@ const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
 
 export const protectedProcedure = t.procedure.use(enforceUserIsAuthed)
 
-export const orgScopedProcedure = protectedProcedure.use(async ({ ctx, next, input }) => {
+/**
+ * Scopes a procedure to an organisation, verifying membership and role.
+ *
+ * Reads `rawInput`, NOT `input`. This middleware is attached before any
+ * `.input()` parser is declared on the derived procedure, and in tRPC v10 a
+ * middleware in that position receives `input` as `undefined` — so
+ * `input.organizationId` was always undefined and EVERY org-scoped procedure
+ * (345 of them) rejected with "organizationId is required", regardless of what
+ * the client sent. `rawInput` is the transformer-deserialised, pre-validation
+ * payload, which is what this check needs.
+ */
+export const orgScopedProcedure = protectedProcedure.use(async ({ ctx, next, rawInput, input }) => {
   const correlationId = ctx.correlationId || createLogger().generateCorrelationId()
   const logger = ctx.logger || createLogger(correlationId)
 
@@ -126,8 +137,17 @@ export const orgScopedProcedure = protectedProcedure.use(async ({ ctx, next, inp
 
   let organizationId: string | undefined
 
-  if (typeof input === "object" && input !== null) {
-    organizationId = (input as any).organizationId
+  // rawInput first (see the note above); `input` is kept as a fallback so this
+  // still works if a caller declares `.input()` before applying this middleware.
+  const source =
+    (typeof rawInput === "object" && rawInput !== null ? rawInput : undefined) ??
+    (typeof input === "object" && input !== null ? input : undefined)
+
+  if (source) {
+    const candidate = (source as Record<string, unknown>).organizationId
+    if (typeof candidate === "string" && candidate.length > 0) {
+      organizationId = candidate
+    }
   }
 
   if (!organizationId) {
