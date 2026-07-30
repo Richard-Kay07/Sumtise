@@ -28,7 +28,7 @@ const ERROR_TEXT: Record<string, string> = {
 }
 
 export default function TaxSettingsPage() {
-  const { orgId } = useOrganization()
+  const { orgId, isLoading: orgLoading } = useOrganization()
   const params = useSearchParams()
 
   const [vrn, setVrn] = useState("")
@@ -90,6 +90,35 @@ export default function TaxSettingsPage() {
       return
     }
     vrnMutation.mutate({ organizationId: orgId, vrn: cleaned })
+  }
+
+  // An empty orgId disables every control on this page. Say so, rather than
+  // presenting a dead button with no explanation.
+  if (!orgLoading && !orgId) {
+    return (
+      <div className="min-h-screen bg-background">
+        <PageHeader crumbs={[{ label: "Tax", href: "/tax" }]} title="Tax Settings" />
+        <main className="container mx-auto py-6 max-w-2xl">
+          <Card className="border-amber-200">
+            <CardContent className="pt-8 pb-8 text-center space-y-4">
+              <AlertTriangle className="mx-auto h-12 w-12 text-amber-500" />
+              <h2 className="text-lg font-semibold">No organisation selected</h2>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Your account is not a member of any organisation, so there is nothing to
+                connect to HMRC. Every control on this page needs an organisation.
+              </p>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                If you expected to see one, your sign-in may not be linked to it yet.
+                Reload the page first — the link is created automatically on load.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                <RefreshCw className="h-4 w-4 mr-2" />Reload
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
   }
 
   return (

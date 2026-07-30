@@ -9,6 +9,7 @@ import { verifyResourceOwnership } from "@/lib/guards/organization"
 import { recordAudit } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
 import { seedCOA } from "@/lib/coa/templates"
+import { ensureUserRecord } from "@/lib/auth/ensure-user"
 import { helloRouter } from "./hello"
 import { vendorsRouter } from "./vendors"
 import { billsRouter } from "./bills"
@@ -197,6 +198,11 @@ export const appRouter = createTRPCRouter({
     create: protectedProcedure
       .input(createOrganizationSchema)
       .mutation(async ({ ctx, input }) => {
+        // creatorId is a foreign key to User.id, so the local row must exist
+        // first — otherwise this fails with a constraint violation for any
+        // account that has never been mirrored from Clerk.
+        await ensureUserRecord(ctx.userId)
+
         const organization = await prisma.organization.create({
           data: {
             ...input,
@@ -230,6 +236,11 @@ export const appRouter = createTRPCRouter({
       }),
 
     getUserOrganizations: protectedProcedure.query(async ({ ctx }) => {
+      // Runs on every app load, so it is the natural place to mirror the Clerk
+      // account locally. Without a User row the account cannot be made a member
+      // of anything, nor create an organisation of its own.
+      await ensureUserRecord(ctx.userId)
+
       const memberships = await prisma.organizationMember.findMany({
         where: { userId: ctx.userId },
         include: { organization: true },

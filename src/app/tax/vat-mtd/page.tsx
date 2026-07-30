@@ -31,7 +31,7 @@ interface Obligation {
 }
 
 export default function VatMtdPage() {
-  const { orgId } = useOrganization()
+  const { orgId, isLoading: orgLoading } = useOrganization()
 
   const [fingerprint, setFingerprint] = useState<BrowserFingerprint | null>(null)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
@@ -135,6 +135,26 @@ export default function VatMtdPage() {
   ] : []
 
   // ── Not connected ──────────────────────────────────────────────────────────
+  if (!orgLoading && !orgId) {
+    return (
+      <div className="min-h-screen bg-background">
+        <PageHeader crumbs={[{ label: "Tax", href: "/tax" }]} title="VAT Return (MTD)" />
+        <main className="container mx-auto py-6 max-w-2xl">
+          <Card className="border-amber-200">
+            <CardContent className="pt-8 pb-8 text-center space-y-3">
+              <AlertTriangle className="mx-auto h-12 w-12 text-amber-500" />
+              <h2 className="text-lg font-semibold">No organisation selected</h2>
+              <p className="text-sm text-muted-foreground">
+                Your account is not a member of any organisation. Reload the page — the
+                link is created automatically on load.
+              </p>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
+  }
+
   if (!connection.isLoading && !isReady) {
     return (
       <div className="min-h-screen bg-background">
