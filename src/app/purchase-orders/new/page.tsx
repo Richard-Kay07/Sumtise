@@ -32,7 +32,7 @@ export default function NewPurchaseOrderPage() {
   const [error, setError]             = useState<string | null>(null)
 
   const { data: vendorsData } = trpc.vendors.getAll.useQuery(
-    { organizationId: orgId ?? "", page: 1, limit: 200 },
+    { organizationId: orgId ?? "", page: 1, limit: 100 },
     { enabled: !!orgId }
   )
 

@@ -40,7 +40,7 @@ export default function LeasesAllPage() {
     { enabled: !!orgId }
   )
 
-  const leases  = (data as any)?.leases ?? []
+  const leases  = (data ?? [])
 
   const totalROU      = leases.reduce((s: number, l: any) => s + Number(l.rouAsset?.currentCarryingAmount ?? l.presentValue ?? 0), 0)
   const totalLiab     = leases.reduce((s: number, l: any) => s + Number(l.currentLiability ?? 0) + Number(l.nonCurrentLiability ?? 0), 0)

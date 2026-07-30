@@ -10,7 +10,7 @@ export default function SignInPage() {
             footerAction: "hidden",
           },
         }}
-        afterSignInUrl="/dashboard"
+        afterSignInUrl="/"
         signUpUrl="/auth/signup"
       />
       <p className="text-sm text-gray-500">

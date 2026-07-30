@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { trpc } from "@/lib/trpc-client"
-import { DollarSign, Users, Play, CheckCircle, Loader2, ChevronDown, Plus, UserPlus } from "lucide-react"
+import { Wallet, Users, Play, CheckCircle, Loader2, ChevronDown, Plus, UserPlus } from "lucide-react"
 import { useOrganization } from "@/contexts/organization-context"
 import { PageHeader } from "@/components/page-header"
 
@@ -212,8 +212,8 @@ export default function PaySalariesPage() {
         <div className="grid gap-4 sm:grid-cols-4 mb-6">
           {[
             { label: "Employees", value: activeRun.employeeCount, icon: <Users className="h-5 w-5 text-gray-400" /> },
-            { label: "Total Gross", value: fmt(totalGross), icon: <DollarSign className="h-5 w-5 text-gray-400" /> },
-            { label: "Total Deductions", value: fmt(totalDeductions), icon: <DollarSign className="h-5 w-5 text-gray-400" /> },
+            { label: "Total Gross", value: fmt(totalGross), icon: <Wallet className="h-5 w-5 text-gray-400" /> },
+            { label: "Total Deductions", value: fmt(totalDeductions), icon: <Wallet className="h-5 w-5 text-gray-400" /> },
             { label: "Total Net Pay", value: fmt(totalNet), icon: <CheckCircle className="h-5 w-5 text-green-500" /> },
           ].map((s) => (
             <Card key={s.label}>

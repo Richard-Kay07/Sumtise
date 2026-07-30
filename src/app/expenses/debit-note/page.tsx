@@ -22,7 +22,7 @@ import {
   ArrowLeft,
   Search,
   FileText,
-  DollarSign,
+
   AlertCircle,
   Info,
   Receipt,
@@ -34,6 +34,9 @@ const debitNoteItemSchema = z.object({
   quantity: z.number().positive("Quantity must be positive"),
   unitPrice: z.number().nonnegative("Unit price must be non-negative"),
   taxRate: z.number().min(0).max(100).default(20),
+  // Derived (quantity x unitPrice + tax), recomputed by updateItem. Declared so
+  // the inferred type matches what the code actually reads and writes.
+  total: z.number().optional(),
 })
 
 const debitNoteFormSchema = z.object({
@@ -66,11 +69,14 @@ export default function DebitNotePage() {
     },
     { enabled: !!orgId }
   )
-  const { data: vendors } = trpc.vendors.getAll.useQuery(
-    { organizationId: orgId },
+  const { data: vendorsData } = trpc.vendors.getAll.useQuery(
+    { organizationId: orgId, limit: 100 },
     { enabled: !!orgId }
   )
 
+  // vendors.getAll returns { vendors, pagination } — the wrapper is truthy,
+  // so `vendors?.map()` did not short-circuit and threw during render.
+  const vendors = vendorsData?.vendors ?? []
   const bills = billsData?.bills || []
   const filteredBills = bills.filter(bill =>
     bill.billNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -103,10 +109,13 @@ export default function DebitNotePage() {
     // Pre-populate items from bill
     const billItems = bill.items?.map((item: any) => ({
       description: item.description,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      taxRate: item.taxRate,
-      total: item.total,
+      // Number() is essential: Prisma Decimal arrives over the wire as a
+      // string, and the form schema types these as numbers, so submitting an
+      // untouched line failed zod with "Expected number, received string".
+      quantity: Number(item.quantity),
+      unitPrice: Number(item.unitPrice),
+      taxRate: Number(item.taxRate),
+      total: Number(item.total),
     })) || []
     setValue("items", billItems.length > 0 ? billItems : [{ description: "", quantity: 1, unitPrice: 0, taxRate: 20 }])
   }
@@ -133,9 +142,9 @@ export default function DebitNotePage() {
     const currentItems = [...watchedItems]
     currentItems[index] = { ...currentItems[index], [field]: value }
     
-    const quantity = typeof currentItems[index].quantity === 'number' ? currentItems[index].quantity : parseFloat(currentItems[index].quantity.toString())
-    const unitPrice = typeof currentItems[index].unitPrice === 'number' ? currentItems[index].unitPrice : parseFloat(currentItems[index].unitPrice.toString())
-    const taxRate = typeof currentItems[index].taxRate === 'number' ? currentItems[index].taxRate : parseFloat(currentItems[index].taxRate.toString())
+    const quantity = Number(currentItems[index].quantity)
+    const unitPrice = Number(currentItems[index].unitPrice)
+    const taxRate = Number(currentItems[index].taxRate)
     
     const subtotal = quantity * unitPrice
     const tax = subtotal * (taxRate / 100)
@@ -147,15 +156,15 @@ export default function DebitNotePage() {
   const calculateTotals = () => {
     const items = watchedItems
     const subtotal = items.reduce((sum, item) => {
-      const quantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity.toString())
-      const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice.toString())
+      const quantity = Number(item.quantity)
+      const unitPrice = Number(item.unitPrice)
       return sum + (quantity * unitPrice)
     }, 0)
     
     const taxAmount = items.reduce((sum, item) => {
-      const quantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity.toString())
-      const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice.toString())
-      const taxRate = typeof item.taxRate === 'number' ? item.taxRate : parseFloat(item.taxRate.toString())
+      const quantity = Number(item.quantity)
+      const unitPrice = Number(item.unitPrice)
+      const taxRate = Number(item.taxRate)
       return sum + (quantity * unitPrice * (taxRate / 100))
     }, 0)
     
@@ -327,7 +336,7 @@ export default function DebitNotePage() {
                         className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
                       >
                         <option value="">Select a vendor...</option>
-                        {vendors?.map((vendor) => (
+                        {vendors.map((vendor) => (
                           <option key={vendor.id} value={vendor.id}>
                             {vendor.name}
                           </option>
@@ -497,7 +506,7 @@ export default function DebitNotePage() {
                     {selectedBill && (
                       <div className="border-t pt-2 flex justify-between font-bold">
                         <span>Net Amount:</span>
-                        <span>{formatCurrency(selectedBill.total - totals.total, watchedCurrency)}</span>
+                        <span>{formatCurrency(Number(selectedBill.total) - totals.total, watchedCurrency)}</span>
                       </div>
                     )}
                   </div>

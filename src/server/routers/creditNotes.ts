@@ -469,7 +469,7 @@ export const creditNotesRouter = createTRPCRouter({
         action: "create",
         after: creditNote,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           creditNoteNumber: creditNote.creditNoteNumber,
           fromInvoiceId: invoice?.id,
@@ -689,7 +689,7 @@ export const creditNotesRouter = createTRPCRouter({
             currency: creditNote.currency,
             rate: 1.0,
             orgId: ctx.organizationId,
-            userId: ctx.session.user.id,
+            userId: ctx.userId,
             description: `Credit note ${creditNote.creditNoteNumber} applied to invoice ${targetInvoice.invoiceNumber}`,
             metadata: {
               creditNoteId: creditNote.id,
@@ -754,7 +754,7 @@ export const creditNotesRouter = createTRPCRouter({
         before: creditNote,
         after: result.creditNote,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           applications: result.applications,
           totalApplied: result.totalApplied,
@@ -840,7 +840,7 @@ export const creditNotesRouter = createTRPCRouter({
           metadata: {
             ...metadata,
             cancelledAt: new Date().toISOString(),
-            cancelledBy: ctx.session.user.id,
+            cancelledBy: ctx.userId,
             cancellationReason: input.reason || undefined,
           },
         },
@@ -862,7 +862,7 @@ export const creditNotesRouter = createTRPCRouter({
         before: creditNote,
         after: cancelledCreditNote,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           reason: input.reason || undefined,
         },

@@ -447,7 +447,7 @@ export const paymentRunsRouter = createTRPCRouter({
           status: PaymentRunStatus.PENDING, // DRAFT status
           totalAmount,
           currency: currency || "GBP",
-          initiatedBy: ctx.session.user.id,
+          initiatedBy: ctx.userId,
           bankAccountId,
           notes: notes || undefined,
           metadata: {
@@ -496,7 +496,7 @@ export const paymentRunsRouter = createTRPCRouter({
         action: "create",
         after: paymentRun,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           runNumber: paymentRun.runNumber,
           billCount: outstandingBills.length,
@@ -775,7 +775,7 @@ export const paymentRunsRouter = createTRPCRouter({
             currency: paymentRun.currency,
             rate: 1.0,
             orgId: ctx.organizationId,
-            userId: ctx.session.user.id,
+            userId: ctx.userId,
             description: `Payment run ${paymentRun.runNumber} - Bill ${snapshot.billNumber}`,
             metadata: {
               paymentId: payment.id,
@@ -838,7 +838,7 @@ export const paymentRunsRouter = createTRPCRouter({
         before: paymentRun,
         after: result.paymentRun,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           paymentCount: result.payments.length,
           totalProcessed: result.totalProcessed,
@@ -976,7 +976,7 @@ export const paymentRunsRouter = createTRPCRouter({
         action: "export",
         after: updatedRun,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           format: input.format,
           fileReference,

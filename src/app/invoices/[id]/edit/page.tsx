@@ -20,11 +20,11 @@ function EditInvoiceContent() {
 
   const { orgId } = useOrganization()
 
-  const { data, isLoading } = trpc.invoices.getAll.useQuery(
-    { organizationId: orgId, page: 1, limit: 200 },
-    { enabled: !!orgId }
+  const { data, isLoading } = trpc.invoices.getById.useQuery(
+    { organizationId: orgId, id },
+    { enabled: !!orgId && !!id }
   )
-  const invoice = data?.invoices?.find((inv: any) => inv.id === id)
+  const invoice = data
 
   const { register, handleSubmit, reset } = useForm({
     defaultValues: { notes: "", dueDate: "" },
@@ -63,6 +63,16 @@ function EditInvoiceContent() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    )
+  }
+
+  // Without this, a NOT_FOUND (bad or foreign id) rendered a fully interactive
+  // but empty form, and submitting fired an update against a nonexistent id.
+  if (!invoice) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Invoice not found.</p>
       </div>
     )
   }

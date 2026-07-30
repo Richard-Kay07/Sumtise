@@ -538,7 +538,7 @@ export const debitNotesRouter = createTRPCRouter({
         action: "create",
         after: debitNote,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
           debitNoteNumber: debitNote.debitNoteNumber,
@@ -790,7 +790,7 @@ export const debitNotesRouter = createTRPCRouter({
           currency: debitNote.currency,
           rate: 1.0,
           orgId: ctx.organizationId,
-          userId: ctx.session.user.id,
+          userId: ctx.userId,
           description: `Debit note application: ${debitNote.debitNoteNumber}`,
           metadata: {
             debitNoteId: input.id,
@@ -852,7 +852,7 @@ export const debitNotesRouter = createTRPCRouter({
         before: debitNote,
         after: result.debitNote,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           targetBillId: input.targetBillId,
           amount: applyAmount.toNumber(),
@@ -924,7 +924,7 @@ export const debitNotesRouter = createTRPCRouter({
           notes: JSON.stringify({
             originalNotes: debitNote.notes || "",
             cancelledAt: new Date().toISOString(),
-            cancelledBy: ctx.session.user.id,
+            cancelledBy: ctx.userId,
             cancellationReason: input.reason || undefined,
           }),
         },
@@ -947,7 +947,7 @@ export const debitNotesRouter = createTRPCRouter({
         before: debitNote,
         after: updatedDebitNote,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           reason: input.reason,
         },

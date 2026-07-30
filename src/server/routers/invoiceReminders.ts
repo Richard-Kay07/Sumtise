@@ -515,7 +515,7 @@ export const invoiceRemindersRouter = createTRPCRouter({
         action: "create",
         after: reminder,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           invoiceId: input.invoiceId,
           reminderType: input.reminderType,
@@ -649,7 +649,7 @@ export const invoiceRemindersRouter = createTRPCRouter({
         before: reminder,
         after: updatedReminder,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           outboxEntryId: outboxEntry.id,
           invoiceId: reminder.invoiceId,
@@ -772,7 +772,7 @@ export const invoiceRemindersRouter = createTRPCRouter({
               // Send email via email service
               const outboxEntry = await createAndSendEmail({
                 organizationId: ctx.organizationId,
-                userId: ctx.session.user.id,
+                userId: ctx.userId,
                 entityType: "reminder",
                 entityId: reminder.id,
                 to: [customerEmail],
@@ -807,7 +807,7 @@ export const invoiceRemindersRouter = createTRPCRouter({
                 before: reminder,
                 after: updatedReminder,
                 organizationId: ctx.organizationId,
-                userId: ctx.session.user.id,
+                userId: ctx.userId,
                 meta: {
                   emailOutboxId: outboxEntry.id,
                   messageId: outboxEntry.messageId,
@@ -852,7 +852,7 @@ export const invoiceRemindersRouter = createTRPCRouter({
         action: "sendBulk",
         after: results,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           total: results.total,
           sent: results.sent,

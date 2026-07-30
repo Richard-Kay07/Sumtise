@@ -20,7 +20,7 @@ import {
   Square,
   FileText,
   Calendar,
-  DollarSign,
+
   Eye,
   Edit
 } from "lucide-react"

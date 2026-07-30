@@ -121,7 +121,7 @@ export interface AuditRecordOptions {
  *   before: { status: "DRAFT", total: 1000 },
  *   after: { status: "SENT", total: 1000 },
  *   organizationId: ctx.organizationId,
- *   userId: ctx.session.user.id,
+ *   userId: ctx.userId,
  *   details: "Invoice sent to customer",
  * })
  * ```

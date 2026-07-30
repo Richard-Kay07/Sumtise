@@ -17,12 +17,12 @@ function InvoiceDetailContent() {
 
   const { orgId } = useOrganization()
 
-  const { data, isLoading } = trpc.invoices.getAll.useQuery(
-    { organizationId: orgId, page: 1, limit: 200 },
-    { enabled: !!orgId }
+  const { data, isLoading } = trpc.invoices.getById.useQuery(
+    { organizationId: orgId, id },
+    { enabled: !!orgId && !!id }
   )
 
-  const invoice = data?.invoices?.find((inv: any) => inv.id === id)
+  const invoice = data
 
   if (isLoading) {
     return (

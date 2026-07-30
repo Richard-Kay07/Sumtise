@@ -171,7 +171,7 @@ export const helloRouter = createTRPCRouter({
         action: "create",
         after: item,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
         },
@@ -228,7 +228,7 @@ export const helloRouter = createTRPCRouter({
         before,
         after,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
           changes: input.data,
@@ -284,7 +284,7 @@ export const helloRouter = createTRPCRouter({
         before,
         after: item,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
         },

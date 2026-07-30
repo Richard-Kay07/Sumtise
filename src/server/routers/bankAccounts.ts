@@ -495,7 +495,7 @@ export const bankAccountsRouter = createTRPCRouter({
           where: { id: match.bankTransactionId },
           data: {
             reconciledAt: new Date(),
-            reconciledBy: ctx.session.user.id,
+            reconciledBy: ctx.userId,
           },
         })
 
@@ -527,7 +527,7 @@ export const bankAccountsRouter = createTRPCRouter({
           difference,
           status: difference.equals(0) ? ReconciliationStatus.COMPLETED : ReconciliationStatus.IN_PROGRESS,
           reconciledAt: difference.equals(0) ? new Date() : null,
-          reconciledBy: difference.equals(0) ? ctx.session.user.id : null,
+          reconciledBy: difference.equals(0) ? ctx.userId : null,
         },
         include: {
           lines: {
@@ -546,7 +546,7 @@ export const bankAccountsRouter = createTRPCRouter({
         action: "create",
         after: updatedReconciliation,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           bankAccountId,
           statementDate,
@@ -597,7 +597,7 @@ export const bankAccountsRouter = createTRPCRouter({
           metadata: {
             ...((before.metadata as any) || {}),
             balanceUpdatedAt: new Date().toISOString(),
-            balanceUpdatedBy: ctx.session.user.id,
+            balanceUpdatedBy: ctx.userId,
             balanceUpdateNotes: input.notes,
             previousBalance: before.currentBalance.toString(),
           },
@@ -612,7 +612,7 @@ export const bankAccountsRouter = createTRPCRouter({
         before,
         after,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           previousBalance: before.currentBalance.toString(),
           newBalance: input.balance.toString(),
@@ -800,7 +800,7 @@ export const bankAccountsRouter = createTRPCRouter({
             mapping,
             parseOptions,
           },
-          importedBy: ctx.session.user.id,
+          importedBy: ctx.userId,
         },
       })
 
@@ -978,7 +978,7 @@ export const bankAccountsRouter = createTRPCRouter({
             errorRows: errorCount,
           },
           organizationId: ctx.organizationId,
-          userId: ctx.session.user.id,
+          userId: ctx.userId,
           meta: {
             bankAccountId,
             fileHash,

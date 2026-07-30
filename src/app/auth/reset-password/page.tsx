@@ -73,7 +73,7 @@ function ResetPasswordContent() {
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId })
         setDone(true)
-        setTimeout(() => router.push("/dashboard"), 2000)
+        setTimeout(() => router.push("/"), 2000)
       } else {
         setError("Verification incomplete. Please try again.")
       }

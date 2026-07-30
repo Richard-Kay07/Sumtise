@@ -45,7 +45,7 @@ export default function NewJournalPage() {
     { enabled: !!orgId }
   )
 
-  const accounts = accountsData?.accounts || []
+  const accounts = accountsData || []
 
   // Create mutation
   const createMutation = trpc.transactions.createDoubleEntry.useMutation({

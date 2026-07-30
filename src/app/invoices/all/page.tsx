@@ -20,7 +20,7 @@ import {
   Trash2,
   FileText,
   Calendar,
-  DollarSign,
+  Wallet,
   User
 } from "lucide-react"
 import { Logo } from "@/components/logo"
@@ -266,7 +266,7 @@ export default function InvoicesPage() {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center">
-                            <DollarSign className="mr-2 h-4 w-4 text-muted-foreground" />
+                            <Wallet className="mr-2 h-4 w-4 text-muted-foreground" />
                             {formatCurrency(Number(invoice.total), invoice.currency)}
                           </div>
                         </td>

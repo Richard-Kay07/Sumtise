@@ -107,7 +107,7 @@ export default function BalanceSheetPage() {
     {
       organizationId: orgId,
       page: 1,
-      limit: 10000,
+      limit: 100,
       sortBy: "date",
       sortOrder: "asc",
       endDate: debouncedAsOfDate ? new Date(debouncedAsOfDate) : undefined,
@@ -123,7 +123,7 @@ export default function BalanceSheetPage() {
     {
       organizationId: orgId,
       page: 1,
-      limit: 1000,
+      limit: 100,
       sortBy: "date",
       sortOrder: "asc",
     },

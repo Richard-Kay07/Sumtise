@@ -5,11 +5,23 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency: string = "GBP"): string {
+/**
+ * Accepts string as well as number: Prisma `Decimal` values cross tRPC as
+ * strings and several call sites pass them straight through. Previously the
+ * signature claimed `number` while receiving strings, which type-checked only
+ * because build errors are ignored, and rendered "£NaN" for undefined.
+ */
+export function formatCurrency(
+  // `unknown` deliberately: callers pass numbers, Decimal-as-string, and
+  // Prisma Decimal objects. All are coerced below.
+  amount: unknown,
+  currency: string = "GBP",
+): string {
+  const value = typeof amount === "number" ? amount : Number(amount)
   return new Intl.NumberFormat("en-GB", {
     style: "currency",
-    currency: currency,
-  }).format(amount)
+    currency,
+  }).format(Number.isFinite(value) ? value : 0)
 }
 
 export function formatDate(date: Date | string): string {

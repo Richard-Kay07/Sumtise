@@ -18,7 +18,7 @@ import {
   FileText,
   Tag,
   Building2,
-  DollarSign,
+
   Calendar,
   CreditCard,
 } from "lucide-react"

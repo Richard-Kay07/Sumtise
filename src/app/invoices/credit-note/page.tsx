@@ -22,7 +22,7 @@ import {
   ArrowLeft,
   Search,
   FileText,
-  DollarSign,
+
   AlertCircle,
   Info
 } from "lucide-react"

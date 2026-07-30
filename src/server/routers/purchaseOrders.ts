@@ -190,7 +190,7 @@ export const purchaseOrdersRouter = createTRPCRouter({
 
       await recordAudit({
         entity: "purchaseOrder", entityId: po.id, action: "create", after: po,
-        organizationId: ctx.organizationId, userId: ctx.session.user.id,
+        organizationId: ctx.organizationId, userId: ctx.userId,
         meta: { correlationId: ctx.correlationId, poNumber: po.poNumber },
       }).catch(() => {})
 
@@ -255,7 +255,7 @@ export const purchaseOrdersRouter = createTRPCRouter({
 
       await recordAudit({
         entity: "purchaseOrder", entityId: input.id, action: "update", before, after,
-        organizationId: ctx.organizationId, userId: ctx.session.user.id,
+        organizationId: ctx.organizationId, userId: ctx.userId,
         meta: { correlationId: ctx.correlationId },
       }).catch(() => {})
 
@@ -275,7 +275,7 @@ export const purchaseOrdersRouter = createTRPCRouter({
       const deleted = await prisma.purchaseOrder.update({ where: { id: input.id }, data: { deletedAt: new Date() } })
       await recordAudit({
         entity: "purchaseOrder", entityId: input.id, action: "delete", before: po, after: deleted,
-        organizationId: ctx.organizationId, userId: ctx.session.user.id,
+        organizationId: ctx.organizationId, userId: ctx.userId,
         meta: { correlationId: ctx.correlationId },
       }).catch(() => {})
       return deleted
@@ -317,7 +317,7 @@ export const purchaseOrdersRouter = createTRPCRouter({
               organizationId: ctx.organizationId,
               entityType: "PURCHASE_ORDER",
               purchaseOrderId: input.id,
-              submittedBy: ctx.session.user.id,
+              submittedBy: ctx.userId,
               assignedTo: policy.approverUserId,
               deadline,
             },
@@ -331,7 +331,7 @@ export const purchaseOrdersRouter = createTRPCRouter({
             status: PurchaseOrderStatus.APPROVED,
             submittedAt: new Date(),
             approvedAt: new Date(),
-            approvedBy: ctx.session.user.id,
+            approvedBy: ctx.userId,
           },
         })
       }
@@ -361,19 +361,19 @@ export const purchaseOrdersRouter = createTRPCRouter({
           data: {
             status: PurchaseOrderStatus.APPROVED,
             approvedAt: new Date(),
-            approvedBy: ctx.session.user.id,
+            approvedBy: ctx.userId,
           },
         })
         if (po.approvalRequest) {
           await tx.approvalRequest.update({
             where: { id: po.approvalRequest.id },
-            data: { status: "APPROVED", completedAt: new Date(), completedBy: ctx.session.user.id, notes: input.notes },
+            data: { status: "APPROVED", completedAt: new Date(), completedBy: ctx.userId, notes: input.notes },
           })
           await tx.approvalAction.create({
             data: {
               approvalRequestId: po.approvalRequest.id,
               actionType: "APPROVED",
-              actorId: ctx.session.user.id,
+              actorId: ctx.userId,
               notes: input.notes,
             },
           })
@@ -382,7 +382,7 @@ export const purchaseOrdersRouter = createTRPCRouter({
 
       await recordAudit({
         entity: "purchaseOrder", entityId: input.id, action: "approve", before: po,
-        organizationId: ctx.organizationId, userId: ctx.session.user.id,
+        organizationId: ctx.organizationId, userId: ctx.userId,
         meta: { correlationId: ctx.correlationId },
       }).catch(() => {})
 
@@ -407,13 +407,13 @@ export const purchaseOrdersRouter = createTRPCRouter({
         if (po.approvalRequest) {
           await tx.approvalRequest.update({
             where: { id: po.approvalRequest.id },
-            data: { status: "REJECTED", completedAt: new Date(), completedBy: ctx.session.user.id, notes: input.reason },
+            data: { status: "REJECTED", completedAt: new Date(), completedBy: ctx.userId, notes: input.reason },
           })
           await tx.approvalAction.create({
             data: {
               approvalRequestId: po.approvalRequest.id,
               actionType: "REJECTED",
-              actorId: ctx.session.user.id,
+              actorId: ctx.userId,
               notes: input.reason,
             },
           })
@@ -458,7 +458,7 @@ export const purchaseOrdersRouter = createTRPCRouter({
 
       await recordAudit({
         entity: "purchaseOrder", entityId: input.id, action: "receive", before: po, after: updated,
-        organizationId: ctx.organizationId, userId: ctx.session.user.id,
+        organizationId: ctx.organizationId, userId: ctx.userId,
         meta: { correlationId: ctx.correlationId, receipts: input.receipts },
       }).catch(() => {})
 
@@ -533,7 +533,7 @@ export const purchaseOrdersRouter = createTRPCRouter({
 
       await recordAudit({
         entity: "purchaseOrder", entityId: input.id, action: "matchBill",
-        organizationId: ctx.organizationId, userId: ctx.session.user.id,
+        organizationId: ctx.organizationId, userId: ctx.userId,
         meta: { correlationId: ctx.correlationId, billId: input.billId },
       }).catch(() => {})
 

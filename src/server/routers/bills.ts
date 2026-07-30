@@ -456,7 +456,7 @@ export const billsRouter = createTRPCRouter({
         action: "create",
         after: bill,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
           billNumber: bill.billNumber,
@@ -622,7 +622,7 @@ export const billsRouter = createTRPCRouter({
         before,
         after,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
           changes: input.data,
@@ -683,7 +683,7 @@ export const billsRouter = createTRPCRouter({
         before,
         after,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
         },
@@ -928,7 +928,7 @@ export const billsRouter = createTRPCRouter({
         currency: bill.currency,
         rate: bookingRate,
         orgId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         description: `Bill ${bill.billNumber} - ${bill.vendor.name}`,
         metadata: {
           billId: bill.id,
@@ -943,7 +943,7 @@ export const billsRouter = createTRPCRouter({
         data: {
           status: BillStatus.APPROVED,
           approvedAt: new Date(),
-          approvedBy: ctx.session.user.id,
+          approvedBy: ctx.userId,
           postedAt: new Date(),
           metadata: {
             ...(bill.metadata as any || {}),
@@ -969,7 +969,7 @@ export const billsRouter = createTRPCRouter({
         before: bill,
         after: updatedBill,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
           postingTransactionIds: postingResult.transactionIds,
@@ -1063,7 +1063,7 @@ export const billsRouter = createTRPCRouter({
         before: bill,
         after: updatedBill,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
           paymentId: input.paymentId,

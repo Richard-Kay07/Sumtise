@@ -19,7 +19,7 @@ import {
   Filter,
   FileText,
   Calendar,
-  DollarSign,
+
   Eye,
   ArrowUp,
   ArrowDown,
@@ -177,7 +177,7 @@ export default function TransactionsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Accounts</SelectItem>
-                    {accountsData?.accounts.map((account) => (
+                    {(accountsData ?? []).map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
                       </SelectItem>

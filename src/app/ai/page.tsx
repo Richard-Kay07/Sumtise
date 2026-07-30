@@ -383,7 +383,7 @@ function ScannerTab({ orgId, tier }: { orgId: string; tier: ModelTier }) {
   }, [])
 
   const vendors = (vendorsData as any)?.vendors ?? []
-  const expenseAccounts = ((coaData as any)?.accounts ?? []).filter((a: any) => a.type === "EXPENSE")
+  const expenseAccounts = ((coaData ?? [])).filter((a: any) => a.type === "EXPENSE")
 
   const handleCreate = () => {
     if (!scanned || !vendorId || !accountId || !orgId) return

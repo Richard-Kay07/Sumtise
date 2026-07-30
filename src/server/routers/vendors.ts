@@ -405,7 +405,7 @@ export const vendorsRouter = createTRPCRouter({
         action: "create",
         after: vendor,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
         },
@@ -510,7 +510,7 @@ export const vendorsRouter = createTRPCRouter({
         before,
         after,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
           changes: input.data,
@@ -590,7 +590,7 @@ export const vendorsRouter = createTRPCRouter({
         before,
         after,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           correlationId: ctx.correlationId,
           force: input.force,

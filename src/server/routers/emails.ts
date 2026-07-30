@@ -307,7 +307,7 @@ export const emailsRouter = createTRPCRouter({
       // Send email
       const outboxEntry = await createAndSendEmail({
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         entityType: "invoice",
         entityId: invoiceId,
         to,
@@ -334,7 +334,7 @@ export const emailsRouter = createTRPCRouter({
         action: "send",
         after: outboxEntry,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           entityType: "invoice",
           entityId: invoiceId,
@@ -423,7 +423,7 @@ export const emailsRouter = createTRPCRouter({
       // Send email
       const outboxEntry = await createAndSendEmail({
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         entityType: "reminder",
         entityId: reminderId,
         to,
@@ -450,7 +450,7 @@ export const emailsRouter = createTRPCRouter({
         action: "send",
         after: outboxEntry,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           entityType: "reminder",
           entityId: reminderId,
@@ -531,7 +531,7 @@ export const emailsRouter = createTRPCRouter({
       // Send email
       const outboxEntry = await createAndSendEmail({
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         entityType: "payment",
         entityId: paymentId,
         to,
@@ -549,7 +549,7 @@ export const emailsRouter = createTRPCRouter({
         action: "send",
         after: outboxEntry,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           entityType: "payment",
           entityId: paymentId,
@@ -584,7 +584,7 @@ export const emailsRouter = createTRPCRouter({
         action: "retry",
         after: result,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
       }).catch((error) => {
         ctx.logger?.warn("Audit recording failed", { error, emailId: input.id })
       })

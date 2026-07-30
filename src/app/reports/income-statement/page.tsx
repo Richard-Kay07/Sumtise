@@ -77,7 +77,7 @@ export default function IncomeStatementPage() {
     {
       organizationId: orgId,
       page: 1,
-      limit: 1000,
+      limit: 100,
       sortBy: "date",
       sortOrder: "asc",
       startDate: debouncedStartDate ? new Date(debouncedStartDate) : undefined,
@@ -94,7 +94,7 @@ export default function IncomeStatementPage() {
     {
       organizationId: orgId,
       page: 1,
-      limit: 1000,
+      limit: 100,
       sortBy: "date",
       sortOrder: "asc",
     },

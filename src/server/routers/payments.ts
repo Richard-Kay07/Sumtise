@@ -582,7 +582,7 @@ export const paymentsRouter = createTRPCRouter({
           currency: payCurrency,
           rate: settlementRate,
           orgId: ctx.organizationId,
-          userId: ctx.session.user.id,
+          userId: ctx.userId,
           description: billId
             ? `Payment for bill ${billId}`
             : `On-account payment to ${vendor.name}`,
@@ -671,7 +671,7 @@ export const paymentsRouter = createTRPCRouter({
                   currency: functionalCurrency,
                   rate: 1.0,
                   orgId: ctx.organizationId,
-                  userId: ctx.session.user.id,
+                  userId: ctx.userId,
                   description: `Realised FX ${isLoss ? "loss" : "gain"} on payment ${payment.id}`,
                   metadata: { paymentId: payment.id, billId, bookingRate, settlementRate },
                 })
@@ -751,7 +751,7 @@ export const paymentsRouter = createTRPCRouter({
         action: "create",
         after: fullPayment,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           billId: billId || undefined,
           vendorId: finalVendorId,
@@ -876,7 +876,7 @@ export const paymentsRouter = createTRPCRouter({
         currency: payment.currency,
         rate: 1.0,
         orgId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         description: `Reversal of payment ${payment.id}`,
         metadata: {
           originalPaymentId: payment.id,
@@ -892,7 +892,7 @@ export const paymentsRouter = createTRPCRouter({
           metadata: {
             ...metadata,
             reversedAt: new Date().toISOString(),
-            reversedBy: ctx.session.user.id,
+            reversedBy: ctx.userId,
             reversingTransactionIds: reversingResult.transactionIds,
             reason: input.reason || "Payment reversal",
           },
@@ -938,7 +938,7 @@ export const paymentsRouter = createTRPCRouter({
         before: payment,
         after: reversedPayment,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           reason: input.reason || "Payment reversal",
           reversingTransactionIds: reversingResult.transactionIds,

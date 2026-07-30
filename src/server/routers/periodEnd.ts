@@ -188,7 +188,7 @@ export const periodEndRouter = createTRPCRouter({
         data: {
           status: PeriodStatus.LOCKED,
           lockedAt: new Date(),
-          lockedBy: ctx.session.user.id,
+          lockedBy: ctx.userId,
           notes: input.notes,
         },
       })
@@ -196,7 +196,7 @@ export const periodEndRouter = createTRPCRouter({
       await recordAudit({
         entity: "accountingPeriod", entityId: input.periodId, action: "lock",
         before: period, after: updated,
-        organizationId: ctx.organizationId, userId: ctx.session.user.id,
+        organizationId: ctx.organizationId, userId: ctx.userId,
         details: `Locked period: ${period.name}`,
       }).catch(() => {})
 
@@ -315,7 +315,7 @@ export const periodEndRouter = createTRPCRouter({
             currency: "GBP",
             rate: 1.0,
             orgId: ctx.organizationId,
-            userId: ctx.session.user.id,
+            userId: ctx.userId,
             description: `Period close — revenue accounts: ${period.name}`,
             metadata: { periodId: period.id, closingType: "REVENUE_CLOSE" },
           })
@@ -361,7 +361,7 @@ export const periodEndRouter = createTRPCRouter({
             currency: "GBP",
             rate: 1.0,
             orgId: ctx.organizationId,
-            userId: ctx.session.user.id,
+            userId: ctx.userId,
             description: `Period close — expense accounts: ${period.name}`,
             metadata: { periodId: period.id, closingType: "EXPENSE_CLOSE" },
           })
@@ -385,7 +385,7 @@ export const periodEndRouter = createTRPCRouter({
         data: {
           status: PeriodStatus.CLOSED,
           closedAt: new Date(),
-          closedBy: ctx.session.user.id,
+          closedBy: ctx.userId,
           notes: input.notes,
         },
       })
@@ -393,7 +393,7 @@ export const periodEndRouter = createTRPCRouter({
       await recordAudit({
         entity: "accountingPeriod", entityId: input.periodId, action: "close",
         before: period, after: updated,
-        organizationId: ctx.organizationId, userId: ctx.session.user.id,
+        organizationId: ctx.organizationId, userId: ctx.userId,
         details: `Closed period: ${period.name}. Closing entries: ${closingEntryIds.length}`,
       }).catch(() => {})
 
@@ -489,7 +489,7 @@ export const periodEndRouter = createTRPCRouter({
         currency: accrual.currency,
         rate: 1.0,
         orgId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         description: `Accrual: ${accrual.description}`,
         metadata: { accrualId: accrual.id, periodId: accrual.periodId, type: accrual.type },
       })
@@ -539,7 +539,7 @@ export const periodEndRouter = createTRPCRouter({
         currency: accrual.currency,
         rate: 1.0,
         orgId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         description: `Accrual reversal: ${accrual.description}`,
         metadata: { accrualId: accrual.id, reversalOf: accrual.id, type: accrual.type },
       })

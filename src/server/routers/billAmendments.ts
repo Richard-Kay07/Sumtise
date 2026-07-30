@@ -551,7 +551,7 @@ export const billAmendmentsRouter = createTRPCRouter({
         data: {
           organizationId: ctx.organizationId,
           billId,
-          userId: ctx.session.user.id,
+          userId: ctx.userId,
           amendmentType: amendmentType as AmendmentType,
           reason,
           originalData,
@@ -584,7 +584,7 @@ export const billAmendmentsRouter = createTRPCRouter({
         action: "create",
         after: amendment,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           billId,
           amendmentType,
@@ -795,7 +795,7 @@ export const billAmendmentsRouter = createTRPCRouter({
               currency: amendment.bill.currency,
               rate: 1.0,
               orgId: ctx.organizationId,
-              userId: ctx.session.user.id,
+              userId: ctx.userId,
               description: `Bill amendment adjustment: ${amendment.bill.billNumber}`,
               metadata: {
                 amendmentId: input.id,
@@ -813,7 +813,7 @@ export const billAmendmentsRouter = createTRPCRouter({
           where: { id: input.id },
           data: {
             status: AmendmentStatus.APPROVED,
-            approvedBy: ctx.session.user.id,
+            approvedBy: ctx.userId,
             approvedAt: new Date(),
           },
         })
@@ -845,7 +845,7 @@ export const billAmendmentsRouter = createTRPCRouter({
         before: amendment,
         after: result.amendment,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           billId: amendment.billId,
           financialImpact,
@@ -901,7 +901,7 @@ export const billAmendmentsRouter = createTRPCRouter({
         where: { id: input.id },
         data: {
           status: AmendmentStatus.REJECTED,
-          approvedBy: ctx.session.user.id,
+          approvedBy: ctx.userId,
           approvedAt: new Date(),
           reason: input.rejectionReason 
             ? `${amendment.reason}\n\nRejection reason: ${input.rejectionReason}`
@@ -934,7 +934,7 @@ export const billAmendmentsRouter = createTRPCRouter({
         before: amendment,
         after: updatedAmendment,
         organizationId: ctx.organizationId,
-        userId: ctx.session.user.id,
+        userId: ctx.userId,
         meta: {
           billId: amendment.billId,
           rejectionReason: input.rejectionReason,

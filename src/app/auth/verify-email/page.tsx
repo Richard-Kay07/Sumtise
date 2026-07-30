@@ -26,7 +26,7 @@ export default function VerifyEmailPage() {
     if (isLoaded && signUp?.status !== "missing_requirements") {
       // Already verified or no sign-up in progress — go to dashboard
       if (signUp?.status === "complete") {
-        router.replace("/dashboard")
+        router.replace("/")
       }
     }
   }, [isLoaded, signUp, router])
@@ -43,7 +43,7 @@ export default function VerifyEmailPage() {
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId })
         setDone(true)
-        setTimeout(() => router.push("/dashboard"), 1500)
+        setTimeout(() => router.push("/"), 1500)
       } else {
         setError("Verification failed. Please check your code and try again.")
       }

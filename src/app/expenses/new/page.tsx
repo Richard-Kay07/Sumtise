@@ -45,6 +45,9 @@ const expenseFormSchema = z.object({
     quantity: z.number().positive("Quantity must be positive"),
     unitPrice: z.number().nonnegative("Unit price must be non-negative"),
     taxRate: z.number().min(0).max(100).default(20),
+    // Derived (quantity x unitPrice + tax); declared so the inferred type
+    // matches what the code reads and writes.
+    total: z.number().optional(),
     accountId: z.string().optional(),
   })).min(1, "At least one item is required"),
 })
@@ -60,10 +63,13 @@ export default function CreateExpensePage() {
   const [scannedData, setScannedData] = useState<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { data: vendors } = trpc.vendors.getAll.useQuery(
-    { organizationId: orgId },
+  const { data: vendorsData } = trpc.vendors.getAll.useQuery(
+    { organizationId: orgId, limit: 100 },
     { enabled: !!orgId }
   )
+  // vendors.getAll returns { vendors, pagination } — the wrapper is truthy,
+  // so `vendors?.map()` did not short-circuit and threw during render.
+  const vendors = vendorsData?.vendors ?? []
   const { data: accounts } = trpc.chartOfAccounts.getAll.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId }
@@ -141,9 +147,9 @@ export default function CreateExpensePage() {
     currentItems[index] = { ...currentItems[index], [field]: value }
     
     // Recalculate total
-    const quantity = typeof currentItems[index].quantity === 'number' ? currentItems[index].quantity : parseFloat(currentItems[index].quantity.toString())
-    const unitPrice = typeof currentItems[index].unitPrice === 'number' ? currentItems[index].unitPrice : parseFloat(currentItems[index].unitPrice.toString())
-    const taxRate = typeof currentItems[index].taxRate === 'number' ? currentItems[index].taxRate : parseFloat(currentItems[index].taxRate.toString())
+    const quantity = Number(currentItems[index].quantity)
+    const unitPrice = Number(currentItems[index].unitPrice)
+    const taxRate = Number(currentItems[index].taxRate)
     
     const subtotal = quantity * unitPrice
     currentItems[index] = { ...currentItems[index], total: subtotal * (1 + taxRate / 100) }
@@ -154,15 +160,15 @@ export default function CreateExpensePage() {
   const calculateTotals = () => {
     const items = watchedItems
     const subtotal = items.reduce((sum, item) => {
-      const quantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity.toString())
-      const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice.toString())
+      const quantity = Number(item.quantity)
+      const unitPrice = Number(item.unitPrice)
       return sum + (quantity * unitPrice)
     }, 0)
     
     const taxAmount = items.reduce((sum, item) => {
-      const quantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity.toString())
-      const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice.toString())
-      const taxRate = typeof item.taxRate === 'number' ? item.taxRate : parseFloat(item.taxRate.toString())
+      const quantity = Number(item.quantity)
+      const unitPrice = Number(item.unitPrice)
+      const taxRate = Number(item.taxRate)
       return sum + (quantity * unitPrice * (taxRate / 100))
     }, 0)
     
@@ -313,7 +319,7 @@ export default function CreateExpensePage() {
                       className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
                     >
                       <option value="">Select a vendor...</option>
-                      {vendors?.map((vendor) => (
+                      {vendors.map((vendor) => (
                         <option key={vendor.id} value={vendor.id}>
                           {vendor.name}
                         </option>

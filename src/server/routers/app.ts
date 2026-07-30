@@ -188,8 +188,10 @@ async function getARAccount(organizationId: string) {
 export const appRouter = createTRPCRouter({
   // Auth routes
   auth: createTRPCRouter({
+    // ctx has no `session` — authentication is Clerk's and the context exposes
+    // only userId. This previously returned undefined on every call.
     getSession: publicProcedure.query(async ({ ctx }) => {
-      return ctx.session
+      return { userId: ctx.userId, isSignedIn: !!ctx.userId }
     }),
   }),
 
@@ -826,6 +828,33 @@ export const appRouter = createTRPCRouter({
 
   // Invoice routes
   invoices: createTRPCRouter({
+    /**
+     * Fetch a single invoice.
+     *
+     * Added because the detail and edit pages were fetching `getAll` with
+     * `limit: 200` and filtering client-side. paginationSchema caps limit at
+     * 100, so Zod rejected the query, it never ran, and both pages rendered
+     * with no data — the detail page showed "Invoice not found" for every
+     * invoice and the edit form appeared blank. Even at limit 100 that approach
+     * silently breaks for any organisation with more than 100 invoices.
+     */
+    getById: orgScopedProcedure
+      .use(requirePermissionProcedure(Permission.INVOICES_VIEW))
+      .input(z.object({
+        id: z.string(),
+        organizationId: z.string(),
+      }))
+      .query(async ({ ctx, input }) => {
+        const invoice = await prisma.invoice.findFirst({
+          where: { id: input.id, organizationId: ctx.organizationId },
+          include: { customer: true, items: true },
+        })
+        if (!invoice) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Invoice not found" })
+        }
+        return invoice
+      }),
+
     getAll: orgScopedProcedure
       .use(requirePermissionProcedure(Permission.INVOICES_VIEW))
       .input(z.object({
@@ -1180,7 +1209,7 @@ export const appRouter = createTRPCRouter({
             currency: invoice.currency,
             rate: 1.0,
             orgId: ctx.organizationId,
-            userId: ctx.session.user.id,
+            userId: ctx.userId,
             description: `Invoice payment: ${invoice.invoiceNumber}`,
             metadata: {
               invoiceId: id,
@@ -1250,7 +1279,7 @@ export const appRouter = createTRPCRouter({
           before: invoice,
           after: result.invoice,
           organizationId: ctx.organizationId,
-          userId: ctx.session.user.id,
+          userId: ctx.userId,
           meta: {
             paymentAmount: amount,
             reference,
@@ -1317,7 +1346,7 @@ export const appRouter = createTRPCRouter({
           before: invoice,
           after: updatedInvoice,
           organizationId: ctx.organizationId,
-          userId: ctx.session.user.id,
+          userId: ctx.userId,
         }).catch((error) => {
           console.warn("Audit recording failed", { error, invoiceId: input.id })
         })
@@ -1462,7 +1491,7 @@ export const appRouter = createTRPCRouter({
           action: "duplicate",
           after: duplicatedInvoice,
           organizationId: ctx.organizationId,
-          userId: ctx.session.user.id,
+          userId: ctx.userId,
           meta: {
             originalInvoiceId: input.id,
             originalInvoiceNumber: originalInvoice.invoiceNumber,
@@ -1698,15 +1727,19 @@ export const appRouter = createTRPCRouter({
             _sum: { debit: true },
           }),
 
-          // Bank balances
+          // Bank accounts. currentBalance is NOT used: it is only ever written
+          // at account creation and by the manual updateBalance mutation —
+          // statement imports and reconciliation never touch it — so it stays
+          // at the opening balance forever. The real balance is derived below.
           prisma.bankAccount.findMany({
             where: {
               organizationId: ctx.organizationId,
               isActive: true,
             },
             select: {
+              id: true,
               name: true,
-              currentBalance: true,
+              openingBalance: true,
               currency: true,
             },
           }),
@@ -1729,17 +1762,51 @@ export const appRouter = createTRPCRouter({
           }),
         ])
 
-        const netProfit = (totalRevenue._sum.credit || 0) - (totalExpenses._sum.debit || 0)
-        const cashPosition = bankBalances.reduce((sum, account) => sum + account.currentBalance, 0)
+        // Derive each account's true balance as opening balance plus the sum of
+        // its bank transactions. BankTransaction.amount is already signed
+        // (positive = deposit, negative = withdrawal), so no sign flipping.
+        const movements = bankBalances.length
+          ? await prisma.bankTransaction.groupBy({
+              by: ["bankAccountId"],
+              where: {
+                organizationId: ctx.organizationId,
+                bankAccountId: { in: bankBalances.map((a) => a.id) },
+              },
+              _sum: { amount: true },
+            })
+          : []
+        const movementByAccount = new Map(
+          movements.map((m) => [m.bankAccountId, m._sum.amount ?? new Prisma.Decimal(0)]),
+        )
+
+        // Field names must match what the dashboard reads (accountName/balance).
+        // It previously received name/currentBalance, so every row rendered a
+        // blank name and £NaN.
+        const balances = bankBalances.map((a) => ({
+          accountName: a.name,
+          balance: a.openingBalance
+            .plus(movementByAccount.get(a.id) ?? new Prisma.Decimal(0))
+            .toNumber(),
+          currency: a.currency,
+        }))
+
+        // .toNumber() is essential. Prisma Decimal.valueOf() returns a STRING,
+        // so `sum + account.currentBalance` took the string-concatenation
+        // branch of `+` and produced "0250000150000" — displayed as
+        // £250,000,150,000.00 on the Cash Position card.
+        const revenue = totalRevenue._sum.credit?.toNumber() ?? 0
+        const expenses = totalExpenses._sum.debit?.toNumber() ?? 0
+        const netProfit = revenue - expenses
+        const cashPosition = balances.reduce((sum, a) => sum + a.balance, 0)
 
         return {
-          totalRevenue: totalRevenue._sum.credit || 0,
-          totalExpenses: totalExpenses._sum.debit || 0,
+          totalRevenue: revenue,
+          totalExpenses: expenses,
           netProfit,
           cashPosition,
           outstandingInvoices,
           overdueInvoices,
-          bankBalances,
+          bankBalances: balances,
         }
       }),
   }),
