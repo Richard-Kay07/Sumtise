@@ -5,81 +5,118 @@
  * ---------------------
  * Authentication is Clerk's, but every ownership relation in the schema points
  * at the local `User` table: `Organization.creatorId`, `OrganizationMember.userId`,
- * `AuditLog.userId`, and so on. `ctx.userId` is the CLERK id
- * (`user_3Cyb…`), and `OrganizationMember.userId` is matched directly against
- * it — so the local row's primary key must BE the Clerk id.
+ * `AuditLog.userId`. `ctx.userId` is the CLERK id (`user_3Cyb…`) and
+ * `OrganizationMember.userId` is matched directly against it, so the local row's
+ * primary key must BE the Clerk id.
  *
- * Nothing was creating that row. There is no `user.created` webhook handler and
- * no provisioning on first request, which left a new sign-in unable to do
- * anything at all:
+ * Nothing was creating that row — no `user.created` webhook, no provisioning on
+ * first request — which left a new sign-in unable to do anything:
  *
  *   - `getUserOrganizations` matches on `OrganizationMember.userId` → returns []
- *     → the org context sets `orgId` to "" → every org-scoped control in the UI
- *     is disabled, with no explanation shown to the user.
+ *     → the org context sets `orgId` to "" → every org-scoped control is
+ *     disabled.
  *   - `organization.create` sets `creatorId: ctx.userId`, a foreign key to
- *     `User.id` → fails with a constraint violation.
+ *     `User.id` → constraint violation.
  *
- * So a new account could neither join an organisation nor create one. Calling
- * this before either path closes that hole.
+ * WHY THERE IS NO STATIC CLERK IMPORT HERE
+ * ----------------------------------------
+ * `import { clerkClient } from "@clerk/nextjs/server"` type-checks and builds
+ * cleanly — the symbol is in Clerk 6.39's `.d.ts` — but it is NOT present at
+ * runtime. A static named import therefore resolved to undefined (or threw on
+ * module evaluation), which broke this module, and with it every consumer of the
+ * app router. The symptom was the whole application reporting no organisation.
+ *
+ * So Clerk is reached only through a guarded dynamic import, and any failure
+ * degrades to a placeholder email rather than breaking the request. The row's
+ * ONLY hard requirement is that it exists so the foreign keys resolve.
  */
 
-import { clerkClient } from "@clerk/nextjs/server"
 import { prisma } from "@/lib/prisma"
+
+/** Deterministic, obviously-not-real address. Never collides across users. */
+const placeholderEmail = (clerkUserId: string) =>
+  `${clerkUserId}@users.noreply.sumtise.local`
+
+interface ClerkProfile {
+  email?: string
+  name?: string | null
+  image?: string | null
+}
+
+/**
+ * Best-effort profile lookup. Returns an empty object on any failure — a
+ * missing display name must never stop a user from reaching their data.
+ */
+async function tryReadClerkProfile(clerkUserId: string): Promise<ClerkProfile> {
+  try {
+    const mod: Record<string, unknown> = await import("@clerk/nextjs/server")
+    const candidate = mod.clerkClient
+    if (!candidate) return {}
+
+    // Clerk has shipped this both as an object and as an async factory.
+    const client: any =
+      typeof candidate === "function" ? await (candidate as () => Promise<any>)() : candidate
+    if (!client?.users?.getUser) return {}
+
+    const u = await client.users.getUser(clerkUserId)
+    const primary =
+      u.emailAddresses?.find((e: any) => e.id === u.primaryEmailAddressId) ??
+      u.emailAddresses?.[0]
+
+    return {
+      email: primary?.emailAddress ?? undefined,
+      name: [u.firstName, u.lastName].filter(Boolean).join(" ") || null,
+      image: u.imageUrl ?? null,
+    }
+  } catch {
+    return {}
+  }
+}
 
 /**
  * Ensure a local `User` row exists whose id equals the Clerk user id.
- * Idempotent and safe to call on every authenticated request.
+ * Idempotent, cheap on the hot path (one indexed lookup), and never throws.
  */
 export async function ensureUserRecord(clerkUserId: string): Promise<void> {
-  const existing = await prisma.user.findUnique({
-    where: { id: clerkUserId },
-    select: { id: true },
-  })
-  if (existing) return
-
-  // Only reach out to Clerk when we actually have to create the row.
-  let email = `${clerkUserId}@placeholder.local`
-  let name: string | null = null
-  let image: string | null = null
+  if (!clerkUserId) return
 
   try {
-    const client = await clerkClient()
-    const u = await client.users.getUser(clerkUserId)
-    const primary =
-      u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId) ??
-      u.emailAddresses[0]
-    if (primary?.emailAddress) email = primary.emailAddress
-    name = [u.firstName, u.lastName].filter(Boolean).join(" ") || null
-    image = u.imageUrl ?? null
-  } catch (err) {
-    // A placeholder email is better than blocking the request outright: the
-    // row exists so the foreign keys resolve, and it is corrected on the next
-    // successful lookup.
-    console.error("[ensureUserRecord] could not read Clerk profile", clerkUserId, err)
-  }
-
-  try {
-    await prisma.user.create({
-      data: { id: clerkUserId, email, name, image, emailVerified: new Date() },
-    })
-  } catch (err) {
-    // Two concurrent requests can race here, and `email` is unique — if another
-    // request won, or the address already belongs to a pre-existing row, fall
-    // back to a deterministic address so provisioning still succeeds.
-    const stillMissing = !(await prisma.user.findUnique({
+    const existing = await prisma.user.findUnique({
       where: { id: clerkUserId },
       select: { id: true },
-    }))
-    if (stillMissing) {
-      await prisma.user.create({
-        data: {
-          id: clerkUserId,
-          email: `${clerkUserId}@users.noreply.sumtise.com`,
-          name,
-          image,
-          emailVerified: new Date(),
-        },
-      })
+    })
+    if (existing) return
+
+    const profile = await tryReadClerkProfile(clerkUserId)
+
+    // `email` is unique. Prefer the real address, but never let a collision or
+    // a failed profile read block provisioning.
+    for (const email of [profile.email, placeholderEmail(clerkUserId)]) {
+      if (!email) continue
+      try {
+        await prisma.user.create({
+          data: {
+            id: clerkUserId,
+            email,
+            name: profile.name ?? null,
+            image: profile.image ?? null,
+            emailVerified: new Date(),
+          },
+        })
+        return
+      } catch {
+        // Unique violation on email, or a concurrent request already created
+        // the row. Re-check before trying the fallback address.
+        const now = await prisma.user.findUnique({
+          where: { id: clerkUserId },
+          select: { id: true },
+        })
+        if (now) return
+      }
     }
+  } catch (err) {
+    // Provisioning is a convenience, not a gate. A user who is already a member
+    // of an organisation must still be able to load the application.
+    console.error("[ensureUserRecord] provisioning failed for", clerkUserId, err)
   }
 }

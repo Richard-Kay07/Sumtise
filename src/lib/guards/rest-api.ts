@@ -6,7 +6,7 @@ export async function requireOrganizationAccess(
   request: NextRequest,
   organizationId?: string
 ): Promise<{ userId: string; organizationId: string }> {
-  const { userId } = auth()
+  const { userId } = await auth()
 
   if (!userId) {
     throw new Error("UNAUTHORIZED")

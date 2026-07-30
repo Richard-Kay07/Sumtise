@@ -28,7 +28,7 @@ const ERROR_TEXT: Record<string, string> = {
 }
 
 export default function TaxSettingsPage() {
-  const { orgId, isLoading: orgLoading } = useOrganization()
+  const { orgId, isLoading: orgLoading, error: orgError, reload: reloadOrgs } = useOrganization()
   const params = useSearchParams()
 
   const [vrn, setVrn] = useState("")
@@ -102,16 +102,17 @@ export default function TaxSettingsPage() {
           <Card className="border-amber-200">
             <CardContent className="pt-8 pb-8 text-center space-y-4">
               <AlertTriangle className="mx-auto h-12 w-12 text-amber-500" />
-              <h2 className="text-lg font-semibold">No organisation selected</h2>
+              <h2 className="text-lg font-semibold">{orgError ? "Could not load your organisation" : "No organisation selected"}</h2>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Your account is not a member of any organisation, so there is nothing to
-                connect to HMRC. Every control on this page needs an organisation.
+                {orgError
+                  ? `Loading your organisation failed: ${orgError}`
+                  : "Your account is not a member of any organisation, so there is nothing to connect to HMRC."}
               </p>
               <p className="text-xs text-muted-foreground max-w-md mx-auto">
                 If you expected to see one, your sign-in may not be linked to it yet.
                 Reload the page first — the link is created automatically on load.
               </p>
-              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              <Button variant="outline" size="sm" onClick={() => { reloadOrgs(); window.location.reload() }}>
                 <RefreshCw className="h-4 w-4 mr-2" />Reload
               </Button>
             </CardContent>

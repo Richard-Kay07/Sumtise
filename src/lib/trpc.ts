@@ -30,8 +30,23 @@ const createInnerTRPCContext = (opts: CreateContextOptions) => {
 }
 
 export const createTRPCContext = async (opts: { req: NextRequest }) => {
-  // Try cookie-based Clerk session first (normal browser flow)
-  let { userId } = auth()
+  // Cookie-based Clerk session (the normal browser flow).
+  //
+  // auth() MUST be awaited. In Clerk 6.x it returns a Promise, so the previous
+  // `let { userId } = auth()` destructured a Promise and always yielded
+  // undefined — the cookie path never authenticated anyone. Every request
+  // depended entirely on the Bearer-token fallback below, which is populated
+  // from getToken() in the browser and is null for a moment while Clerk
+  // initialises. In that window protectedProcedure threw UNAUTHORIZED, so
+  // getUserOrganizations returned nothing, the org context set orgId to "" and
+  // the UI reported no organisation — intermittently, depending on timing.
+  let userId: string | null = null
+  try {
+    const session = await auth()
+    userId = session?.userId ?? null
+  } catch {
+    // No request scope, or Clerk not configured — fall through to the token.
+  }
 
   // Fall back to Bearer token if the cookie session isn't present
   // (handles the window between Clerk client init and cookie propagation)

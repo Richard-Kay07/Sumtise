@@ -31,7 +31,7 @@ interface Obligation {
 }
 
 export default function VatMtdPage() {
-  const { orgId, isLoading: orgLoading } = useOrganization()
+  const { orgId, isLoading: orgLoading, error: orgError, reload: reloadOrgs } = useOrganization()
 
   const [fingerprint, setFingerprint] = useState<BrowserFingerprint | null>(null)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
@@ -143,10 +143,11 @@ export default function VatMtdPage() {
           <Card className="border-amber-200">
             <CardContent className="pt-8 pb-8 text-center space-y-3">
               <AlertTriangle className="mx-auto h-12 w-12 text-amber-500" />
-              <h2 className="text-lg font-semibold">No organisation selected</h2>
+              <h2 className="text-lg font-semibold">{orgError ? "Could not load your organisation" : "No organisation selected"}</h2>
               <p className="text-sm text-muted-foreground">
-                Your account is not a member of any organisation. Reload the page — the
-                link is created automatically on load.
+                {orgError
+                  ? `Loading your organisation failed: ${orgError}`
+                  : "Your account is not a member of any organisation."}
               </p>
             </CardContent>
           </Card>

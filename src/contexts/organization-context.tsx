@@ -27,6 +27,9 @@ interface OrgContextValue {
   orgId:     string
   role:      string
   isLoading: boolean
+  /** Set when the membership lookup failed — distinct from "has no orgs". */
+  error:     string | null
+  reload:    () => void
   switchOrg: (id: string) => void
 }
 
@@ -38,6 +41,8 @@ const OrgContext = createContext<OrgContextValue>({
   orgId:     "",
   role:      "",
   isLoading: true,
+  error:     null,
+  reload:    () => {},
   switchOrg: () => {},
 })
 
@@ -48,10 +53,15 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [activeOrgId, setActiveOrgId] = useState<string>("")
   const initialised = useRef(false)
 
-  const { data: memberships, isLoading } = trpc.organization.getUserOrganizations.useQuery(
-    undefined,
-    { enabled: !!isSignedIn }
-  )
+  // retry: a transient UNAUTHORIZED while Clerk finishes initialising must not
+  // leave the app permanently believing the user has no organisations.
+  const { data: memberships, isLoading, error, refetch } =
+    trpc.organization.getUserOrganizations.useQuery(undefined, {
+      enabled: !!isSignedIn,
+      retry: 3,
+      retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 4000),
+      staleTime: 30_000,
+    })
 
   // Restore from localStorage on first mount
   useEffect(() => {
@@ -92,6 +102,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       orgId:     activeOrg?.id   ?? "",
       role:      activeOrg?.role ?? "",
       isLoading,
+      error:     error?.message ?? null,
+      reload:    () => { void refetch() },
       switchOrg,
     }}>
       {children}
